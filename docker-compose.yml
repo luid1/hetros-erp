@@ -1,0 +1,38 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wms_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: erp_user
+      POSTGRES_PASSWORD: erp_password
+      POSTGRES_DB: erp_wms
+    ports:
+      - "5433:5432"
+    volumes:
+      - wms_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp_user -d erp_wms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: wms_redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - wms_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  wms_postgres_data:
+  wms_redis_data:
