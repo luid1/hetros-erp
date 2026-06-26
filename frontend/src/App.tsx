@@ -4,8 +4,8 @@ import AppShell from './components/layout/AppShell';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import PosicaoEstoque from './modules/estoque/pages/PosicaoEstoque';
+import ControleCarga from './modules/logistica/pages/ControleCarga';
 
-// Lazy pages (adicionar conforme implementar)
 const Placeholder = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-64">
     <div className="text-center">
@@ -54,6 +54,7 @@ export default function App() {
 
             {/* Logística */}
             <Route path="logistica/pedidos" element={<Placeholder title="Pedidos de Venda" />} />
+            <Route path="logistica/carga" element={<ControleCarga />} />
             <Route path="logistica/romaneios" element={<Placeholder title="Romaneios de Carga" />} />
             <Route path="logistica/frotas" element={<Placeholder title="Frotas & Veículos" />} />
 

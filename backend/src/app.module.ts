@@ -20,13 +20,13 @@ import { ContasPagarModule } from './modules/contas-pagar/contas-pagar.module';
 import { DreModule } from './modules/dre/dre.module';
 import { AuditoriaModule } from './modules/auditoria/auditoria.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { CargaModule } from './modules/carga/carga.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
   imports: [
-    // Event-Driven Architecture
     EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
     JwtModule.register({ secret: process.env.JWT_SECRET || 'secret', global: true }),
     PrismaModule,
@@ -47,6 +47,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     DreModule,
     AuditoriaModule,
     DashboardModule,
+    CargaModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
