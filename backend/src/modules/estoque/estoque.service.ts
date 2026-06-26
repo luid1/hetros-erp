@@ -86,12 +86,13 @@ export class EstoqueService {
    * Toda entrada/saída/transferência passa por aqui.
    */
   async movimentar(tenantId: string, dto: MovimentarEstoqueDto): Promise<void> {
-    const isEntrada = [
+    const tiposEntrada: TipoMovimentacao[] = [
       TipoMovimentacao.ENTRADA_COMPRA,
       TipoMovimentacao.ENTRADA_DEVOLUCAO,
       TipoMovimentacao.TRANSFERENCIA_ENTRADA,
       TipoMovimentacao.AJUSTE_POSITIVO,
-    ].includes(dto.tipo);
+    ];
+    const isEntrada = tiposEntrada.includes(dto.tipo);
 
     const isSaida = !isEntrada;
 
