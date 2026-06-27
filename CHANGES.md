@@ -20,6 +20,24 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-27] — Modal Nova Entrega com motoristas SEMPRE visíveis
+
+### O que mudou
+- **Layout split na etapa 2**: coluna esquerda (dados) + coluna direita (motoristas)
+- **Lista de motoristas sempre aberta** como radio buttons — 16 rotas visíveis
+- Clique para selecionar, clique em outro para trocar — sem precisar de botão "Trocar"
+- Motorista selecionado destaca em **azul escuro** com radio preenchido
+- **Resumo do motorista** no rodapé da coluna direita (nome, veículo, rota, peso)
+- Opção "Sem motorista (rotear depois)" no topo da lista
+- Cada motorista mostra: nome, tipo veículo, peso carregado, entregas, nº rota
+- VAN REFRIGERADA com ícone cyan diferenciado
+- Modal mais largo (max-w-4xl) para acomodar as duas colunas
+
+### Arquivos modificados
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx` — modal reescrito com layout split
+
+---
+
 ## [2026-06-27] — Nova Entrega com Motorista/Rota integrado
 
 ### O que mudou
