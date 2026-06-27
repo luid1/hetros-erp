@@ -36,6 +36,7 @@ const navigation: NavGroup[] = [
       { to: '/wms/entradas',      icon: ClipboardList,  label: 'Entradas (XML NF-e)' },
       { to: '/wms/movimentacoes', icon: BarChart3,      label: 'Movimentações' },
       { to: '/wms/inventario',    icon: ClipboardList,  label: 'Inventário' },
+      { to: '/wms/analise-estoque', icon: BarChart3,    label: 'Análise Estoque Físico', highlight: true },
     ],
   },
   {

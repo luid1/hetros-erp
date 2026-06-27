@@ -20,6 +20,28 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-27] — Análise de Estoque Físico (Contagem)
+
+### O que mudou
+- Tela **Análise de Estoque Físico** replicando o NewOxxy exato
+- Filtros: Período, Tipo Item, Família (BCA/Frutas/Citricos/etc.), Grupo, CD, Unidade de Apuração
+- Grade com colunas: Código, Descrição, Família, Saldo Inicial, Entradas, Ordens de Compra, Saídas, Saldo Final, Und, Contagem Física, Diferença, Preço Custo, Valor Atual
+- Cores: azul nos códigos/links, vermelho nos valores negativos, seleção azul escuro
+- **Drill-down** (duplo clique): modal "Detalhamento do Registro" com todas as movimentações do produto (clientes, NFe, quantidades, preço médio)
+- Modal "Processando... Aguarde..." com indicador de carregamento
+- Campo de Contagem Física editável quando checkbox ativado
+- 22 produtos mock (BCA + Frutas) com dados reais do NewOxxy (BATATA ASTERIX, CEBOLA, MANGA PALMER, etc.)
+- 14 movimentações detalhadas para BATATA ASTERIX (drill-down)
+- Totais no rodapé: Registros encontrados, Saldo Final, Diferença, Valor Total
+- Rota `/wms/analise-estoque` no menu lateral com destaque
+
+### Arquivos criados/modificados
+- `frontend/src/modules/estoque/pages/AnaliseEstoqueFisico.tsx` — tela completa
+- `frontend/src/App.tsx` — rota adicionada
+- `frontend/src/components/layout/AppShell.tsx` — menu atualizado
+
+---
+
 ## [2026-06-27] — Clientes importados + CRUD funcional + Carga corrigida
 
 ### O que mudou
