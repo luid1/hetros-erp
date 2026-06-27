@@ -20,6 +20,27 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-27] — Pedidos integrado + Nova Entrega real
+
+### O que mudou
+- **Backend PedidosService** completo: create, findAll (com filtros), findOne, confirmar, cancelar, updateStatus
+- **PedidosController** com POST/GET/PATCH endpoints
+- **Modal Nova Entrega** real no Controle de Carga:
+  - Busca de clientes do banco (399 clientes importados) com pesquisa por nome/CNPJ
+  - Seleção visual do cliente (card verde com dados)
+  - Campos: Data Entrega, Período (Manhã/Tarde), Tipo Faturamento (NFe/Repo/NFC-e), Volumes, Peso, Região, Observações
+  - Cria pedido real via API `POST /pedidos`
+  - Pedido criado aparece na grade como linha vermelha (Impressão Pendente)
+- **Integração completa**: Clientes → Pedidos → Grade de Carga
+- Botão "Nova Entrega" abre modal ao invés de alert
+
+### Arquivos modificados
+- `backend/src/modules/pedidos/pedidos.service.ts` — CRUD completo
+- `backend/src/modules/pedidos/pedidos.controller.ts` — endpoints
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx` — modal Nova Entrega (~200 linhas)
+
+---
+
 ## [2026-06-27] — Controle de Carga 100% funcional
 
 ### O que mudou

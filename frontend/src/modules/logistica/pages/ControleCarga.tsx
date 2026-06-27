@@ -3,8 +3,10 @@ import {
   RefreshCw, Printer, Truck, CheckSquare,
   ChevronDown, RotateCcw, Trash2,
   PlusCircle, ShieldCheck, Eraser, Clock, Check,
+  X, Search, UserPlus,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import api from '../../../services/api';
 
 // ─── Tipos ───────────────────────────────────────
 interface PedidoCarga {
@@ -212,8 +214,12 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
     if (w) { w.document.write(html); w.document.close(); }
   };
 
-  const handleNovaEntrega = () => {
-    alert('Nova Entrega — funcionalidade será integrada com o módulo de Pedidos.');
+  // ── Modal Nova Entrega ──
+  const [modalNovaEntrega, setModalNovaEntrega] = useState(false);
+
+  const handleNovaEntregaCriada = (novoPedido: PedidoCarga) => {
+    setPedidos(prev => [novoPedido, ...prev]);
+    setModalNovaEntrega(false);
   };
 
   // ── KPIs do painel inferior direito ──
@@ -507,7 +513,7 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
         <button onClick={handleImprimirSel} disabled={selecionados.size === 0} className="flex items-center gap-1 bg-white border border-gray-400 hover:bg-gray-50 px-3 py-1 rounded text-gray-700 font-medium disabled:opacity-40">
           <Printer className="h-3.5 w-3.5" /> Imprimir Bilhete
         </button>
-        <button onClick={handleNovaEntrega} className="flex items-center gap-1 bg-white border border-gray-400 hover:bg-green-50 hover:text-green-700 px-3 py-1 rounded text-gray-700 font-medium">
+        <button onClick={() => setModalNovaEntrega(true)} className="flex items-center gap-1 bg-white border border-gray-400 hover:bg-green-50 hover:text-green-700 px-3 py-1 rounded text-gray-700 font-medium">
           <PlusCircle className="h-3.5 w-3.5" /> Nova Entrega
         </button>
         <button onClick={handleAutorizar} disabled={selecionados.size === 0} className="flex items-center gap-1 bg-white border border-gray-400 hover:bg-blue-50 hover:text-blue-700 px-3 py-1 rounded text-gray-700 font-medium disabled:opacity-40">
@@ -527,6 +533,258 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
               {selecionados.size} selecionado{selecionados.size !== 1 ? 's' : ''}
             </span>
           )}
+        </div>
+      </div>
+
+      {/* ═══════════ MODAL NOVA ENTREGA ═══════════ */}
+      {modalNovaEntrega && (
+        <ModalNovaEntrega
+          dataCarga={dataCarga}
+          onClose={() => setModalNovaEntrega(false)}
+          onCriado={handleNovaEntregaCriada}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Modal Nova Entrega ──────────────────────────
+function ModalNovaEntrega({ dataCarga, onClose, onCriado }: {
+  dataCarga: string;
+  onClose: () => void;
+  onCriado: (pedido: PedidoCarga) => void;
+}) {
+  const { filialAtiva } = useAuth();
+  const [clientes, setClientes]     = useState<any[]>([]);
+  const [buscaCliente, setBuscaCliente] = useState('');
+  const [loading, setLoading]       = useState(false);
+  const [salvando, setSalvando]     = useState(false);
+  const [erro, setErro]             = useState('');
+
+  // Campos do pedido
+  const [clienteSel, setClienteSel] = useState<any>(null);
+  const [volumes, setVolumes]       = useState('1');
+  const [pesoKg, setPesoKg]         = useState('0');
+  const [tipoFat, setTipoFat]      = useState('NFe');
+  const [periodo, setPeriodo]       = useState('MANHA');
+  const [regiao, setRegiao]         = useState('');
+  const [observacoes, setObs]       = useState('');
+  const [dataEntrega, setDataEntrega] = useState(dataCarga);
+
+  // Busca clientes da API
+  useEffect(() => {
+    setLoading(true);
+    api.get('/clientes', { params: { search: buscaCliente || undefined } })
+      .then(r => setClientes(r.data))
+      .catch(() => setClientes([]))
+      .finally(() => setLoading(false));
+  }, [buscaCliente]);
+
+  const handleSalvar = async () => {
+    if (!clienteSel) { setErro('Selecione um cliente.'); return; }
+    if (!filialAtiva) { setErro('Nenhuma filial selecionada.'); return; }
+
+    setSalvando(true);
+    setErro('');
+    try {
+      const res = await api.post('/pedidos', {
+        filialOrigemId: filialAtiva.id,
+        clienteId: clienteSel.id,
+        tipo: 'VENDA',
+        dataEntrega,
+        observacoes,
+      });
+
+      const pedido = res.data;
+      const end: any = clienteSel.enderecoJson || {};
+      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+      // Monta o objeto para a grade
+      const novoPedido: PedidoCarga = {
+        id: pedido.id,
+        numero: pedido.numero,
+        data: dataEntrega,
+        liberadoEm: hora,
+        nomeFantasia: clienteSel.nomeFantasia || clienteSel.razaoSocial,
+        referencia: String(pedido.numero).padStart(5, '0'),
+        volumes: parseInt(volumes) || 0,
+        pesoKg: parseFloat(pesoKg).toFixed(1).replace('.', ','),
+        empresa: 'Hetr.',
+        tipoFaturamento: tipoFat,
+        autorizacao: '',
+        status: '',
+        statusCarga: 'IMPRESSAO_PENDENTE',
+        aurCargaOk: false,
+        regiao: regiao || end.cidade || '',
+        cep: end.cep || '',
+        bairro: end.bairro || '',
+        subRegiao: '',
+        onda: 1,
+        periodo: periodo as any,
+        rota: '',
+        recebimento: '',
+        motorista: '',
+        andamento: 0,
+        valorTotal: 0,
+        idMltvenda: '',
+        idVenda: String(pedido.numero),
+      };
+
+      onCriado(novoPedido);
+    } catch (e: any) {
+      setErro(e.response?.data?.message || e.response?.data?.error?.message || 'Erro ao criar pedido.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const REGIOES = ['GUARULHOS', 'ZONA NORTE', 'ZONA SUL', 'ZONA OESTE', 'CENTRO', 'ARUJÁ', 'ZONA LESTE', 'ABC'];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white border border-gray-300 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-xl">
+          <div className="flex items-center gap-2">
+            <PlusCircle className="h-5 w-5 text-green-600" />
+            <h2 className="font-bold text-gray-900 text-sm">Nova Entrega / Pedido</h2>
+          </div>
+          <button onClick={onClose} className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+
+          {/* ── Selecionar Cliente ── */}
+          <div>
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1.5">
+              <UserPlus className="h-3.5 w-3.5 inline mr-1" />
+              Cliente *
+            </label>
+
+            {clienteSel ? (
+              <div className="flex items-center justify-between bg-green-50 border border-green-300 rounded-lg px-3 py-2">
+                <div>
+                  <p className="font-bold text-green-800 text-sm">{clienteSel.nomeFantasia || clienteSel.razaoSocial}</p>
+                  <p className="text-xs text-green-600">{clienteSel.cnpjCpf} · {clienteSel.email}</p>
+                </div>
+                <button onClick={() => setClienteSel(null)} className="text-green-600 hover:text-red-600 transition-colors">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={buscaCliente}
+                    onChange={e => setBuscaCliente(e.target.value)}
+                    placeholder="Buscar cliente por nome ou CNPJ..."
+                    className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                    autoFocus
+                  />
+                </div>
+                <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                  {loading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full" />
+                    </div>
+                  ) : clientes.length === 0 ? (
+                    <p className="text-center text-gray-400 text-xs py-4">Nenhum cliente encontrado.</p>
+                  ) : (
+                    clientes.slice(0, 30).map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => setClienteSel(c)}
+                        className="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100 last:border-0 transition-colors flex items-center justify-between"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{c.nomeFantasia || c.razaoSocial}</p>
+                          <p className="text-xs text-gray-400">{c.cnpjCpf}</p>
+                        </div>
+                        <span className="text-xs text-blue-600">Selecionar</span>
+                      </button>
+                    ))
+                  )}
+                  {clientes.length > 30 && (
+                    <p className="text-center text-xs text-gray-400 py-2">
+                      Mostrando 30 de {clientes.length} — refine a busca
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Dados da Entrega ── */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Data Entrega</label>
+              <input type="date" value={dataEntrega} onChange={e => setDataEntrega(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Período</label>
+              <select value={periodo} onChange={e => setPeriodo(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="MANHA">MANHÃ</option>
+                <option value="TARDE">TARDE</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Tipo Faturamento</label>
+              <select value={tipoFat} onChange={e => setTipoFat(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="NFe">NF-e</option>
+                <option value="Repo.">Repo.</option>
+                <option value="NFC-e">NFC-e</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Volumes</label>
+              <input type="number" min="0" value={volumes} onChange={e => setVolumes(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Peso (Kg)</label>
+              <input type="number" step="0.1" min="0" value={pesoKg} onChange={e => setPesoKg(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Região</label>
+              <select value={regiao} onChange={e => setRegiao(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <option value="">Selecione...</option>
+                {REGIOES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide mb-1">Observações</label>
+            <input type="text" value={observacoes} onChange={e => setObs(e.target.value)} placeholder="Informações adicionais..." className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+
+          {erro && (
+            <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded-lg">{erro}</div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+          <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 font-medium">
+            Cancelar
+          </button>
+          <button
+            onClick={handleSalvar}
+            disabled={salvando || !clienteSel}
+            className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-1.5 transition-colors"
+          >
+            {salvando ? (
+              <><span className="animate-spin h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full" /> Salvando...</>
+            ) : (
+              <><PlusCircle className="h-4 w-4" /> Criar Entrega</>
+            )}
+          </button>
         </div>
       </div>
     </div>
