@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { CheckCircle, Printer, Download, X, ChevronRight } from 'lucide-react';
+import { useState, useMemo, useCallback, useRef } from 'react';
+import { CheckCircle, Printer, Download, X, ChevronRight, Search } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 
 // ─── Tipos ───────────────────────────────────────
@@ -8,6 +8,7 @@ interface ProdutoEstoque {
   codigo: string;
   descricao: string;
   familia: string;
+  grupo: string;
   saldoInicial: number;
   entradas: number;
   ordensCompra: number;
@@ -36,45 +37,67 @@ interface Movimentacao {
   status: number;
 }
 
-// ─── Famílias do NewOxxy ─────────────────────────
+// ─── Famílias e Grupos do NewOxxy ────────────────
 const FAMILIAS = [
   '<Todas>', 'BCA', 'Chas e Temperos', 'Citricos', 'Congelados',
   'Diversos', 'Embalado', 'Embalagem', 'Flores e Plantas', 'Folhagem',
   'Fruta', 'Legumes', 'Ovos', 'Processados', 'Verdura',
 ];
 
-const GRUPOS = ['<Todas>', 'Grupo A', 'Grupo B', 'Grupo C'];
+const GRUPOS: Record<string, string[]> = {
+  '<Todas>': ['<Todas>'],
+  'BCA':     ['<Todas>', 'Batatas', 'Cebolas', 'Alhos', 'Raizes'],
+  'Fruta':   ['<Todas>', 'Tropical', 'Nacional', 'Importada'],
+  'Citricos':['<Todas>', 'Limão', 'Laranja', 'Outros'],
+  'Legumes': ['<Todas>', 'Folhosos', 'Raízes', 'Outros'],
+  'Verdura': ['<Todas>', 'Folhosas', 'Temperos'],
+};
 
-// ─── Mock de produtos (idêntico ao screenshot) ──
-const MOCK_PRODUTOS: ProdutoEstoque[] = [
-  { id:'1',  codigo:'ALHOC',   descricao:'ALHO',                   familia:'BCA', saldoInicial:0,       entradas:233.810, ordensCompra:0,       saidas:-85.500,   saldoFinal:148.310, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:12.13, valorAtualEstoque:1799.00 },
-  { id:'2',  codigo:'ALPD',    descricao:'ALHO DESCASCADO',        familia:'BCA', saldoInicial:0,       entradas:21.900,  ordensCompra:200.000, saidas:-100.000,  saldoFinal:121.900, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:13.00, valorAtualEstoque:1584.70 },
-  { id:'3',  codigo:'BAT25',   descricao:'BATATA ASTERIX',         familia:'BCA', saldoInicial:0,       entradas:147.850, ordensCompra:360.000, saidas:-228.000,  saldoFinal:279.850, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:6.25,  valorAtualEstoque:1749.06 },
-  { id:'4',  codigo:'BATB25',  descricao:'BATATA BOLINHA',         familia:'BCA', saldoInicial:0,       entradas:167.600, ordensCompra:288.000, saidas:-282.000,  saldoFinal:173.600, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:3.75,  valorAtualEstoque:651.00 },
-  { id:'5',  codigo:'BATN',    descricao:'BATATA LAVADA',          familia:'BCA', saldoInicial:0,       entradas:21.550,  ordensCompra:240.000, saidas:-408.300,  saldoFinal:146.750, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:5.42,  valorAtualEstoque:-795.39 },
-  { id:'6',  codigo:'BATFLO',  descricao:'BATATA LAVADA FLORAO',   familia:'BCA', saldoInicial:0,       entradas:151.900, ordensCompra:120.000, saidas:-110.000,  saldoFinal:161.900, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:6.02,  valorAtualEstoque:974.64 },
-  { id:'7',  codigo:'BATM',    descricao:'BATATA MARQUISE CESAR',  familia:'BCA', saldoInicial:0,       entradas:-78.000, ordensCompra:0,       saidas:0,         saldoFinal:-78.000, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:6.37,  valorAtualEstoque:-496.86 },
-  { id:'8',  codigo:'CEBGRA3', descricao:'CEBOLA CX3',            familia:'BCA', saldoInicial:0,       entradas:124.000, ordensCompra:0,       saidas:-75.000,   saldoFinal:49.000,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.71,  valorAtualEstoque:230.79 },
-  { id:'9',  codigo:'CEBGRA4', descricao:'CEBOLA CX4',            familia:'BCA', saldoInicial:0,       entradas:-285.550,ordensCompra:950.000, saidas:-838.900,  saldoFinal:-174.450,undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.21,  valorAtualEstoque:-734.43 },
-  { id:'10', codigo:'CEBECHA', descricao:'CEBOLA ECHALOTE',        familia:'BCA', saldoInicial:0,       entradas:53.000,  ordensCompra:0,       saidas:-0.500,    saldoFinal:52.500,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:7.36,  valorAtualEstoque:386.40 },
-  { id:'11', codigo:'CEBOPI',  descricao:'CEBOLA PIRULITO',        familia:'BCA', saldoInicial:0,       entradas:3.600,   ordensCompra:0,       saidas:0,         saldoFinal:3.600,   undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.00,  valorAtualEstoque:14.40 },
-  { id:'12', codigo:'CEBR',    descricao:'CEBOLA ROXA CX3',       familia:'BCA', saldoInicial:0,       entradas:692.300, ordensCompra:380.000, saidas:-112.450,  saldoFinal:959.850, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:5.79,  valorAtualEstoque:5557.53 },
-  { id:'13', codigo:'CRX',     descricao:'CEBOLA ROXA CX4',       familia:'BCA', saldoInicial:0,       entradas:61.400,  ordensCompra:76.000,  saidas:-62.000,   saldoFinal:75.400,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.74,  valorAtualEstoque:357.40 },
-  { id:'14', codigo:'COS',     descricao:'COCO SECO',              familia:'BCA', saldoInicial:0,       entradas:43.880,  ordensCompra:0,       saidas:-1.330,    saldoFinal:42.550,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:3.23,  valorAtualEstoque:137.64 },
-  { id:'15', codigo:'MANDV',   descricao:'MANDIOCA A VACUO',       familia:'BCA', saldoInicial:0,       entradas:49.000,  ordensCompra:0,       saidas:-5.000,    saldoFinal:44.000,  undEstoque:'PC', contagemFisica:null, diferencaEstoque:0, precoCusto:4.90,  valorAtualEstoque:215.60 },
-  // Frutas
-  { id:'16', codigo:'ABAC',    descricao:'ABACATE',                familia:'Fruta', saldoInicial:143.30, entradas:180.00, ordensCompra:0, saidas:-130.65, saldoFinal:192.65, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:8.50, valorAtualEstoque:1637.53 },
-  { id:'17', codigo:'AVO',     descricao:'ABACATE AVOCADO',        familia:'Fruta', saldoInicial:37.73,  entradas:0,      ordensCompra:0, saidas:-2.00,   saldoFinal:35.73,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:12.00, valorAtualEstoque:428.76 },
-  { id:'18', codigo:'BNAN',    descricao:'BANANA NANICA',          familia:'Fruta', saldoInicial:338.12, entradas:400.00, ordensCompra:0, saidas:-799.44, saldoFinal:-61.32, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:3.50, valorAtualEstoque:-214.62 },
-  { id:'19', codigo:'BAN',     descricao:'BANANA PRATA',           familia:'Fruta', saldoInicial:53.55,  entradas:395.00, ordensCompra:0, saidas:-419.45, saldoFinal:149.80, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:5.20, valorAtualEstoque:778.96 },
-  { id:'20', codigo:'MANGP20', descricao:'MANGA PALMER',           familia:'Fruta', saldoInicial:114.53, entradas:716.00, ordensCompra:0, saidas:-445.19, saldoFinal:385.35, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.80, valorAtualEstoque:1849.68 },
-  { id:'21', codigo:'MAMF',    descricao:'MAMAO FORMOSA',          familia:'Fruta', saldoInicial:-88.65, entradas:700.00, ordensCompra:0, saidas:-486.10, saldoFinal:113.25, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.20, valorAtualEstoque:475.65 },
-  { id:'22', codigo:'KIWI',    descricao:'KIWI',                   familia:'Fruta', saldoInicial:51.00,  entradas:0,      ordensCompra:0, saidas:-25.78,  saldoFinal:25.28,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:18.00, valorAtualEstoque:455.04 },
+const TIPOS_ITEM = [
+  '00-Mercadoria para Revenda',
+  '01-Matéria Prima',
+  '02-Embalagem',
+  '03-Produto em Processo',
+  '04-Produto Acabado',
+  '05-Subproduto',
+  '06-Produto Intermediário',
+  '10-Outros Insumos',
 ];
 
-// ─── Mock movimentações do BAT25 (drill-down) ───
+// ─── Dados mock (produtos reais do NewOxxy) ──────
+const TODOS_PRODUTOS: ProdutoEstoque[] = [
+  { id:'1',  codigo:'ALHOC',   descricao:'ALHO',                   familia:'BCA', grupo:'Alhos',   saldoInicial:0,       entradas:233.810, ordensCompra:0,       saidas:-85.500,   saldoFinal:148.310, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:12.13, valorAtualEstoque:1799.00 },
+  { id:'2',  codigo:'ALPD',    descricao:'ALHO DESCASCADO',        familia:'BCA', grupo:'Alhos',   saldoInicial:0,       entradas:21.900,  ordensCompra:200.000, saidas:-100.000,  saldoFinal:121.900, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:13.00, valorAtualEstoque:1584.70 },
+  { id:'3',  codigo:'BAT25',   descricao:'BATATA ASTERIX',         familia:'BCA', grupo:'Batatas', saldoInicial:0,       entradas:147.850, ordensCompra:360.000, saidas:-228.000,  saldoFinal:279.850, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:6.25,  valorAtualEstoque:1749.06 },
+  { id:'4',  codigo:'BATB25',  descricao:'BATATA BOLINHA',         familia:'BCA', grupo:'Batatas', saldoInicial:0,       entradas:167.600, ordensCompra:288.000, saidas:-282.000,  saldoFinal:173.600, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:3.75,  valorAtualEstoque:651.00 },
+  { id:'5',  codigo:'BATN',    descricao:'BATATA LAVADA',          familia:'BCA', grupo:'Batatas', saldoInicial:0,       entradas:21.550,  ordensCompra:240.000, saidas:-408.300,  saldoFinal:146.750, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:5.42,  valorAtualEstoque:-795.39 },
+  { id:'6',  codigo:'BATFLO',  descricao:'BATATA LAVADA FLORAO',   familia:'BCA', grupo:'Batatas', saldoInicial:0,       entradas:151.900, ordensCompra:120.000, saidas:-110.000,  saldoFinal:161.900, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:6.02,  valorAtualEstoque:974.64 },
+  { id:'7',  codigo:'BATM',    descricao:'BATATA MARQUISE CESAR',  familia:'BCA', grupo:'Batatas', saldoInicial:0,       entradas:-78.000, ordensCompra:0,       saidas:0,         saldoFinal:-78.000, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:6.37,  valorAtualEstoque:-496.86 },
+  { id:'8',  codigo:'CEBGRA3', descricao:'CEBOLA CX3',            familia:'BCA', grupo:'Cebolas', saldoInicial:0,       entradas:124.000, ordensCompra:0,       saidas:-75.000,   saldoFinal:49.000,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.71,  valorAtualEstoque:230.79 },
+  { id:'9',  codigo:'CEBGRA4', descricao:'CEBOLA CX4',            familia:'BCA', grupo:'Cebolas', saldoInicial:0,       entradas:-285.550,ordensCompra:950.000, saidas:-838.900,  saldoFinal:-174.450,undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.21,  valorAtualEstoque:-734.43 },
+  { id:'10', codigo:'CEBECHA', descricao:'CEBOLA ECHALOTE',        familia:'BCA', grupo:'Cebolas', saldoInicial:0,       entradas:53.000,  ordensCompra:0,       saidas:-0.500,    saldoFinal:52.500,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:7.36,  valorAtualEstoque:386.40 },
+  { id:'11', codigo:'CEBOPI',  descricao:'CEBOLA PIRULITO',        familia:'BCA', grupo:'Cebolas', saldoInicial:0,       entradas:3.600,   ordensCompra:0,       saidas:0,         saldoFinal:3.600,   undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.00,  valorAtualEstoque:14.40 },
+  { id:'12', codigo:'CEBR',    descricao:'CEBOLA ROXA CX3',       familia:'BCA', grupo:'Cebolas', saldoInicial:0,       entradas:692.300, ordensCompra:380.000, saidas:-112.450,  saldoFinal:959.850, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:5.79,  valorAtualEstoque:5557.53 },
+  { id:'13', codigo:'CRX',     descricao:'CEBOLA ROXA CX4',       familia:'BCA', grupo:'Cebolas', saldoInicial:0,       entradas:61.400,  ordensCompra:76.000,  saidas:-62.000,   saldoFinal:75.400,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.74,  valorAtualEstoque:357.40 },
+  { id:'14', codigo:'COS',     descricao:'COCO SECO',              familia:'BCA', grupo:'Raizes', saldoInicial:0,       entradas:43.880,  ordensCompra:0,       saidas:-1.330,    saldoFinal:42.550,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:3.23,  valorAtualEstoque:137.64 },
+  { id:'15', codigo:'MANDV',   descricao:'MANDIOCA A VACUO',       familia:'BCA', grupo:'Raizes', saldoInicial:0,       entradas:49.000,  ordensCompra:0,       saidas:-5.000,    saldoFinal:44.000,  undEstoque:'PC', contagemFisica:null, diferencaEstoque:0, precoCusto:4.90,  valorAtualEstoque:215.60 },
+  { id:'16', codigo:'ABAC',    descricao:'ABACATE',                familia:'Fruta', grupo:'Nacional',  saldoInicial:143.30, entradas:180.00, ordensCompra:0, saidas:-130.65, saldoFinal:192.65, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:8.50, valorAtualEstoque:1637.53 },
+  { id:'17', codigo:'AVO',     descricao:'ABACATE AVOCADO',        familia:'Fruta', grupo:'Importada', saldoInicial:37.73,  entradas:0,      ordensCompra:0, saidas:-2.00,   saldoFinal:35.73,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:12.00, valorAtualEstoque:428.76 },
+  { id:'18', codigo:'BNAN',    descricao:'BANANA NANICA',          familia:'Fruta', grupo:'Tropical',  saldoInicial:338.12, entradas:400.00, ordensCompra:0, saidas:-799.44, saldoFinal:-61.32, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:3.50, valorAtualEstoque:-214.62 },
+  { id:'19', codigo:'BAN',     descricao:'BANANA PRATA',           familia:'Fruta', grupo:'Tropical',  saldoInicial:53.55,  entradas:395.00, ordensCompra:0, saidas:-419.45, saldoFinal:149.80, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:5.20, valorAtualEstoque:778.96 },
+  { id:'20', codigo:'MANGP20', descricao:'MANGA PALMER',           familia:'Fruta', grupo:'Tropical',  saldoInicial:114.53, entradas:716.00, ordensCompra:0, saidas:-445.19, saldoFinal:385.35, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.80, valorAtualEstoque:1849.68 },
+  { id:'21', codigo:'MAMF',    descricao:'MAMAO FORMOSA',          familia:'Fruta', grupo:'Tropical',  saldoInicial:-88.65, entradas:700.00, ordensCompra:0, saidas:-486.10, saldoFinal:113.25, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.20, valorAtualEstoque:475.65 },
+  { id:'22', codigo:'KIWI',    descricao:'KIWI',                   familia:'Fruta', grupo:'Importada', saldoInicial:51.00,  entradas:0,      ordensCompra:0, saidas:-25.78,  saldoFinal:25.28,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:18.00, valorAtualEstoque:455.04 },
+  { id:'23', codigo:'LIM',     descricao:'LIMAO TAITI',            familia:'Citricos', grupo:'Limão', saldoInicial:200.00, entradas:500.00, ordensCompra:0, saidas:-450.00, saldoFinal:250.00, undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:3.80, valorAtualEstoque:950.00 },
+  { id:'24', codigo:'LARG',    descricao:'LARANJA PERA',           familia:'Citricos', grupo:'Laranja', saldoInicial:80.00,  entradas:300.00, ordensCompra:0, saidas:-320.00, saldoFinal:60.00,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:2.50, valorAtualEstoque:150.00 },
+  { id:'25', codigo:'ABOBI',   descricao:'ABOBRINHA ITALIANA',     familia:'Legumes', grupo:'Outros', saldoInicial:45.00,  entradas:120.00, ordensCompra:0, saidas:-98.00,  saldoFinal:67.00,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:6.50, valorAtualEstoque:435.50 },
+  { id:'26', codigo:'ALFAC',   descricao:'ALFACE CRESPA',          familia:'Verdura', grupo:'Folhosas', saldoInicial:30.00,  entradas:80.00,  ordensCompra:0, saidas:-95.00,  saldoFinal:15.00,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:4.20, valorAtualEstoque:63.00 },
+  { id:'27', codigo:'RUCUL',   descricao:'RUCULA',                 familia:'Verdura', grupo:'Folhosas', saldoInicial:12.00,  entradas:40.00,  ordensCompra:0, saidas:-38.00,  saldoFinal:14.00,  undEstoque:'KG', contagemFisica:null, diferencaEstoque:0, precoCusto:8.00, valorAtualEstoque:112.00 },
+];
+
+// ─── Mock movimentações do BAT25 ─────────────────
 const MOCK_MOVIMENTACOES: Record<string, Movimentacao[]> = {
-  '3': [ // BAT25
+  '3': [
     { idDfe:'Id Venda: 1616...', nomeCliente:'SENAC PENHA',            natureza:'NFe Padrao', observacoes:'PESAR',  dataHoraVenda:'26/06/2026 07:07:58', dataEntrega:'27/06/2026', qtdeApuracao:5.000,  unidadeApuracao:'KG', vlrTotalVenda:67.20,  qtdeConvertida:0.208, unidadeConvertida:'SC', precoMedio:322.612, status:1 },
     { idDfe:'Id Venda: 1616...', nomeCliente:'MERCEARIA AMAURI',       natureza:'NFe Padrao', observacoes:'',       dataHoraVenda:'26/06/2026 09:33:21', dataEntrega:'27/06/2026', qtdeApuracao:20.000, unidadeApuracao:'KG', vlrTotalVenda:220.00, qtdeConvertida:0.833, unidadeConvertida:'SC', precoMedio:264.011, status:1 },
     { idDfe:'Id Venda: 1616...', nomeCliente:'DEMOISELLE BISTRO',      natureza:'NFe Padrao', observacoes:'',       dataHoraVenda:'26/06/2026 09:56:34', dataEntrega:'27/06/2026', qtdeApuracao:10.000, unidadeApuracao:'KG', vlrTotalVenda:134.40, qtdeConvertida:0.417, unidadeConvertida:'SC', precoMedio:322.534, status:1 },
@@ -93,93 +116,206 @@ const MOCK_MOVIMENTACOES: Record<string, Movimentacao[]> = {
 };
 
 // ─── Formatação ──────────────────────────────────
-const N = (v: number) => {
-  if (v === 0) return '0';
-  const s = Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: v % 1 === 0 ? 0 : 3 });
-  return v < 0 ? `- ${s}` : s;
-};
-const R$ = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtN = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const fmtR = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const negClass = (v: number) => v < 0 ? 'text-red-600' : '';
+const hoje = () => new Date().toISOString().split('T')[0];
+
+// ─── Exportar CSV ────────────────────────────────
+function exportarCSV(produtos: ProdutoEstoque[]) {
+  const header = 'Código;Descrição;Família;Saldo Inicial;Entradas;Ordens Compra;Saídas;Saldo Final;Unidade;Contagem;Diferença;Preço Custo;Valor Estoque\n';
+  const rows = produtos.map(p =>
+    `${p.codigo};${p.descricao};${p.familia};${fmtN(p.saldoInicial)};${fmtN(p.entradas)};${fmtN(p.ordensCompra)};${fmtN(p.saidas)};${fmtN(p.saldoFinal)};${p.undEstoque};${p.contagemFisica ?? ''};${fmtN(p.diferencaEstoque)};${fmtR(p.precoCusto)};${fmtR(p.valorAtualEstoque)}`
+  ).join('\n');
+  const bom = '﻿';
+  const blob = new Blob([bom + header + rows], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `analise_estoque_${hoje()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Imprimir ────────────────────────────────────
+function imprimirRelatorio(produtos: ProdutoEstoque[], dataIni: string, dataFim: string) {
+  const html = `<!DOCTYPE html><html><head><title>Movimentação de Estoque</title>
+<style>
+  @page { size: landscape; margin: 10mm; }
+  body { font-family: Arial, sans-serif; font-size: 10px; }
+  .header { text-align: center; margin-bottom: 10px; }
+  .header h2 { margin: 0; font-size: 14px; }
+  .header p { margin: 2px 0; font-size: 11px; color: #333; }
+  .titulo { background: #444; color: white; text-align: center; padding: 6px; font-size: 13px; font-weight: bold; margin: 10px 0; }
+  .info { font-size: 10px; margin-bottom: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 9px; }
+  th { background: #f0f0f0; border: 1px solid #999; padding: 3px 4px; text-align: left; font-weight: bold; }
+  td { border: 1px solid #ccc; padding: 2px 4px; }
+  .r { text-align: right; font-family: monospace; }
+  .neg { color: red; }
+  .bold { font-weight: bold; }
+  @media print { button { display: none; } }
+</style></head><body>
+<div class="header">
+  <h2>HETROS IMP. E EXP. LTDA</h2>
+  <p>AV DOUTOR GASTAO VIDIGAL, SN - PAV HFC BOX 19</p>
+  <p>05316-900 - VILA LEOPOLDINA SAO PAULO-SP</p>
+</div>
+<div class="titulo">Movimentação de Estoque</div>
+<div class="info"><strong>1001 - HETROS</strong><br/>Período: ${dataIni} até ${dataFim}</div>
+<table>
+<thead><tr>
+  <th>Produto</th><th>Descrição</th><th>Unidade</th><th>Tipo Prod</th>
+  <th>Saldo Inicial</th><th>Entradas</th><th>Saídas</th><th>Saldo Final</th>
+</tr></thead><tbody>
+${produtos.map(p => `<tr>
+  <td>${p.codigo}</td><td>${p.descricao}</td><td>${p.undEstoque}</td><td>${p.familia}</td>
+  <td class="r ${p.saldoInicial < 0 ? 'neg' : ''}">${fmtN(p.saldoInicial)}</td>
+  <td class="r ${p.entradas < 0 ? 'neg' : ''}">${fmtN(p.entradas)}</td>
+  <td class="r ${p.saidas < 0 ? 'neg' : ''}">${fmtN(p.saidas)}</td>
+  <td class="r bold ${p.saldoFinal < 0 ? 'neg' : ''}">${fmtN(p.saldoFinal)}</td>
+</tr>`).join('')}
+</tbody></table>
+<p style="margin-top:10px;font-size:9px;color:#666;">Emissão: ${new Date().toLocaleString('pt-BR')} — Registros: ${produtos.length}</p>
+<script>window.print();</script>
+</body></html>`;
+  const w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+}
 
 // ─── Componente principal ────────────────────────
 export default function AnaliseEstoqueFisico() {
   const { filialAtiva } = useAuth();
 
   // Filtros
-  const [dataIni, setDataIni]     = useState('26/06/2026 00:00:00');
-  const [dataFim, setDataFim]     = useState('26/06/2026 23:59:59');
-  const [tipoItem, setTipoItem]   = useState('00-Mercadoria para Revenda');
-  const [familia, setFamilia]     = useState('<Todas>');
-  const [grupo, setGrupo]         = useState('<Todas>');
-  const [cd, setCd]               = useState('1 - HETROS');
+  const [dataIni, setDataIni]       = useState(hoje());
+  const [dataFim, setDataFim]       = useState(hoje());
+  const [tipoItem, setTipoItem]     = useState('00-Mercadoria para Revenda');
+  const [familia, setFamilia]       = useState('<Todas>');
+  const [grupo, setGrupo]           = useState('<Todas>');
+  const [cd, setCd]                 = useState('1 - HETROS');
   const [undApuracao, setUndApuracao] = useState('Estoque');
-  const [confFisica, setConfFisica]   = useState(false);
+  const [confFisica, setConfFisica] = useState(false);
   const [semOrdCompra, setSemOrdCompra] = useState(false);
-  const [executado, setExecutado]     = useState(true);
-  const [processando, setProcessando] = useState(false);
+  const [busca, setBusca]           = useState('');
 
-  // Detalhe
+  // Estado da grade
+  const [produtos, setProdutos]       = useState<ProdutoEstoque[]>([]);
+  const [executado, setExecutado]     = useState(false);
+  const [processando, setProcessando] = useState(false);
+  const [prodProcessando, setProdProcessando] = useState('');
+
+  // Seleção e detalhe
+  const [selId, setSelId]               = useState<string | null>(null);
   const [detalheAberto, setDetalheAberto] = useState<ProdutoEstoque | null>(null);
 
-  // Seleção de linha
-  const [selId, setSelId] = useState<string | null>(null);
+  // Grupos disponíveis para a família selecionada
+  const gruposDisponiveis = useMemo(() =>
+    GRUPOS[familia] || ['<Todas>'],
+  [familia]);
 
-  // Filtrar produtos
-  const produtosFiltrados = useMemo(() => {
-    if (!executado) return [];
-    return MOCK_PRODUTOS.filter(p => {
+  // Reset grupo ao trocar família
+  const handleFamiliaChange = (f: string) => {
+    setFamilia(f);
+    setGrupo('<Todas>');
+  };
+
+  // ── Executar: filtra e exibe resultados ────────
+  const handleExecutar = useCallback(() => {
+    setProcessando(true);
+    setExecutado(false);
+    setProdutos([]);
+
+    const produtosPorFiltrar = TODOS_PRODUTOS.filter(p => {
       if (familia !== '<Todas>' && p.familia !== familia) return false;
+      if (grupo !== '<Todas>' && p.grupo !== grupo) return false;
       return true;
     });
-  }, [executado, familia]);
+
+    // Simula processamento produto a produto
+    let idx = 0;
+    const timer = setInterval(() => {
+      if (idx < produtosPorFiltrar.length) {
+        setProdProcessando(produtosPorFiltrar[idx].descricao);
+        idx++;
+      } else {
+        clearInterval(timer);
+        setProdutos(produtosPorFiltrar);
+        setProcessando(false);
+        setExecutado(true);
+        setProdProcessando('');
+      }
+    }, 80);
+  }, [familia, grupo]);
+
+  // ── Contagem física: editar valor ──────────────
+  const handleContagemChange = (id: string, valor: string) => {
+    const num = valor === '' ? null : parseFloat(valor.replace(',', '.'));
+    setProdutos(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      const contagem = num;
+      const diferenca = contagem !== null ? contagem - p.saldoFinal : 0;
+      return { ...p, contagemFisica: contagem, diferencaEstoque: diferenca };
+    }));
+  };
+
+  // Filtrar por busca
+  const produtosFiltrados = useMemo(() => {
+    if (!busca) return produtos;
+    const q = busca.toLowerCase();
+    return produtos.filter(p =>
+      p.codigo.toLowerCase().includes(q) ||
+      p.descricao.toLowerCase().includes(q)
+    );
+  }, [produtos, busca]);
 
   // Totais
   const totais = useMemo(() => ({
+    count: produtosFiltrados.length,
     saldoFinal: produtosFiltrados.reduce((s, p) => s + p.saldoFinal, 0),
     diferenca:  produtosFiltrados.reduce((s, p) => s + p.diferencaEstoque, 0),
     valorTotal: produtosFiltrados.reduce((s, p) => s + p.valorAtualEstoque, 0),
   }), [produtosFiltrados]);
 
-  const handleExecutar = () => {
-    setProcessando(true);
-    setExecutado(false);
-    setTimeout(() => {
-      setProcessando(false);
-      setExecutado(true);
-    }, 1500);
-  };
-
   return (
     <div className="flex flex-col h-full bg-gray-100 text-xs select-none overflow-hidden">
 
-      {/* ── Barra de filtros (idêntica ao NewOxxy) ── */}
-      <div className="bg-gray-200 border-b border-gray-400 px-3 py-2 flex flex-wrap items-end gap-4 shrink-0">
+      {/* ── Barra de filtros ── */}
+      <div className="bg-gray-200 border-b border-gray-400 px-3 py-2 flex flex-wrap items-end gap-3 shrink-0">
 
         {/* Período */}
-        <fieldset className="border border-gray-400 rounded px-2 pb-1 pt-0">
+        <fieldset className="border border-gray-400 rounded px-2 pb-1.5 pt-0">
           <legend className="text-[10px] font-semibold text-gray-700 px-1">Período</legend>
           <div className="space-y-1">
             <div className="flex items-center gap-1">
               <span className="text-gray-600 w-6">De:</span>
-              <input value={dataIni} onChange={e => setDataIni(e.target.value)} className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded w-36 font-mono" />
+              <input
+                type="date"
+                value={dataIni}
+                onChange={e => setDataIni(e.target.value)}
+                className="border border-gray-400 bg-white text-xs px-1.5 py-0.5 rounded w-32 font-mono cursor-pointer"
+              />
             </div>
             <div className="flex items-center gap-1">
               <span className="text-gray-600 w-6">Até:</span>
-              <input value={dataFim} onChange={e => setDataFim(e.target.value)} className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded w-36 font-mono" />
+              <input
+                type="date"
+                value={dataFim}
+                onChange={e => setDataFim(e.target.value)}
+                className="border border-gray-400 bg-white text-xs px-1.5 py-0.5 rounded w-32 font-mono cursor-pointer"
+              />
             </div>
           </div>
         </fieldset>
 
         {/* Seleção */}
-        <fieldset className="border border-gray-400 rounded px-2 pb-1 pt-0">
+        <fieldset className="border border-gray-400 rounded px-2 pb-1.5 pt-0">
           <legend className="text-[10px] font-semibold text-gray-700 px-1">Seleção</legend>
           <div className="space-y-1">
             <div className="flex items-center gap-1">
               <span className="text-gray-600">Tipo Item:</span>
-              <select value={tipoItem} onChange={e => setTipoItem(e.target.value)} className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded">
-                <option>00-Mercadoria para Revenda</option>
-                <option>01-Matéria Prima</option>
-                <option>02-Embalagem</option>
+              <select value={tipoItem} onChange={e => setTipoItem(e.target.value)} className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded w-44">
+                {TIPOS_ITEM.map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
             <label className="flex items-center gap-1 cursor-pointer text-gray-600">
@@ -193,27 +329,26 @@ export default function AnaliseEstoqueFisico() {
           </div>
         </fieldset>
 
-        {/* Família */}
-        <fieldset className="border border-gray-400 rounded px-2 pb-1 pt-0">
+        {/* Família + Grupo */}
+        <fieldset className="border border-gray-400 rounded px-2 pb-1.5 pt-0">
           <legend className="text-[10px] font-semibold text-gray-700 px-1">Selecione uma Família</legend>
           <select
             value={familia}
-            onChange={e => setFamilia(e.target.value)}
-            className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded w-36"
-            size={1}
+            onChange={e => handleFamiliaChange(e.target.value)}
+            className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded w-40"
           >
             {FAMILIAS.map(f => <option key={f}>{f}</option>)}
           </select>
-          <div className="mt-1">
-            <span className="text-[10px] text-gray-500">Selecione um Grupo</span>
-            <select value={grupo} onChange={e => setGrupo(e.target.value)} className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded w-36 block">
-              {GRUPOS.map(g => <option key={g}>{g}</option>)}
+          <div className="mt-1.5">
+            <span className="text-[10px] text-gray-600">Selecione um Grupo</span>
+            <select value={grupo} onChange={e => setGrupo(e.target.value)} className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded w-40 block mt-0.5">
+              {gruposDisponiveis.map(g => <option key={g}>{g}</option>)}
             </select>
           </div>
         </fieldset>
 
         {/* Centro de Distribuição */}
-        <fieldset className="border border-gray-400 rounded px-2 pb-1 pt-0">
+        <fieldset className="border border-gray-400 rounded px-2 pb-1.5 pt-0">
           <legend className="text-[10px] font-semibold text-gray-700 px-1">Centro de Distribuição</legend>
           <select value={cd} onChange={e => setCd(e.target.value)} className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded w-28">
             <option>1 - HETROS</option>
@@ -221,109 +356,163 @@ export default function AnaliseEstoqueFisico() {
         </fieldset>
 
         {/* Unidade de Apuração */}
-        <fieldset className="border border-gray-400 rounded px-2 pb-1 pt-0">
+        <fieldset className="border border-gray-400 rounded px-2 pb-1.5 pt-0">
           <legend className="text-[10px] font-semibold text-gray-700 px-1">Unidade de Apuração</legend>
-          <label className="flex items-center gap-1 text-gray-700">
+          <label className="flex items-center gap-1 text-gray-700 cursor-pointer">
             <input type="radio" name="und" checked={undApuracao === 'Estoque'} onChange={() => setUndApuracao('Estoque')} className="accent-blue-600" />
             Estoque
           </label>
-          <label className="flex items-center gap-1 text-gray-700">
+          <label className="flex items-center gap-1 text-gray-700 cursor-pointer">
             <input type="radio" name="und" checked={undApuracao === 'Principal'} onChange={() => setUndApuracao('Principal')} className="accent-blue-600" />
             Principal
           </label>
         </fieldset>
 
-        {/* Botões */}
+        {/* Botões de ação */}
         <div className="flex gap-2">
-          <button onClick={handleExecutar} className="flex items-center gap-1 bg-white border border-gray-400 hover:bg-green-50 px-3 py-1.5 rounded text-green-700 font-semibold">
+          <button
+            onClick={handleExecutar}
+            disabled={processando}
+            className="flex items-center gap-1.5 bg-white border-2 border-green-600 hover:bg-green-50 px-4 py-2 rounded text-green-700 font-bold disabled:opacity-50 shadow-sm"
+          >
             <CheckCircle className="h-4 w-4" /> Executar
           </button>
-          <button className="flex items-center gap-1 bg-white border border-gray-400 hover:bg-gray-50 px-3 py-1.5 rounded text-gray-700">
+          <button
+            onClick={() => imprimirRelatorio(produtosFiltrados, dataIni, dataFim)}
+            disabled={!executado}
+            className="flex items-center gap-1.5 bg-white border border-gray-400 hover:bg-gray-50 px-3 py-2 rounded text-gray-700 disabled:opacity-30 shadow-sm"
+          >
             <Printer className="h-4 w-4" /> Imprimir
           </button>
-          <button className="flex items-center gap-1 bg-white border border-gray-400 hover:bg-gray-50 px-3 py-1.5 rounded text-gray-700">
+          <button
+            onClick={() => exportarCSV(produtosFiltrados)}
+            disabled={!executado}
+            className="flex items-center gap-1.5 bg-white border border-gray-400 hover:bg-gray-50 px-3 py-2 rounded text-gray-700 disabled:opacity-30 shadow-sm"
+          >
             <Download className="h-4 w-4" /> Exportar
           </button>
         </div>
       </div>
 
+      {/* ── Busca rápida ── */}
+      {executado && (
+        <div className="bg-gray-100 border-b border-gray-300 px-3 py-1 flex items-center gap-2 shrink-0">
+          <Search className="h-3.5 w-3.5 text-gray-400" />
+          <input
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            placeholder="Filtrar por código ou descrição..."
+            className="border border-gray-300 bg-white text-xs px-2 py-0.5 rounded w-60"
+          />
+          {busca && (
+            <button onClick={() => setBusca('')} className="text-gray-400 hover:text-gray-600"><X className="h-3 w-3" /></button>
+          )}
+          <span className="text-gray-500 ml-2">
+            {familia !== '<Todas>' && <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-semibold mr-1">{familia}</span>}
+            {grupo !== '<Todas>' && <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">{grupo}</span>}
+          </span>
+        </div>
+      )}
+
       {/* ── Grade de produtos ── */}
       <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse text-[11px]" style={{ minWidth: 1200 }}>
-          <thead className="sticky top-0 z-10">
-            <tr className="bg-gray-300 border-b-2 border-gray-500">
-              <th className="px-2 py-1 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">Código Produto</th>
-              <th className="px-2 py-1 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">Descrição</th>
-              <th className="px-2 py-1 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">Família</th>
-              <th className="px-2 py-1 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">↓ Saldo Inicial</th>
-              <th className="px-2 py-1 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">⇒ Entradas</th>
-              <th className="px-2 py-1 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">Ordens de Compras</th>
-              <th className="px-2 py-1 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">⇐ Saídas</th>
-              <th className="px-2 py-1 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">⇒ Saldo Final</th>
-              <th className="px-2 py-1 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">Und Estoque</th>
-              <th className="px-2 py-1 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">✎ Contagem Física</th>
-              <th className="px-2 py-1 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">⊘ Diferença de Estoque</th>
-              <th className="px-2 py-1 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">Preço Custo</th>
-              <th className="px-2 py-1 text-right font-semibold text-gray-800 whitespace-nowrap">Valor Atual do Estoque</th>
-            </tr>
-          </thead>
-          <tbody>
-            {produtosFiltrados.map((p) => {
-              const isSelected = selId === p.id;
-              return (
-                <tr
-                  key={p.id}
-                  onClick={() => setSelId(p.id)}
-                  onDoubleClick={() => setDetalheAberto(p)}
-                  className={`border-b border-gray-200 cursor-pointer transition-colors ${isSelected ? 'bg-blue-600 text-white' : 'bg-white hover:bg-gray-50'}`}
-                >
-                  <td className="px-2 py-1 border-r border-gray-200">
-                    <div className="flex items-center gap-1">
-                      <ChevronRight className="h-3 w-3 text-gray-400 shrink-0" />
-                      <span className={`font-semibold ${isSelected ? 'text-white' : 'text-blue-700'}`}>{p.codigo}</span>
-                    </div>
-                  </td>
-                  <td className={`px-2 py-1 border-r border-gray-200 ${isSelected ? '' : 'text-blue-600'}`}>{p.descricao}</td>
-                  <td className="px-2 py-1 border-r border-gray-200">{p.familia}</td>
-                  <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${isSelected ? '' : negClass(p.saldoInicial)}`}>{N(p.saldoInicial)}</td>
-                  <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${isSelected ? '' : negClass(p.entradas)}`}>{N(p.entradas)}</td>
-                  <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${isSelected ? '' : 'text-green-700'}`}>{p.ordensCompra > 0 ? N(p.ordensCompra) : ''}</td>
-                  <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${isSelected ? '' : negClass(p.saidas)}`}>{N(p.saidas)}</td>
-                  <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono font-bold ${isSelected ? '' : negClass(p.saldoFinal)}`}>{N(p.saldoFinal)}</td>
-                  <td className="px-2 py-1 border-r border-gray-200">{p.undEstoque}</td>
-                  <td className="px-2 py-1 border-r border-gray-200 text-right font-mono">
-                    {confFisica ? (
-                      <input
-                        type="number"
-                        step="0.001"
-                        className="w-20 border border-gray-300 text-right text-xs px-1 py-0 rounded bg-yellow-50"
-                        value={p.contagemFisica ?? ''}
-                        onClick={e => e.stopPropagation()}
-                        onChange={() => {}}
-                        placeholder="0,000"
-                      />
-                    ) : null}
-                  </td>
-                  <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${isSelected ? '' : negClass(p.diferencaEstoque)}`}>{p.diferencaEstoque !== 0 ? N(p.diferencaEstoque) : ''}</td>
-                  <td className="px-2 py-1 border-r border-gray-200 text-right font-mono">{R$(p.precoCusto)}</td>
-                  <td className={`px-2 py-1 text-right font-mono font-semibold ${isSelected ? '' : negClass(p.valorAtualEstoque)}`}>{R$(p.valorAtualEstoque)}</td>
-                </tr>
-              );
-            })}
-            {produtosFiltrados.length === 0 && (
-              <tr><td colSpan={13} className="px-4 py-8 text-center text-gray-400 italic">Nenhum item encontrado!</td></tr>
-            )}
-          </tbody>
-        </table>
+        {!executado && !processando ? (
+          <div className="flex items-center justify-center h-full text-gray-400">
+            <div className="text-center">
+              <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-200" />
+              <p className="text-sm font-medium">Clique em <strong className="text-green-600">Executar</strong> para carregar a análise de estoque</p>
+              <p className="text-xs text-gray-300 mt-1">Selecione os filtros desejados e clique no botão verde</p>
+            </div>
+          </div>
+        ) : (
+          <table className="w-full border-collapse text-[11px]" style={{ minWidth: 1300 }}>
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-gray-300 border-b-2 border-gray-500">
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Código Produto</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">Descrição</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-16">Família</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">↓ Saldo Inicial</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">⇒ Entradas</th>
+                {!semOrdCompra && (
+                  <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Ordens de Compras</th>
+                )}
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">⇐ Saídas</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">⇒ Saldo Final</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-12">Und</th>
+                {confFisica && (
+                  <>
+                    <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24 bg-yellow-100">✎ Contagem Física</th>
+                    <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-28 bg-yellow-100">⊘ Diferença de Estoque</th>
+                  </>
+                )}
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-20">Preço Custo</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 whitespace-nowrap w-28">Valor Atual do Estoque</th>
+              </tr>
+            </thead>
+            <tbody>
+              {produtosFiltrados.map(p => {
+                const sel = selId === p.id;
+                return (
+                  <tr
+                    key={p.id}
+                    onClick={() => setSelId(p.id)}
+                    onDoubleClick={() => setDetalheAberto(p)}
+                    className={`border-b border-gray-200 cursor-pointer transition-colors ${sel ? 'bg-blue-600 text-white' : 'bg-white hover:bg-blue-50'}`}
+                    title="Duplo clique para ver movimentações"
+                  >
+                    <td className="px-2 py-1 border-r border-gray-200">
+                      <div className="flex items-center gap-1">
+                        <ChevronRight className={`h-3 w-3 shrink-0 ${sel ? 'text-white/60' : 'text-gray-300'}`} />
+                        <span className={`font-semibold ${sel ? 'text-white' : 'text-blue-700'}`}>{p.codigo}</span>
+                      </div>
+                    </td>
+                    <td className={`px-2 py-1 border-r border-gray-200 ${sel ? '' : 'text-blue-600'}`}>{p.descricao}</td>
+                    <td className="px-2 py-1 border-r border-gray-200">{p.familia}</td>
+                    <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${sel ? '' : negClass(p.saldoInicial)}`}>{fmtN(p.saldoInicial)}</td>
+                    <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${sel ? '' : negClass(p.entradas)}`}>{fmtN(p.entradas)}</td>
+                    {!semOrdCompra && (
+                      <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${sel ? '' : 'text-green-700'}`}>{p.ordensCompra > 0 ? fmtN(p.ordensCompra) : ''}</td>
+                    )}
+                    <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${sel ? '' : negClass(p.saidas)}`}>{fmtN(p.saidas)}</td>
+                    <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono font-bold ${sel ? '' : negClass(p.saldoFinal)}`}>{fmtN(p.saldoFinal)}</td>
+                    <td className="px-2 py-1 border-r border-gray-200">{p.undEstoque}</td>
+                    {confFisica && (
+                      <>
+                        <td className="px-2 py-1 border-r border-gray-200 bg-yellow-50" onClick={e => e.stopPropagation()}>
+                          <input
+                            type="number"
+                            step="0.001"
+                            className="w-full border border-gray-300 text-right text-xs px-1.5 py-0.5 rounded bg-white focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                            value={p.contagemFisica ?? ''}
+                            onChange={e => handleContagemChange(p.id, e.target.value)}
+                            placeholder="0,000"
+                          />
+                        </td>
+                        <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono font-bold bg-yellow-50 ${sel ? '' : p.diferencaEstoque < 0 ? 'text-red-600' : p.diferencaEstoque > 0 ? 'text-green-600' : ''}`}>
+                          {p.contagemFisica !== null ? fmtN(p.diferencaEstoque) : ''}
+                        </td>
+                      </>
+                    )}
+                    <td className="px-2 py-1 border-r border-gray-200 text-right font-mono">{fmtR(p.precoCusto)}</td>
+                    <td className={`px-2 py-1 text-right font-mono font-semibold ${sel ? '' : negClass(p.valorAtualEstoque)}`}>{fmtR(p.valorAtualEstoque)}</td>
+                  </tr>
+                );
+              })}
+              {executado && produtosFiltrados.length === 0 && (
+                <tr><td colSpan={15} className="px-4 py-8 text-center text-gray-400 italic">Nenhum item encontrado!</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* ── Rodapé com totais ── */}
-      <div className="shrink-0 bg-gray-300 border-t-2 border-gray-500 px-3 py-1 flex items-center justify-between text-gray-800">
-        <span>Registros encontrados: <strong>{produtosFiltrados.length}</strong></span>
-        <div className="flex gap-8 font-mono">
-          <span>{R$(totais.saldoFinal)}</span>
-          <span>{R$(totais.diferenca)}</span>
-          <span className="font-bold">{R$(totais.valorTotal)}</span>
+      <div className="shrink-0 bg-gray-300 border-t-2 border-gray-500 px-3 py-1.5 flex items-center justify-between text-gray-800">
+        <span>Registros encontrados: <strong>{totais.count}</strong></span>
+        <div className="flex gap-8 font-mono text-[11px]">
+          <span className={negClass(totais.saldoFinal)}>{fmtN(totais.saldoFinal)}</span>
+          <span className={totais.diferenca !== 0 ? (totais.diferenca < 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold') : ''}>{fmtN(totais.diferenca)}</span>
+          <span className={`font-bold ${negClass(totais.valorTotal)}`}>{fmtR(totais.valorTotal)}</span>
         </div>
       </div>
 
@@ -334,7 +523,7 @@ export default function AnaliseEstoqueFisico() {
             <p className="text-xs text-gray-500">Análise de Estoque</p>
             <p className="text-sm text-gray-600 mt-1">Processando...</p>
             <p className="text-xl font-bold text-gray-900 mt-2">Aguarde...</p>
-            <p className="text-xs text-gray-500 mt-2">Produto: FEIJAO PROCESSADO</p>
+            <p className="text-xs text-gray-500 mt-2">Produto: <strong>{prodProcessando}</strong></p>
             <div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mt-3" />
             <button onClick={() => setProcessando(false)} className="mt-4 px-4 py-1 bg-gray-200 border border-gray-400 rounded text-xs text-gray-700 hover:bg-gray-300">
               Cancelar
@@ -345,52 +534,42 @@ export default function AnaliseEstoqueFisico() {
 
       {/* ── Modal Detalhamento do Registro ── */}
       {detalheAberto && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border-2 border-gray-400 rounded-lg shadow-xl w-full max-w-5xl max-h-[80vh] flex flex-col">
-            {/* Header */}
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white border-2 border-gray-400 rounded-lg shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between px-4 py-2 border-b border-gray-300 bg-gray-100 shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-gray-700">⊞ Detalhamento do Registro</span>
-              </div>
+              <span className="text-xs font-semibold text-gray-700">⊞ Detalhamento do Registro</span>
               <button onClick={() => setDetalheAberto(null)} className="text-gray-500 hover:text-gray-800">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Info do produto */}
-            <div className="px-4 py-2 border-b border-gray-200 bg-gray-50 flex items-center gap-6 shrink-0 text-xs">
-              <div className="flex items-center gap-2">
+            <div className="px-4 py-2 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center gap-4 shrink-0 text-xs">
+              <div className="flex items-center gap-1.5">
                 <span className="text-gray-600">Código do Produto</span>
-                <input value={detalheAberto.codigo} readOnly className="border border-gray-400 bg-white px-2 py-0.5 rounded w-20 font-mono font-bold" />
+                <span className="border border-gray-400 bg-white px-2 py-0.5 rounded font-mono font-bold">{detalheAberto.codigo}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <span className="text-gray-600">Descrição do Produto</span>
-                <input value={detalheAberto.descricao} readOnly className="border border-gray-400 bg-white px-2 py-0.5 rounded w-52" />
+                <span className="border border-gray-400 bg-white px-2 py-0.5 rounded font-semibold">{detalheAberto.descricao}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <span className="text-gray-600">Quantidade Total</span>
-                <input value={N(Math.abs(detalheAberto.saidas))} readOnly className="border border-gray-400 bg-white px-2 py-0.5 rounded w-20 text-right font-mono" />
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-gray-600">Unidade</span>
+                <span className="border border-gray-400 bg-white px-2 py-0.5 rounded font-mono">{fmtN(Math.abs(detalheAberto.saidas))}</span>
                 <span className="font-bold">{detalheAberto.undEstoque}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <span className="text-gray-600">Saldo Atual</span>
-                <span className="bg-blue-600 text-white px-3 py-0.5 rounded font-bold font-mono">{R$(detalheAberto.saldoFinal)}</span>
+                <span className="bg-blue-600 text-white px-3 py-1 rounded font-bold font-mono text-sm">
+                  {fmtN(detalheAberto.saldoFinal)}
+                </span>
               </div>
-              <label className="flex items-center gap-1 ml-auto text-gray-500 text-[10px]">
-                <input type="checkbox" className="accent-blue-600" />
-                Mostrar movimentações de Alteração/Exclusão
-              </label>
             </div>
 
-            {/* Tabela de movimentações */}
             <div className="flex-1 overflow-auto">
               <table className="w-full border-collapse text-[11px]">
                 <thead className="sticky top-0 bg-gray-200 border-b border-gray-400">
                   <tr>
-                    {['Id DFe/Pedido','Nome/Razão Social','Natureza de Operação','Observações','Data/Hora Venda','Data Entrega','Qtde Apuração','Unidade Apuração','Vlr Total Venda','Qtde Convertida','Unidade Convertida','Preço Médio','Status'].map(h => (
+                    {['Id DFe/Pedido','Nome/Razão Social','Natureza de Operação','Observações','Data/Hora Venda','Data Entrega','Qtde Apuração','Unidade','Vlr Total Venda','Qtde Conv.','Und Conv.','Preço Médio','Status'].map(h => (
                       <th key={h} className="px-2 py-1 text-left font-semibold text-gray-700 border-r border-gray-300 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -399,35 +578,42 @@ export default function AnaliseEstoqueFisico() {
                   {(MOCK_MOVIMENTACOES[detalheAberto.id] || []).map((m, i) => (
                     <tr key={i} className="border-b border-gray-100 hover:bg-blue-50">
                       <td className="px-2 py-1 border-r border-gray-200 text-blue-700 whitespace-nowrap">{m.idDfe}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 whitespace-nowrap">{m.nomeCliente}</td>
+                      <td className="px-2 py-1 border-r border-gray-200 whitespace-nowrap font-medium">{m.nomeCliente}</td>
                       <td className="px-2 py-1 border-r border-gray-200">{m.natureza}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 text-orange-600 font-semibold">{m.observacoes}</td>
+                      <td className="px-2 py-1 border-r border-gray-200 text-orange-600 font-bold">{m.observacoes}</td>
                       <td className="px-2 py-1 border-r border-gray-200 font-mono whitespace-nowrap">{m.dataHoraVenda}</td>
                       <td className="px-2 py-1 border-r border-gray-200 font-mono">{m.dataEntrega}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 text-right font-mono font-bold">{N(m.qtdeApuracao)}</td>
+                      <td className="px-2 py-1 border-r border-gray-200 text-right font-mono font-bold">{fmtN(m.qtdeApuracao)}</td>
                       <td className="px-2 py-1 border-r border-gray-200">{m.unidadeApuracao}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 text-right font-mono">{R$(m.vlrTotalVenda)}</td>
+                      <td className="px-2 py-1 border-r border-gray-200 text-right font-mono">{fmtR(m.vlrTotalVenda)}</td>
                       <td className="px-2 py-1 border-r border-gray-200 text-right font-mono">{m.qtdeConvertida.toFixed(3)}</td>
                       <td className="px-2 py-1 border-r border-gray-200">{m.unidadeConvertida}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 text-right font-mono">{R$(m.precoMedio)}</td>
+                      <td className="px-2 py-1 border-r border-gray-200 text-right font-mono">{fmtR(m.precoMedio)}</td>
                       <td className="px-2 py-1 text-center">{m.status}</td>
                     </tr>
                   ))}
                   {!(MOCK_MOVIMENTACOES[detalheAberto.id] || []).length && (
-                    <tr><td colSpan={13} className="px-4 py-6 text-center text-gray-400 italic">Nenhuma movimentação encontrada para este produto.</td></tr>
+                    <tr><td colSpan={13} className="px-4 py-6 text-center text-gray-400 italic">Nenhuma movimentação para este produto.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
 
-            {/* Footer do modal */}
             <div className="shrink-0 bg-gray-100 border-t border-gray-300 px-4 py-2 flex items-center justify-between text-xs">
-              <span className="text-gray-500">
-                Registros Encontrados: <strong>{(MOCK_MOVIMENTACOES[detalheAberto.id] || []).length}</strong>
-              </span>
-              <div className="flex gap-3">
-                <button className="px-3 py-1 bg-white border border-gray-400 rounded hover:bg-gray-50 text-gray-700 font-medium">
-                  <Download className="h-3 w-3 inline mr-1" /> Exportar
+              <span className="text-gray-500">Registros Encontrados: <strong>{(MOCK_MOVIMENTACOES[detalheAberto.id] || []).length}</strong></span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const movs = MOCK_MOVIMENTACOES[detalheAberto.id] || [];
+                    const csv = 'Id DFe;Cliente;Natureza;Obs;Data Venda;Data Entrega;Qtde;Und;Vlr Total;Preco Medio\n' +
+                      movs.map(m => `${m.idDfe};${m.nomeCliente};${m.natureza};${m.observacoes};${m.dataHoraVenda};${m.dataEntrega};${fmtN(m.qtdeApuracao)};${m.unidadeApuracao};${fmtR(m.vlrTotalVenda)};${fmtR(m.precoMedio)}`).join('\n');
+                    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+                    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+                    a.download = `movimentacoes_${detalheAberto.codigo}_${hoje()}.csv`; a.click();
+                  }}
+                  className="px-3 py-1 bg-white border border-gray-400 rounded hover:bg-gray-50 text-gray-700 font-medium flex items-center gap-1"
+                >
+                  <Download className="h-3 w-3" /> Exportar
                 </button>
                 <button onClick={() => setDetalheAberto(null)} className="px-4 py-1 bg-blue-600 text-white rounded font-medium hover:bg-blue-700">
                   OK

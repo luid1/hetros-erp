@@ -20,6 +20,30 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-27] — Análise Estoque Físico 100% funcional
+
+### O que mudou
+- **Calendário**: campos `type="date"` com seletor nativo do browser
+- **Família**: dropdown filtra ao trocar (BCA/Fruta/Citricos/Legumes/Verdura)
+- **Grupo**: muda dinamicamente conforme família (Batatas/Cebolas/Tropical/etc.)
+- **Tipo Item**: 8 opções (00-Mercadoria para Revenda até 10-Outros Insumos)
+- **Unidade de Apuração**: radio buttons Estoque/Principal funcionais
+- **Conferência Física**: checkbox liga/desliga colunas editáveis de contagem
+- **Contagem Física**: campo numérico editável calcula diferença em tempo real (verde/vermelho)
+- **Executar**: animação de processamento produto a produto, depois exibe grade
+- **Imprimir**: abre nova janela com relatório formatado (cabeçalho Hetros, tabela, `window.print()`)
+- **Exportar**: gera CSV com BOM UTF-8 e separador ponto-e-vírgula (abre correto no Excel BR)
+- **Exportar detalhe**: exporta movimentações do drill-down também em CSV
+- **Busca rápida**: campo de filtro por código/descrição após executar
+- **Não Mostrar Ordens de Compra**: checkbox oculta coluna Ordens de Compra
+- 27 produtos mock (BCA + Fruta + Citricos + Legumes + Verdura)
+- Estado vazio com instrução "Clique em Executar" antes de rodar
+
+### Arquivos modificados
+- `frontend/src/modules/estoque/pages/AnaliseEstoqueFisico.tsx` — reescrito completo
+
+---
+
 ## [2026-06-27] — Análise de Estoque Físico (Contagem)
 
 ### O que mudou
