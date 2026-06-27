@@ -217,8 +217,8 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
   // ── Modal Nova Entrega ──
   const [modalNovaEntrega, setModalNovaEntrega] = useState(false);
 
-  const handleNovaEntregaCriada = (novoPedido: PedidoCarga) => {
-    setPedidos(prev => [novoPedido, ...prev]);
+  const handleNovasEntregasCriadas = (novosPedidos: PedidoCarga[]) => {
+    setPedidos(prev => [...novosPedidos, ...prev]);
     setModalNovaEntrega(false);
   };
 
@@ -542,40 +542,60 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
           dataCarga={dataCarga}
           rotas={rotas}
           onClose={() => setModalNovaEntrega(false)}
-          onCriado={handleNovaEntregaCriada}
+          onCriado={handleNovasEntregasCriadas}
         />
       )}
     </div>
   );
 }
 
-// ─── Modal Nova Entrega (cliente + motoristas sempre visíveis) ───
+// ─── Tipo para item da lista de entregas no modal ───
+interface EntregaItem {
+  cliente: any;
+  volumes: number;
+  pesoKg: number;
+  tipoFat: string;
+  regiao: string;
+  observacoes: string;
+}
+
+// ─── Modal Nova Entrega (motorista fixo + múltiplos clientes) ───
 function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
   dataCarga: string;
   rotas: RotaMotorista[];
   onClose: () => void;
-  onCriado: (pedido: PedidoCarga) => void;
+  onCriado: (pedidos: PedidoCarga[]) => void;
 }) {
   const { filialAtiva } = useAuth();
+  const REGIOES = ['GUARULHOS', 'ZONA NORTE', 'ZONA SUL', 'ZONA OESTE', 'CENTRO', 'ARUJÁ', 'ZONA LESTE', 'ABC'];
 
-  const [etapa, setEtapa] = useState(1);
+  // Motorista fixo
+  const [rotaSelId, setRotaSelId] = useState<string>('none');
+  const rotaSel = rotas.find(r => r.id === rotaSelId) || null;
+
+  // Dados compartilhados
+  const [dataEntrega, setDataEntrega] = useState(dataCarga);
+  const [periodo, setPeriodo]         = useState('MANHA');
+  const [recebimento, setRecebimento] = useState('07:00');
+
+  // Busca de clientes
   const [clientes, setClientes]         = useState<any[]>([]);
   const [buscaCliente, setBuscaCliente] = useState('');
   const [loadingCli, setLoadingCli]     = useState(false);
 
-  const [clienteSel, setClienteSel] = useState<any>(null);
-  const [rotaSelId, setRotaSelId]   = useState<string>('none');
-  const [volumes, setVolumes]       = useState('1');
-  const [pesoKg, setPesoKg]         = useState('0');
-  const [tipoFat, setTipoFat]      = useState('NFe');
-  const [periodo, setPeriodo]       = useState('MANHA');
-  const [regiao, setRegiao]         = useState('');
-  const [observacoes, setObs]       = useState('');
-  const [dataEntrega, setDataEntrega] = useState(dataCarga);
-  const [recebimento, setRecebimento] = useState('07:00');
-  const [salvando, setSalvando]     = useState(false);
-  const [erro, setErro]             = useState('');
+  // Formulário do cliente atual sendo adicionado
+  const [volumes, setVolumes]     = useState('1');
+  const [pesoKg, setPesoKg]       = useState('');
+  const [tipoFat, setTipoFat]     = useState('NFe');
+  const [regiao, setRegiao]       = useState('');
+  const [obs, setObs]             = useState('');
 
+  // Lista de entregas acumuladas
+  const [entregas, setEntregas] = useState<EntregaItem[]>([]);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro]         = useState('');
+
+  // Busca clientes
   useEffect(() => {
     setLoadingCli(true);
     const t = setTimeout(() => {
@@ -587,264 +607,274 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
     return () => clearTimeout(t);
   }, [buscaCliente]);
 
-  const handleSelectCliente = (c: any) => {
-    setClienteSel(c);
+  // IDs dos clientes já adicionados
+  const idsAdicionados = new Set(entregas.map(e => e.cliente.id));
+
+  // Adiciona cliente à lista
+  const handleAddCliente = (c: any) => {
     const end: any = c.enderecoJson || {};
+    let reg = regiao;
     if (end.cidade) {
       const cidade = end.cidade.toUpperCase();
-      if (cidade.includes('GUARULHOS')) setRegiao('GUARULHOS');
-      else if (cidade.includes('ARUJÁ') || cidade.includes('ARUJA')) setRegiao('ARUJÁ');
-      else setRegiao('');
+      if (cidade.includes('GUARULHOS')) reg = 'GUARULHOS';
+      else if (cidade.includes('ARUJÁ') || cidade.includes('ARUJA')) reg = 'ARUJÁ';
     }
-    setEtapa(2);
+
+    setEntregas(prev => [...prev, {
+      cliente: c,
+      volumes: parseInt(volumes) || 1,
+      pesoKg: parseFloat(pesoKg) || 0,
+      tipoFat,
+      regiao: reg,
+      observacoes: obs,
+    }]);
+
+    // Limpa para próximo
+    setPesoKg('');
+    setVolumes('1');
+    setObs('');
+    setRegiao('');
+    setBuscaCliente('');
   };
 
-  const rotaSel = rotas.find(r => r.id === rotaSelId) || null;
+  // Remove da lista
+  const handleRemove = (idx: number) => {
+    setEntregas(prev => prev.filter((_, i) => i !== idx));
+  };
 
-  const handleSalvar = async () => {
-    if (!clienteSel || !filialAtiva) { setErro('Selecione um cliente.'); return; }
+  // Totais
+  const pesoTotal = entregas.reduce((s, e) => s + e.pesoKg, 0);
+  const volumesTotal = entregas.reduce((s, e) => s + e.volumes, 0);
+
+  // Salvar TODOS de uma vez
+  const handleSalvarTodos = async () => {
+    if (entregas.length === 0) { setErro('Adicione pelo menos um cliente.'); return; }
+    if (!filialAtiva) { setErro('Nenhuma filial selecionada.'); return; }
     setSalvando(true); setErro('');
+
+    const pedidosCriados: PedidoCarga[] = [];
+    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
     try {
-      const res = await api.post('/pedidos', {
-        filialOrigemId: filialAtiva.id, clienteId: clienteSel.id,
-        tipo: 'VENDA', dataEntrega, observacoes,
-      });
-      const pedido = res.data;
-      const end: any = clienteSel.enderecoJson || {};
-      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      onCriado({
-        id: pedido.id, numero: pedido.numero, data: dataEntrega, liberadoEm: hora,
-        nomeFantasia: clienteSel.nomeFantasia || clienteSel.razaoSocial,
-        referencia: String(pedido.numero).padStart(5, '0'),
-        volumes: parseInt(volumes) || 0,
-        pesoKg: parseFloat(pesoKg).toFixed(1).replace('.', ','),
-        empresa: 'Hetr.', tipoFaturamento: tipoFat, autorizacao: '', status: '',
-        statusCarga: 'IMPRESSAO_PENDENTE', aurCargaOk: false,
-        regiao: regiao || end.cidade || '', cep: end.cep || '', bairro: end.bairro || '',
-        subRegiao: '', onda: 1, periodo: periodo as any,
-        rota: rotaSel ? String(rotaSel.numero) : '',
-        recebimento: recebimento ? recebimento + '-1.' : '',
-        motorista: rotaSel ? rotaSel.motorista : '',
-        andamento: 0, valorTotal: 0, idMltvenda: '', idVenda: String(pedido.numero),
-      });
+      for (const entrega of entregas) {
+        const res = await api.post('/pedidos', {
+          filialOrigemId: filialAtiva.id,
+          clienteId: entrega.cliente.id,
+          tipo: 'VENDA',
+          dataEntrega,
+          observacoes: entrega.observacoes,
+        });
+        const pedido = res.data;
+        const end: any = entrega.cliente.enderecoJson || {};
+
+        pedidosCriados.push({
+          id: pedido.id, numero: pedido.numero, data: dataEntrega, liberadoEm: hora,
+          nomeFantasia: entrega.cliente.nomeFantasia || entrega.cliente.razaoSocial,
+          referencia: String(pedido.numero).padStart(5, '0'),
+          volumes: entrega.volumes,
+          pesoKg: entrega.pesoKg.toFixed(1).replace('.', ','),
+          empresa: 'Hetr.', tipoFaturamento: entrega.tipoFat, autorizacao: '', status: '',
+          statusCarga: 'IMPRESSAO_PENDENTE', aurCargaOk: false,
+          regiao: entrega.regiao || end.cidade || '', cep: end.cep || '', bairro: end.bairro || '',
+          subRegiao: '', onda: 1, periodo: periodo as any,
+          rota: rotaSel ? String(rotaSel.numero) : '',
+          recebimento: recebimento ? recebimento + '-1.' : '',
+          motorista: rotaSel ? rotaSel.motorista : '',
+          andamento: 0, valorTotal: 0, idMltvenda: '', idVenda: String(pedido.numero),
+        });
+      }
+      onCriado(pedidosCriados);
     } catch (e: any) {
-      setErro(e.response?.data?.message || 'Erro ao criar pedido.');
+      setErro(`Erro ao criar: ${e.response?.data?.message || e.message}. ${pedidosCriados.length} de ${entregas.length} criados.`);
+      if (pedidosCriados.length > 0) onCriado(pedidosCriados);
     } finally { setSalvando(false); }
   };
 
-  const REGIOES = ['GUARULHOS', 'ZONA NORTE', 'ZONA SUL', 'ZONA OESTE', 'CENTRO', 'ARUJÁ', 'ZONA LESTE', 'ABC'];
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white border border-gray-300 rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
+      <div className="bg-white border border-gray-300 rounded-xl shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col">
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-2.5 border-b border-gray-200 bg-gray-50 rounded-t-xl shrink-0">
-          <div className="flex items-center gap-3">
+        {/* ═══ HEADER ═══ */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50 rounded-t-xl shrink-0">
+          <div className="flex items-center gap-2">
             <PlusCircle className="h-5 w-5 text-green-600" />
-            <h2 className="font-bold text-gray-900 text-sm">Nova Entrega / Pedido</h2>
-            <div className="flex items-center gap-1 ml-2">
-              <span className={`h-5 w-5 rounded-full text-[9px] font-bold flex items-center justify-center ${etapa >= 1 ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-500'}`}>1</span>
-              <span className="w-3 h-0.5 bg-gray-300" />
-              <span className={`h-5 w-5 rounded-full text-[9px] font-bold flex items-center justify-center ${etapa >= 2 ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-500'}`}>2</span>
-            </div>
-            <span className="text-xs text-gray-400">{etapa === 1 ? 'Selecione o cliente' : 'Dados + motorista'}</span>
+            <h2 className="font-bold text-gray-900 text-sm">Nova Entrega — Montagem de Carga</h2>
+            {entregas.length > 0 && (
+              <span className="bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full ml-2">
+                {entregas.length} cliente{entregas.length !== 1 ? 's' : ''} · {pesoTotal.toFixed(1)}Kg
+              </span>
+            )}
           </div>
           <button onClick={onClose} className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-700">
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        {/* ═══ CORPO: 3 colunas ═══ */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
 
-          {/* ═══ ETAPA 1: Cliente ═══ */}
-          {etapa === 1 && (
-            <div className="p-5 space-y-3">
-              <label className="block text-xs font-bold text-gray-700 uppercase tracking-wide">
-                <UserPlus className="h-3.5 w-3.5 inline mr-1" /> Selecione o Cliente
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input type="text" value={buscaCliente} onChange={e => setBuscaCliente(e.target.value)}
-                  placeholder="Buscar cliente por nome ou CNPJ..."
-                  className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" autoFocus />
+          {/* ── Col 1: Motorista + Config (fixo) ── */}
+          <div className="w-64 shrink-0 border-r border-gray-200 flex flex-col bg-gray-50">
+            {/* Dados compartilhados */}
+            <div className="p-3 space-y-2 border-b border-gray-200 shrink-0">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Data Entrega</label>
+                <input type="date" value={dataEntrega} onChange={e => setDataEntrega(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-xs" />
               </div>
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className="overflow-y-auto" style={{ maxHeight: 400 }}>
-                  {loadingCli ? (
-                    <div className="flex items-center justify-center py-8"><div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full" /><span className="ml-2 text-sm text-gray-400">Buscando...</span></div>
-                  ) : clientes.length === 0 ? (
-                    <p className="text-center text-gray-400 text-sm py-8">Nenhum cliente encontrado.</p>
-                  ) : clientes.slice(0, 50).map(c => (
-                    <button key={c.id} onClick={() => handleSelectCliente(c)}
-                      className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b border-gray-100 last:border-0 transition-colors flex items-center justify-between group">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 shrink-0 group-hover:bg-blue-100 group-hover:text-blue-700">
-                          {(c.nomeFantasia || c.razaoSocial || '?')[0].toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">{c.nomeFantasia || c.razaoSocial}</p>
-                          <p className="text-xs text-gray-400">{c.cnpjCpf}</p>
-                        </div>
-                      </div>
-                      <span className="text-xs text-blue-600 opacity-0 group-hover:opacity-100 font-semibold">Selecionar →</span>
-                    </button>
-                  ))}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Período</label>
+                  <select value={periodo} onChange={e => setPeriodo(e.target.value)} className="w-full border border-gray-300 rounded px-1 py-1 text-xs">
+                    <option value="MANHA">MANHÃ</option><option value="TARDE">TARDE</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Receb.</label>
+                  <input type="time" value={recebimento} onChange={e => setRecebimento(e.target.value)} className="w-full border border-gray-300 rounded px-1 py-1 text-xs" />
                 </div>
               </div>
             </div>
-          )}
 
-          {/* ═══ ETAPA 2: Dados + Motoristas lado a lado ═══ */}
-          {etapa === 2 && (
-            <div className="flex min-h-0">
-
-              {/* ── Coluna esquerda: dados da entrega ── */}
-              <div className="flex-1 p-4 space-y-3 border-r border-gray-200 overflow-y-auto">
-
-                {/* Cliente selecionado */}
-                <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-lg bg-green-600 flex items-center justify-center text-white text-xs font-bold">
-                      {(clienteSel?.nomeFantasia || clienteSel?.razaoSocial || '?')[0].toUpperCase()}
+            {/* Motoristas */}
+            <div className="bg-gray-200 px-3 py-1.5 border-b border-gray-300 shrink-0">
+              <p className="text-[10px] font-bold text-gray-700 uppercase flex items-center gap-1">
+                <Truck className="h-3 w-3" /> Motorista / Rota
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <button onClick={() => setRotaSelId('none')}
+                className={`w-full text-left px-2 py-1.5 border-b border-gray-200 flex items-center gap-1.5 text-[11px] ${rotaSelId === 'none' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>
+                <div className={`h-2.5 w-2.5 rounded-full border-2 shrink-0 ${rotaSelId === 'none' ? 'border-white bg-white' : 'border-gray-400'}`} />
+                <span className="italic">Sem motorista</span>
+              </button>
+              {rotas.map(r => {
+                const sel = rotaSelId === r.id;
+                return (
+                  <button key={r.id} onClick={() => setRotaSelId(r.id)}
+                    className={`w-full text-left px-2 py-1.5 border-b border-gray-200 flex items-center gap-1.5 ${sel ? 'bg-blue-600 text-white' : 'hover:bg-blue-50'}`}>
+                    <div className={`h-2.5 w-2.5 rounded-full border-2 shrink-0 ${sel ? 'border-white' : 'border-gray-400'}`}>
+                      {sel && <div className="h-1 w-1 bg-white rounded-full m-px" />}
                     </div>
-                    <div>
-                      <p className="font-bold text-green-900 text-xs">{clienteSel?.nomeFantasia || clienteSel?.razaoSocial}</p>
-                      <p className="text-[10px] text-green-600">{clienteSel?.cnpjCpf}</p>
+                    <Truck className={`h-3 w-3 shrink-0 ${sel ? 'text-white' : r.refrigerado ? 'text-cyan-500' : 'text-gray-400'}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-[10px] font-bold truncate ${sel ? 'text-white' : 'text-gray-900'}`}>{r.motorista}</p>
+                      <span className={`text-[9px] ${sel ? 'text-blue-100' : 'text-gray-400'}`}>
+                        {r.tipoVeiculo.slice(0, 8)} · {r.pesoKg.toFixed(0)}Kg · #{r.numero}
+                      </span>
                     </div>
-                  </div>
-                  <button onClick={() => { setClienteSel(null); setEtapa(1); }} className="text-[10px] text-green-700 hover:text-red-600 font-semibold">✕ Trocar</button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Data Entrega</label>
-                    <input type="date" value={dataEntrega} onChange={e => setDataEntrega(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-xs" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Período</label>
-                    <select value={periodo} onChange={e => setPeriodo(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-xs">
-                      <option value="MANHA">MANHÃ</option><option value="TARDE">TARDE</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Tipo Faturamento</label>
-                    <select value={tipoFat} onChange={e => setTipoFat(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-xs">
-                      <option value="NFe">NF-e</option><option value="Repo.">Repo.</option><option value="NFC-e">NFC-e</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Recebimento</label>
-                    <input type="time" value={recebimento} onChange={e => setRecebimento(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-xs" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Volumes</label>
-                    <input type="number" min="0" value={volumes} onChange={e => setVolumes(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-xs" />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Peso (Kg)</label>
-                    <input type="number" step="0.1" min="0" value={pesoKg} onChange={e => setPesoKg(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-xs" />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Região</label>
-                    <select value={regiao} onChange={e => setRegiao(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-xs">
-                      <option value="">Selecione...</option>
-                      {REGIOES.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Observações</label>
-                    <input type="text" value={observacoes} onChange={e => setObs(e.target.value)} placeholder="Informações adicionais..." className="w-full border border-gray-300 rounded px-2 py-1 text-xs" />
-                  </div>
-                </div>
-
-                {erro && <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-3 py-2 rounded">{erro}</div>}
-              </div>
-
-              {/* ── Coluna direita: MOTORISTAS (sempre visível) ── */}
-              <div className="w-80 shrink-0 flex flex-col bg-gray-50 overflow-hidden">
-                <div className="bg-gray-200 px-3 py-2 border-b border-gray-300 shrink-0">
-                  <p className="text-[10px] font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1">
-                    <Truck className="h-3.5 w-3.5" /> Atribuir Motorista / Rota
-                  </p>
-                  <p className="text-[9px] text-gray-500 mt-0.5">Clique para selecionar — clique de novo para trocar</p>
-                </div>
-
-                <div className="flex-1 overflow-y-auto">
-                  {/* Sem motorista */}
-                  <button
-                    onClick={() => setRotaSelId('none')}
-                    className={`w-full text-left px-3 py-2 border-b border-gray-200 transition-all flex items-center gap-2 ${rotaSelId === 'none' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}
-                  >
-                    <div className={`h-3 w-3 rounded-full border-2 shrink-0 ${rotaSelId === 'none' ? 'border-white bg-white' : 'border-gray-400'}`}>
-                      {rotaSelId === 'none' && <div className="h-1.5 w-1.5 bg-blue-600 rounded-full m-[1px]" />}
-                    </div>
-                    <span className="text-xs italic">{rotaSelId === 'none' ? '✔ Sem motorista (rotear depois)' : 'Sem motorista (rotear depois)'}</span>
                   </button>
+                );
+              })}
+            </div>
+          </div>
 
-                  {/* Lista de motoristas */}
-                  {rotas.map(r => {
-                    const sel = rotaSelId === r.id;
-                    return (
-                      <button
-                        key={r.id}
-                        onClick={() => setRotaSelId(r.id)}
-                        className={`w-full text-left px-3 py-2 border-b border-gray-200 transition-all flex items-center gap-2 ${sel ? 'bg-blue-600 text-white' : 'hover:bg-blue-50'}`}
-                      >
-                        <div className={`h-3 w-3 rounded-full border-2 shrink-0 flex items-center justify-center ${sel ? 'border-white' : 'border-gray-400'}`}>
-                          {sel && <div className="h-1.5 w-1.5 bg-white rounded-full" />}
-                        </div>
-                        <Truck className={`h-3.5 w-3.5 shrink-0 ${sel ? 'text-white' : r.refrigerado ? 'text-cyan-500' : 'text-gray-400'}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-xs font-bold truncate ${sel ? 'text-white' : 'text-gray-900'}`}>{r.motorista}</p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`text-[9px] font-bold px-1 rounded ${sel ? 'bg-white/20 text-white' : r.refrigerado ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-200 text-gray-600'}`}>
-                              {r.tipoVeiculo.length > 10 ? r.tipoVeiculo.slice(0, 10) : r.tipoVeiculo}
-                            </span>
-                            <span className={`text-[9px] ${sel ? 'text-blue-100' : 'text-gray-400'}`}>
-                              {r.pesoKg.toFixed(0)}Kg · {r.qtdEntregas}e · #{r.numero}
-                            </span>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
+          {/* ── Col 2: Busca + Add cliente ── */}
+          <div className="flex-1 flex flex-col border-r border-gray-200 min-w-0 overflow-hidden">
+            {/* Barra de add */}
+            <div className="p-3 border-b border-gray-200 bg-white shrink-0 space-y-2">
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                  <input type="text" value={buscaCliente} onChange={e => setBuscaCliente(e.target.value)}
+                    placeholder="Buscar cliente..."
+                    className="w-full border border-gray-300 rounded pl-8 pr-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-400 focus:border-blue-400" />
                 </div>
-
-                {/* Resumo do motorista selecionado */}
-                <div className="bg-gray-200 border-t border-gray-300 px-3 py-2 shrink-0">
-                  {rotaSel ? (
-                    <div className="flex items-center gap-2">
-                      <Truck className={`h-4 w-4 ${rotaSel.refrigerado ? 'text-cyan-600' : 'text-blue-600'}`} />
-                      <div>
-                        <p className="text-[10px] font-bold text-gray-800">{rotaSel.motorista}</p>
-                        <p className="text-[9px] text-gray-500">{rotaSel.tipoVeiculo} · Rota {rotaSel.numero} · {rotaSel.pesoKg.toFixed(0)}Kg</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-[10px] text-gray-500 italic">Nenhum motorista · será roteado depois</p>
-                  )}
-                </div>
+                <input type="number" value={pesoKg} onChange={e => setPesoKg(e.target.value)}
+                  placeholder="Peso Kg" className="w-20 border border-gray-300 rounded px-2 py-1.5 text-xs text-right" />
+                <input type="number" value={volumes} onChange={e => setVolumes(e.target.value)}
+                  placeholder="Vol" className="w-14 border border-gray-300 rounded px-2 py-1.5 text-xs text-right" />
+                <select value={regiao} onChange={e => setRegiao(e.target.value)} className="w-28 border border-gray-300 rounded px-1 py-1.5 text-xs">
+                  <option value="">Região</option>
+                  {REGIOES.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-2.5 border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0">
-          <div>
-            {etapa === 2 && (
-              <button onClick={() => setEtapa(1)} className="text-xs text-gray-500 hover:text-gray-700 font-medium">← Voltar para clientes</button>
+            {/* Lista de clientes p/ adicionar */}
+            <div className="flex-1 overflow-y-auto">
+              {loadingCli ? (
+                <div className="flex items-center justify-center py-8"><div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full" /></div>
+              ) : clientes.length === 0 ? (
+                <p className="text-center text-gray-400 text-xs py-6">Nenhum cliente encontrado.</p>
+              ) : clientes.slice(0, 60).map(c => {
+                const jaAdd = idsAdicionados.has(c.id);
+                return (
+                  <button key={c.id} onClick={() => !jaAdd && handleAddCliente(c)} disabled={jaAdd}
+                    className={`w-full text-left px-3 py-2 border-b border-gray-100 flex items-center justify-between group transition-colors ${jaAdd ? 'bg-green-50 opacity-60' : 'hover:bg-blue-50'}`}>
+                    <div className="flex items-center gap-2.5">
+                      <div className={`h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0 ${jaAdd ? 'bg-green-200 text-green-700' : 'bg-gray-100 text-gray-600 group-hover:bg-blue-100 group-hover:text-blue-700'}`}>
+                        {jaAdd ? '✔' : (c.nomeFantasia || c.razaoSocial || '?')[0].toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-semibold truncate ${jaAdd ? 'text-green-700' : 'text-gray-900'}`}>{c.nomeFantasia || c.razaoSocial}</p>
+                        <p className="text-[10px] text-gray-400">{c.cnpjCpf}</p>
+                      </div>
+                    </div>
+                    {!jaAdd && <span className="text-[10px] text-blue-600 opacity-0 group-hover:opacity-100 font-bold">+ Adicionar</span>}
+                    {jaAdd && <span className="text-[10px] text-green-600 font-bold">Adicionado</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Col 3: Lista de entregas acumuladas ── */}
+          <div className="w-72 shrink-0 flex flex-col bg-white">
+            <div className="bg-green-600 text-white px-3 py-2 shrink-0 flex items-center justify-between">
+              <p className="text-xs font-bold">Entregas desta carga</p>
+              <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">{entregas.length} · {pesoTotal.toFixed(1)}Kg</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {entregas.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-gray-400 px-4 text-center">
+                  <div>
+                    <Truck className="h-8 w-8 mx-auto mb-2 text-gray-200" />
+                    <p className="text-xs">Busque e clique nos clientes à esquerda para montar a carga</p>
+                  </div>
+                </div>
+              ) : entregas.map((e, idx) => (
+                <div key={idx} className="px-3 py-2 border-b border-gray-100 flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-gray-900 truncate">{e.cliente.nomeFantasia || e.cliente.razaoSocial}</p>
+                    <p className="text-[10px] text-gray-400">
+                      {e.pesoKg > 0 ? e.pesoKg.toFixed(1) + 'Kg' : ''}{e.pesoKg > 0 && e.volumes > 0 ? ' · ' : ''}{e.volumes > 0 ? e.volumes + ' vol' : ''}{e.regiao ? ' · ' + e.regiao : ''}
+                    </p>
+                  </div>
+                  <button onClick={() => handleRemove(idx)} className="text-gray-400 hover:text-red-600 shrink-0">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Totais */}
+            {entregas.length > 0 && (
+              <div className="bg-gray-100 border-t border-gray-200 px-3 py-2 shrink-0 grid grid-cols-2 gap-2 text-[10px]">
+                <div><span className="text-gray-500">Clientes:</span> <strong>{entregas.length}</strong></div>
+                <div><span className="text-gray-500">Peso Total:</span> <strong>{pesoTotal.toFixed(1)}Kg</strong></div>
+                <div><span className="text-gray-500">Volumes:</span> <strong>{volumesTotal}</strong></div>
+                <div><span className="text-gray-500">Motorista:</span> <strong className="truncate">{rotaSel?.motorista || '—'}</strong></div>
+              </div>
             )}
           </div>
+        </div>
+
+        {/* ═══ FOOTER ═══ */}
+        <div className="flex items-center justify-between px-4 py-2 border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0">
+          <div className="text-xs text-gray-500">
+            {rotaSel && <span className="flex items-center gap-1"><Truck className="h-3 w-3 text-blue-600" /> <strong>{rotaSel.motorista}</strong> — {rotaSel.tipoVeiculo} · #{rotaSel.numero}</span>}
+          </div>
+          {erro && <span className="text-xs text-red-600">{erro}</span>}
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 font-medium">Cancelar</button>
-            {etapa === 2 && (
-              <button onClick={handleSalvar} disabled={salvando || !clienteSel}
-                className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-1.5 shadow-sm">
-                {salvando ? <><span className="animate-spin h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full" /> Salvando...</> : <><PlusCircle className="h-4 w-4" /> Criar Entrega</>}
-              </button>
-            )}
+            <button onClick={onClose} className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50 font-medium">Cancelar</button>
+            <button onClick={handleSalvarTodos} disabled={salvando || entregas.length === 0}
+              className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold disabled:opacity-40 flex items-center gap-1.5 shadow-sm">
+              {salvando
+                ? <><span className="animate-spin h-3 w-3 border-2 border-white/30 border-t-white rounded-full" /> Criando {entregas.length}...</>
+                : <><PlusCircle className="h-3.5 w-3.5" /> Criar {entregas.length} Entrega{entregas.length !== 1 ? 's' : ''}</>
+              }
+            </button>
           </div>
         </div>
       </div>

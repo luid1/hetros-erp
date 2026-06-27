@@ -20,6 +20,27 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-27] — Nova Entrega: múltiplos clientes na mesma rota
+
+### O que mudou
+- **Redesenho total do modal** em 3 colunas:
+  - Coluna 1 (esquerda): Motorista fixo + Data/Período/Recebimento
+  - Coluna 2 (centro): Busca de clientes + campos Peso/Volumes/Região por cliente
+  - Coluna 3 (direita): Lista acumulada de entregas com totais
+- **Fluxo**: seleciona motorista UMA VEZ → vai adicionando clientes em sequência
+- Cada cliente adicionado: peso, volumes e região independentes
+- **Lista acumulada** mostra todos os clientes já adicionados com X para remover
+- **Totais em tempo real**: nº clientes, peso total, volumes, motorista
+- **"Criar N Entregas"**: cria todos os pedidos de uma vez via API
+- Clientes já adicionados aparecem em verde com "Adicionado" (não duplica)
+- Badge no header: "3 clientes · 450.0Kg"
+- Campos Peso e Região pré-preenchidos no formulário de cada cliente
+
+### Arquivos modificados
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx` — modal reescrito (~300 linhas)
+
+---
+
 ## [2026-06-27] — Modal Nova Entrega com motoristas SEMPRE visíveis
 
 ### O que mudou
