@@ -20,6 +20,23 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-27] — Nova Entrega: Peso obrigatório + Frete + % + Pagamento
+
+### O que mudou
+- **Peso obrigatório**: campo destacado em vermelho quando vazio, bloqueia adição sem peso
+- **Valor do Frete (R$)**: campo por cliente na barra de adição
+- **Percentual (%)**: campo por cliente para comissão/markup
+- **Forma de Pagamento**: dropdown por cliente (Boleto, PIX, Dinheiro, Cartão, Cheque, Depósito, A Prazo)
+- **Lista acumulada** mostra todos os dados: peso, volumes, região, frete (tag azul), % (tag roxa), pagamento (tag cinza), tipo faturamento
+- **Totais** incluem frete total acumulado
+- Labels descritivos na barra de adição (Peso *, Vol)
+- Erro inline quando tenta adicionar sem peso
+
+### Arquivos modificados
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx`
+
+---
+
 ## [2026-06-27] — Nova Entrega: múltiplos clientes na mesma rota
 
 ### O que mudou

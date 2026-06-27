@@ -557,6 +557,9 @@ interface EntregaItem {
   tipoFat: string;
   regiao: string;
   observacoes: string;
+  valorFrete: number;
+  percentual: number;
+  formaPagamento: string;
 }
 
 // ─── Modal Nova Entrega (motorista fixo + múltiplos clientes) ───
@@ -584,11 +587,14 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
   const [loadingCli, setLoadingCli]     = useState(false);
 
   // Formulário do cliente atual sendo adicionado
-  const [volumes, setVolumes]     = useState('1');
-  const [pesoKg, setPesoKg]       = useState('');
-  const [tipoFat, setTipoFat]     = useState('NFe');
-  const [regiao, setRegiao]       = useState('');
-  const [obs, setObs]             = useState('');
+  const [volumes, setVolumes]           = useState('1');
+  const [pesoKg, setPesoKg]             = useState('');
+  const [tipoFat, setTipoFat]           = useState('NFe');
+  const [regiao, setRegiao]             = useState('');
+  const [obs, setObs]                   = useState('');
+  const [valorFrete, setValorFrete]     = useState('');
+  const [percentual, setPercentual]     = useState('');
+  const [formaPagamento, setFormaPag]   = useState('BOLETO');
 
   // Lista de entregas acumuladas
   const [entregas, setEntregas] = useState<EntregaItem[]>([]);
@@ -620,6 +626,11 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
       else if (cidade.includes('ARUJÁ') || cidade.includes('ARUJA')) reg = 'ARUJÁ';
     }
 
+    if (!pesoKg || parseFloat(pesoKg) <= 0) {
+      setErro('Informe o peso (Kg) antes de adicionar.');
+      return;
+    }
+
     setEntregas(prev => [...prev, {
       cliente: c,
       volumes: parseInt(volumes) || 1,
@@ -627,6 +638,9 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
       tipoFat,
       regiao: reg,
       observacoes: obs,
+      valorFrete: parseFloat(valorFrete) || 0,
+      percentual: parseFloat(percentual) || 0,
+      formaPagamento,
     }]);
 
     // Limpa para próximo
@@ -634,7 +648,10 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
     setVolumes('1');
     setObs('');
     setRegiao('');
+    setValorFrete('');
+    setPercentual('');
     setBuscaCliente('');
+    setErro('');
   };
 
   // Remove da lista
@@ -772,22 +789,62 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
           <div className="flex-1 flex flex-col border-r border-gray-200 min-w-0 overflow-hidden">
             {/* Barra de add */}
             <div className="p-3 border-b border-gray-200 bg-white shrink-0 space-y-2">
-              <div className="flex gap-2">
+              {/* Linha 1: Busca + Peso + Volumes */}
+              <div className="flex gap-1.5">
                 <div className="flex-1 relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
                   <input type="text" value={buscaCliente} onChange={e => setBuscaCliente(e.target.value)}
                     placeholder="Buscar cliente..."
                     className="w-full border border-gray-300 rounded pl-8 pr-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-400 focus:border-blue-400" />
                 </div>
-                <input type="number" value={pesoKg} onChange={e => setPesoKg(e.target.value)}
-                  placeholder="Peso Kg" className="w-20 border border-gray-300 rounded px-2 py-1.5 text-xs text-right" />
-                <input type="number" value={volumes} onChange={e => setVolumes(e.target.value)}
-                  placeholder="Vol" className="w-14 border border-gray-300 rounded px-2 py-1.5 text-xs text-right" />
-                <select value={regiao} onChange={e => setRegiao(e.target.value)} className="w-28 border border-gray-300 rounded px-1 py-1.5 text-xs">
+                <div className="relative">
+                  <input type="number" step="0.1" value={pesoKg} onChange={e => setPesoKg(e.target.value)}
+                    placeholder="0,0"
+                    className={`w-20 border rounded px-2 py-1.5 text-xs text-right font-bold ${!pesoKg ? 'border-red-400 bg-red-50 placeholder:text-red-300' : 'border-gray-300'}`} />
+                  <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 pointer-events-none">Kg</span>
+                </div>
+                <input type="number" min="0" value={volumes} onChange={e => setVolumes(e.target.value)}
+                  placeholder="Vol" className="w-12 border border-gray-300 rounded px-1.5 py-1.5 text-xs text-right" title="Volumes" />
+              </div>
+
+              {/* Linha 2: Frete + % + Pagamento + Região */}
+              <div className="flex gap-1.5">
+                <div className="relative">
+                  <input type="number" step="0.01" value={valorFrete} onChange={e => setValorFrete(e.target.value)}
+                    placeholder="0,00"
+                    className="w-24 border border-gray-300 rounded px-2 py-1.5 text-xs text-right" />
+                  <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 pointer-events-none">R$</span>
+                </div>
+                <div className="relative">
+                  <input type="number" step="0.1" value={percentual} onChange={e => setPercentual(e.target.value)}
+                    placeholder="0"
+                    className="w-16 border border-gray-300 rounded px-2 py-1.5 text-xs text-right" title="Percentual" />
+                  <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 pointer-events-none">%</span>
+                </div>
+                <select value={formaPagamento} onChange={e => setFormaPag(e.target.value)}
+                  className="w-24 border border-gray-300 rounded px-1 py-1.5 text-xs" title="Forma de Pagamento">
+                  <option value="BOLETO">Boleto</option>
+                  <option value="PIX">PIX</option>
+                  <option value="DINHEIRO">Dinheiro</option>
+                  <option value="CARTAO">Cartão</option>
+                  <option value="CHEQUE">Cheque</option>
+                  <option value="DEPOSITO">Depósito</option>
+                  <option value="A_PRAZO">A Prazo</option>
+                </select>
+                <select value={regiao} onChange={e => setRegiao(e.target.value)} className="flex-1 border border-gray-300 rounded px-1 py-1.5 text-xs">
                   <option value="">Região</option>
                   {REGIOES.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
+
+              {/* Labels */}
+              <div className="flex gap-1.5 text-[9px] text-gray-400 -mt-1">
+                <span className="flex-1">Cliente</span>
+                <span className="w-20 text-right">Peso *</span>
+                <span className="w-12 text-right">Vol</span>
+              </div>
+
+              {erro && <p className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">{erro}</p>}
             </div>
 
             {/* Lista de clientes p/ adicionar */}
@@ -834,27 +891,38 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
                   </div>
                 </div>
               ) : entregas.map((e, idx) => (
-                <div key={idx} className="px-3 py-2 border-b border-gray-100 flex items-center gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-900 truncate">{e.cliente.nomeFantasia || e.cliente.razaoSocial}</p>
-                    <p className="text-[10px] text-gray-400">
-                      {e.pesoKg > 0 ? e.pesoKg.toFixed(1) + 'Kg' : ''}{e.pesoKg > 0 && e.volumes > 0 ? ' · ' : ''}{e.volumes > 0 ? e.volumes + ' vol' : ''}{e.regiao ? ' · ' + e.regiao : ''}
-                    </p>
+                <div key={idx} className="px-3 py-2 border-b border-gray-100">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-900 truncate">{e.cliente.nomeFantasia || e.cliente.razaoSocial}</p>
+                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                        <span className="text-[10px] text-gray-600 font-semibold">{e.pesoKg.toFixed(1)}Kg</span>
+                        <span className="text-[10px] text-gray-400">{e.volumes} vol</span>
+                        {e.regiao && <span className="text-[10px] text-gray-400">{e.regiao}</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-x-2 mt-0.5">
+                        {e.valorFrete > 0 && <span className="text-[9px] bg-blue-50 text-blue-700 px-1 rounded font-medium">Frete: R${e.valorFrete.toFixed(2)}</span>}
+                        {e.percentual > 0 && <span className="text-[9px] bg-purple-50 text-purple-700 px-1 rounded font-medium">{e.percentual}%</span>}
+                        <span className="text-[9px] bg-gray-100 text-gray-600 px-1 rounded">{e.formaPagamento}</span>
+                        <span className="text-[9px] text-gray-400">{e.tipoFat}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => handleRemove(idx)} className="text-gray-400 hover:text-red-600 shrink-0 mt-0.5">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <button onClick={() => handleRemove(idx)} className="text-gray-400 hover:text-red-600 shrink-0">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
                 </div>
               ))}
             </div>
 
             {/* Totais */}
             {entregas.length > 0 && (
-              <div className="bg-gray-100 border-t border-gray-200 px-3 py-2 shrink-0 grid grid-cols-2 gap-2 text-[10px]">
+              <div className="bg-gray-100 border-t border-gray-200 px-3 py-2 shrink-0 grid grid-cols-2 gap-1 text-[10px]">
                 <div><span className="text-gray-500">Clientes:</span> <strong>{entregas.length}</strong></div>
-                <div><span className="text-gray-500">Peso Total:</span> <strong>{pesoTotal.toFixed(1)}Kg</strong></div>
+                <div><span className="text-gray-500">Peso:</span> <strong>{pesoTotal.toFixed(1)}Kg</strong></div>
                 <div><span className="text-gray-500">Volumes:</span> <strong>{volumesTotal}</strong></div>
-                <div><span className="text-gray-500">Motorista:</span> <strong className="truncate">{rotaSel?.motorista || '—'}</strong></div>
+                <div><span className="text-gray-500">Frete:</span> <strong>R${entregas.reduce((s, e) => s + e.valorFrete, 0).toFixed(2)}</strong></div>
+                <div className="col-span-2"><span className="text-gray-500">Motorista:</span> <strong className="truncate">{rotaSel?.motorista || '—'}</strong></div>
               </div>
             )}
           </div>
