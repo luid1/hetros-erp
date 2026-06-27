@@ -20,6 +20,22 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-27] — Clientes importados + CRUD funcional + Carga corrigida
+
+### O que mudou
+- CRUD completo de Clientes (create, findAll com busca, findOne, update, delete)
+- Importados **299 clientes** do arquivo CLIENTES.xlsx para o banco (total: 399 no banco)
+- CargaService corrigido — erros TypeScript resolvidos (campos do Prisma)
+- Backend e frontend rodando: `localhost:3002` (API) + `localhost:3000` (UI)
+- Tela Controle de Carga acessível em `/logistica/carga`
+
+### Arquivos modificados
+- `backend/src/modules/clientes/clientes.service.ts` — CRUD real com Prisma
+- `backend/src/modules/clientes/clientes.controller.ts` — endpoints POST/GET/PUT/DELETE
+- `backend/src/modules/carga/carga.service.ts` — fix TypeScript (romaneios as any)
+
+---
+
 ## [2026-06-26] — Scaffold inicial completo + Login Kiosk
 
 ### O que mudou

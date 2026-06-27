@@ -67,30 +67,29 @@ export class CargaService {
     const inicio  = new Date(dataObj); inicio.setHours(0, 0, 0, 0);
     const fim     = new Date(dataObj); fim.setHours(23, 59, 59, 999);
 
-    const romaneios = await this.prisma.romaneio.findMany({
+    const romaneios: any[] = await this.prisma.romaneio.findMany({
       where: { tenantId, filialId, createdAt: { gte: inicio, lte: fim } },
       include: {
         transportadora: { select: { razaoSocial: true } },
-        veiculo: true,
-        itens: { include: { pedido: { select: { pesoKg: true, valorTotal: true } } } },
+        itens: { include: { pedido: true } },
       },
       orderBy: { numero: 'asc' },
     });
 
-    return romaneios.map((r) => {
-      const pesoTotal = r.itens.reduce((s, i) => s + Number((i.pedido as any)?.pesoKg || 0), 0);
+    return romaneios.map((r: any) => {
+      const pesoTotal = (r.itens || []).reduce((s: number, i: any) => s + Number(i.pedido?.pesoKg || 0), 0);
       return {
         id: r.id,
         numero: r.numero,
-        motorista: (r.veiculo as any)?.motoristaNome || r.motorista || '—',
-        tipoVeiculo: r.veiculo?.tipo || 'VAN',
-        refrigerado: (r.veiculo as any)?.refrigerado || false,
+        motorista: r.motorista || '—',
+        tipoVeiculo: 'VAN',
+        refrigerado: false,
         pesoKg: pesoTotal,
-        qtdEntregas: r.itens.length,
-        periodo: (r as any).periodo || 'MANHA',
-        horaInicio: (r as any).horaInicio,
+        qtdEntregas: (r.itens || []).length,
+        periodo: r.periodo || 'MANHA',
+        horaInicio: r.horaInicio,
         status: r.status,
-        slaPercent: Number((r as any).slaPercent || 0),
+        slaPercent: Number(r.slaPercent || 0),
       };
     });
   }
