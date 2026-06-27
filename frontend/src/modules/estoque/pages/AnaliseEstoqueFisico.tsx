@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { CheckCircle, Printer, Download, X, ChevronRight, Search } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 
@@ -221,32 +221,25 @@ export default function AnaliseEstoqueFisico() {
   };
 
   // ── Executar: filtra e exibe resultados ────────
-  const handleExecutar = useCallback(() => {
-    setProcessando(true);
-    setExecutado(false);
-    setProdutos([]);
-
-    const produtosPorFiltrar = TODOS_PRODUTOS.filter(p => {
+  const handleExecutar = () => {
+    const filtrado = TODOS_PRODUTOS.filter(p => {
       if (familia !== '<Todas>' && p.familia !== familia) return false;
       if (grupo !== '<Todas>' && p.grupo !== grupo) return false;
       return true;
     });
 
-    // Simula processamento produto a produto
-    let idx = 0;
-    const timer = setInterval(() => {
-      if (idx < produtosPorFiltrar.length) {
-        setProdProcessando(produtosPorFiltrar[idx].descricao);
-        idx++;
-      } else {
-        clearInterval(timer);
-        setProdutos(produtosPorFiltrar);
-        setProcessando(false);
-        setExecutado(true);
-        setProdProcessando('');
-      }
-    }, 80);
-  }, [familia, grupo]);
+    setProcessando(true);
+    setExecutado(false);
+    setProdutos([]);
+    setProdProcessando(filtrado.length > 0 ? filtrado[Math.floor(Math.random() * filtrado.length)].descricao : '...');
+
+    window.setTimeout(() => {
+      setProdutos(filtrado);
+      setProcessando(false);
+      setExecutado(true);
+      setProdProcessando('');
+    }, 1200);
+  };
 
   // ── Contagem física: editar valor ──────────────
   const handleContagemChange = (id: string, valor: string) => {
