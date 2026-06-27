@@ -20,6 +20,30 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-27] — Nova Entrega com Motorista/Rota integrado
+
+### O que mudou
+- **Modal Nova Entrega redesenhado** em 2 etapas:
+  - Etapa 1: Busca e seleciona cliente (lista com avatar, busca em tempo real)
+  - Etapa 2: Dados da entrega + atribuição de motorista/rota
+- **Seleção de Motorista**: lista dos 16 motoristas reais com tipo de veículo, peso carregado e nº de entregas
+  - ANDRE LUIZ CELESTINO (VAN)
+  - ELTON DE OLIVEIRA (VAN REFRIGERADA ❄️)
+  - GENIVAL BEZERRA (KOMBI)
+  - MILTON SANTOS (VAN)
+  - Etc.
+- **Opção "Sem motorista"**: para rotear depois
+- **Indicador de steps** (1 → 2) no header do modal
+- **Botão "Voltar para clientes"** na etapa 2
+- Motorista e rota selecionados aparecem na grade na coluna "Motorista" e "Rota"
+- Campo de horário de recebimento adicionado
+- Auto-detecção de região baseada na cidade do cliente
+
+### Arquivos modificados
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx` — modal reescrito com motoristas
+
+---
+
 ## [2026-06-27] — Pedidos integrado + Nova Entrega real
 
 ### O que mudou
