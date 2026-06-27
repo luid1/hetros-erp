@@ -20,6 +20,38 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-27] — Controle de Carga 100% funcional
+
+### O que mudou
+- **Toolbar completa funcional**: Segmento dropdown (8 opções), Atualizar Lista, todos os checkboxes reativos
+- **Mostrar Pedidos Finalizados**: checkbox filtra grade em tempo real
+- **Mostrar grade de produtos**: checkbox funcional
+- **Rota Pendente**: checkbox com ícone verde ✔
+- **Somente Escolas**: filtra apenas pedidos com "ESCOLA" no nome
+- **Permitir Desconto no Frete**: checkbox funcional
+- **Rotear**: botão habilitado só com seleção, mostra alerta
+- **Imprimir Selecionados**: abre nova janela com tabela formatada dos pedidos selecionados
+- **Calendário**: campos `type="date"` para Carga e Entrega com seletor nativo
+- **Legenda de cores**: Impresso / Impressão Pendente / Pedido Alterado / AurCarga Ok
+- **Painel Entregas funcional**: mostra os pedidos SELECIONADOS (não mais vazio)
+  - Data Entrega, Rota, Nome Fantasia, Id Mltvenda, Id Venda, Volumes, Peso, Empresa, Tipo Faturamento, Vlr Tot Pedido, Autorização de Carga
+- **KPIs atualizados em tempo real**: Qtd Rotas=16, Peso Carga calculado dos selecionados, Qtd Entregas=selecionados, SLA%
+- **Botões do rodapé todos funcionais**:
+  - Remover Linha: remove pedidos selecionados da grade
+  - Imprimir Bilhete: imprime selecionados
+  - Nova Entrega: alerta de integração
+  - Incluir na Autorização: muda status para AURCARGA_OK (verde)
+  - Limpar a Grade: restaura dados originais
+- **Contadores no rodapé**: Entregas, Peso, Valor Total, badge "X selecionados"
+- **Busca de motoristas**: campo de pesquisa no painel de rotas
+- **16 rotas** com motoristas reais (ANDRE LUIZ, MILTON SANTOS, SIDNEY, etc.)
+- **Seleção múltipla**: checkbox no header seleciona/deseleciona todos
+
+### Arquivos modificados
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx` — reescrito completo (~500 linhas)
+
+---
+
 ## [2026-06-27] — Análise Estoque Físico 100% funcional
 
 ### O que mudou
