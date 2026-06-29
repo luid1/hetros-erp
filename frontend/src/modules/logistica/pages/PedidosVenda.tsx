@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   ClipboardList, Plus, Search, X, Check, Trash2, Eye,
-  Package, DollarSign, Truck, FileText,
+  Package, Truck, FileText,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
@@ -191,8 +191,6 @@ function ModalNovoPedido({ onClose, onCriado }: { onClose: () => void; onCriado:
   const [dataEntrega, setDataEntrega]   = useState(new Date().toISOString().split('T')[0]);
   const [pesoKg, setPesoKg]             = useState('');
   const [volumes, setVolumes]           = useState('1');
-  const [valorFrete, setValorFrete]     = useState('0');
-  const [percentual, setPercentual]     = useState('0');
   const [formaPagamento, setFormaPag]   = useState('BOLETO');
   const [tipoFat, setTipoFat]          = useState('NFe');
   const [periodo, setPeriodo]           = useState('MANHA');
@@ -227,7 +225,7 @@ function ModalNovoPedido({ onClose, onCriado }: { onClose: () => void; onCriado:
         dataEntrega,
         observacoes: obs,
         tipoFrete: 'CIF',
-        valorFrete: parseFloat(valorFrete) || 0,
+        valorFrete: 0, // frete é definido depois no Controle de Carga (logística)
       });
       onCriado();
     } catch (e: any) {
@@ -323,23 +321,9 @@ function ModalNovoPedido({ onClose, onCriado }: { onClose: () => void; onCriado:
             </div>
           </div>
 
-          {/* Linha: Frete + % + Forma Pagamento */}
+          {/* Linha: Forma Pagamento (Frete e % são definidos na Logística / Controle de Carga) */}
           <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
-                <Truck className="h-3 w-3 inline" /> Valor Frete (R$)
-              </label>
-              <input type="number" step="0.01" min="0" value={valorFrete} onChange={e => setValorFrete(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
-                <DollarSign className="h-3 w-3 inline" /> Percentual (%)
-              </label>
-              <input type="number" step="0.1" min="0" value={percentual} onChange={e => setPercentual(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
-            </div>
-            <div>
+            <div className="col-span-2">
               <label className="block text-[10px] font-bold text-gray-600 uppercase mb-1">
                 <FileText className="h-3 w-3 inline" /> Forma de Pagamento
               </label>
@@ -347,6 +331,11 @@ function ModalNovoPedido({ onClose, onCriado }: { onClose: () => void; onCriado:
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
                 {FORMAS_PAG.map(f => <option key={f} value={f}>{f === 'A_PRAZO' ? 'A Prazo' : f === 'CARTAO' ? 'Cartão' : f === 'DEPOSITO' ? 'Depósito' : f}</option>)}
               </select>
+            </div>
+            <div className="flex items-end">
+              <p className="text-[10px] text-gray-400 leading-tight pb-2">
+                <Truck className="h-3 w-3 inline text-gray-300" /> O <strong>frete</strong> é definido no Controle de Carga (logística).
+              </p>
             </div>
           </div>
 

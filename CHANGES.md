@@ -20,6 +20,20 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-29] — Frete sai do Pedido de Venda → só na Logística
+
+### O que mudou
+- **Valor Frete (R$)** e **Percentual (%)** removidos do modal "Novo Pedido de Venda".
+  - Motivo: somente quem faz o **Controle de Carga** (logística) define o frete.
+  - No lugar dos campos, aparece a nota: "O frete é definido no Controle de Carga (logística)."
+  - Pedido agora é criado com `valorFrete: 0`; o valor é atribuído depois na roteirização.
+- Limpeza: estado `valorFrete`/`percentual` e import `DollarSign` removidos (sem uso).
+
+### Arquivos
+- `frontend/src/modules/logistica/pages/PedidosVenda.tsx`
+
+---
+
 ## [2026-06-28] — Pedidos de Venda + Carga só roteiriza
 
 ### O que mudou
