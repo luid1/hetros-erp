@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
-import { CheckCircle, Printer, Download, X, ChevronRight, Search } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { CheckCircle, Printer, Download, X, ChevronRight, Search, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+import api from '../../../services/api';
 
 // ─── Tipos ───────────────────────────────────────
 interface ProdutoEstoque {
@@ -188,6 +189,12 @@ export default function AnaliseEstoqueFisico() {
   const { filialAtiva } = useAuth();
 
   // Filtros
+  const [aRepor, setARepor] = useState<any[]>([]);
+  useEffect(() => {
+    if (!filialAtiva) return;
+    api.get(`/estoque/${filialAtiva.id}/a-comprar`).then(r => setARepor(r.data)).catch(() => setARepor([]));
+  }, [filialAtiva?.id]);
+
   const [dataIni, setDataIni]       = useState(hoje());
   const [dataFim, setDataFim]       = useState(hoje());
   const [tipoItem, setTipoItem]     = useState('00-Mercadoria para Revenda');
@@ -272,6 +279,30 @@ export default function AnaliseEstoqueFisico() {
 
   return (
     <div className="flex flex-col h-full bg-gray-100 text-xs select-none overflow-hidden">
+
+      {/* ── Aviso: produtos a repor / em falta ── */}
+      {aRepor.length > 0 && (
+        <div className="bg-amber-50 border-b border-amber-300 px-3 py-1.5 shrink-0 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <span className="text-[11px] font-bold text-amber-800">
+              {aRepor.filter(p => p.negativo).length > 0
+                ? `${aRepor.filter(p => p.negativo).length} produto(s) em FALTA (estoque negativo) e `
+                : ''}
+              {aRepor.length} produto(s) a repor:
+            </span>
+            <span className="ml-1 inline-flex flex-wrap gap-1.5">
+              {aRepor.slice(0, 14).map(p => (
+                <span key={p.produtoId}
+                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${p.negativo ? 'bg-red-100 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                  {p.descricao} · disp. {p.disponivel}{p.negativo && ` · comprar ${p.sugestaoCompra}`}
+                </span>
+              ))}
+              {aRepor.length > 14 && <span className="text-[10px] text-amber-600">+{aRepor.length - 14}</span>}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── Barra de filtros ── */}
       <div className="bg-gray-200 border-b border-gray-400 px-3 py-2 flex flex-wrap items-end gap-3 shrink-0">

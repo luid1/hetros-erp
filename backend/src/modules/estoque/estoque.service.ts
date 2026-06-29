@@ -228,6 +228,50 @@ export class EstoqueService {
     }
   }
 
+  /**
+   * Produtos a comprar/repor: disponível negativo (vendido sem estoque) ou abaixo do mínimo.
+   * Agrega por produto somando todos os saldos (lotes/localizações) da filial.
+   */
+  async getAComprar(tenantId: string, filialId: string) {
+    const saldos = await this.prisma.estoqueSaldo.findMany({
+      where: { tenantId, filialId },
+      include: {
+        produto: {
+          select: {
+            id: true, codigo: true, descricao: true, estoqueMinimo: true,
+            unidadeMedida: { select: { sigla: true } },
+          },
+        },
+      },
+    });
+
+    const porProduto = new Map<string, { produtoId: string; codigo: string; descricao: string; unidade: string; quantidade: number; reservada: number; disponivel: number; estoqueMinimo: number }>();
+    for (const s of saldos) {
+      const k = s.produtoId;
+      const cur = porProduto.get(k) || {
+        produtoId: k,
+        codigo: s.produto.codigo,
+        descricao: s.produto.descricao,
+        unidade: s.produto.unidadeMedida?.sigla || 'UN',
+        quantidade: 0, reservada: 0, disponivel: 0,
+        estoqueMinimo: Number(s.produto.estoqueMinimo || 0),
+      };
+      cur.quantidade += Number(s.quantidade);
+      cur.reservada += Number(s.quantidadeReservada);
+      cur.disponivel = cur.quantidade - cur.reservada;
+      porProduto.set(k, cur);
+    }
+
+    return [...porProduto.values()]
+      .filter((p) => p.disponivel < 0 || p.disponivel <= p.estoqueMinimo)
+      .map((p) => ({
+        ...p,
+        negativo: p.disponivel < 0,
+        sugestaoCompra: Math.max(0, p.estoqueMinimo - p.disponivel),
+      }))
+      .sort((a, b) => a.disponivel - b.disponivel);
+  }
+
   async getMovimentacoes(tenantId: string, filialId: string, filters: { produtoId?: string; tipo?: TipoMovimentacao; dataInicio?: Date; dataFim?: Date }) {
     return this.prisma.movimentacaoEstoque.findMany({
       where: {

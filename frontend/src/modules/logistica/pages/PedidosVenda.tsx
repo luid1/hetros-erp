@@ -50,6 +50,7 @@ export default function PedidosVenda() {
   const [statusFilter, setStatusFilter] = useState('');
   const [modalAberto, setModalAberto] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [aComprar, setAComprar] = useState<any[]>([]);
 
   const carregarPedidos = useCallback(() => {
     if (!filialAtiva) return;
@@ -60,7 +61,13 @@ export default function PedidosVenda() {
       .finally(() => setLoading(false));
   }, [filialAtiva?.id, statusFilter, search]);
 
+  const carregarAComprar = useCallback(() => {
+    if (!filialAtiva) return;
+    api.get(`/estoque/${filialAtiva.id}/a-comprar`).then(r => setAComprar(r.data)).catch(() => setAComprar([]));
+  }, [filialAtiva?.id]);
+
   useEffect(() => { carregarPedidos(); }, [filialAtiva?.id, statusFilter]);
+  useEffect(() => { carregarAComprar(); }, [filialAtiva?.id]);
 
   const pedidosFiltrados = useMemo(() => {
     if (!search) return pedidos;
@@ -73,8 +80,14 @@ export default function PedidosVenda() {
 
   const handleConfirmar = async (id: string) => {
     try {
-      await api.patch(`/pedidos/${id}/confirmar`);
+      const r = await api.patch(`/pedidos/${id}/confirmar`);
+      const avisos = r.data?.avisosEstoque || [];
+      if (avisos.length > 0) {
+        const linhas = avisos.map((a: any) => `• ${a.descricao}: faltam ${a.faltam} (estoque ficou negativo)`).join('\n');
+        alert(`✅ Pedido APROVADO.\n\n⚠️ ATENÇÃO — estoque negativo, PRECISA COMPRAR:\n${linhas}`);
+      }
       carregarPedidos();
+      carregarAComprar();
     } catch (e: any) {
       alert(e.response?.data?.message || 'Não foi possível aprovar o pedido.');
     }
@@ -119,6 +132,31 @@ export default function PedidosVenda() {
         </div>
         <button onClick={carregarPedidos} className="text-xs text-gray-500 hover:text-blue-600">↻ Atualizar</button>
       </div>
+
+      {/* ── Caixinha de aviso: produtos a comprar (estoque negativo / abaixo do mínimo) ── */}
+      {aComprar.length > 0 && (
+        <div className="bg-amber-50 border-b border-amber-200 px-5 py-2 shrink-0">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-amber-800">
+                {aComprar.some(p => p.negativo) ? 'Estoque NEGATIVO — precisa comprar' : 'Estoque baixo — repor'}
+                <span className="ml-1 font-normal text-amber-600">({aComprar.length} produto{aComprar.length !== 1 ? 's' : ''})</span>
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                {aComprar.slice(0, 12).map(p => (
+                  <span key={p.produtoId}
+                    className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${p.negativo ? 'bg-red-100 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                    {p.descricao} · disp. {p.disponivel} {p.unidade}
+                    {p.negativo && <strong className="ml-1">comprar {p.sugestaoCompra}</strong>}
+                  </span>
+                ))}
+                {aComprar.length > 12 && <span className="text-[10px] text-amber-600">+{aComprar.length - 12} outros</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-auto">
         {loading ? (

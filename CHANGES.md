@@ -20,6 +20,30 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-29] — Aprovar com estoque negativo + avisos "a comprar/repor"
+
+### O que mudou
+- **Aprovar pedido NÃO bloqueia mais por falta de estoque.** Ao aprovar, reserva os itens
+  permitindo o disponível ficar **negativo** (sinaliza que precisa comprar). Continua
+  bloqueando só por crédito.
+- Ao aprovar com saldo negativo, mostra **alerta** listando os produtos e quanto falta.
+- Novo `GET /estoque/:filialId/a-comprar` — produtos com disponível negativo OU abaixo do
+  mínimo, com sugestão de compra (mínimo − disponível).
+- **Caixinha de aviso** no topo de **Pedidos de Venda** e da **Análise de Estoque Físico**
+  listando os produtos em falta/a repor.
+
+### Arquivos
+- `backend/src/modules/pedidos/pedidos.service.ts` (confirmar)
+- `backend/src/modules/estoque/{service,controller}.ts` (getAComprar)
+- `frontend/src/modules/logistica/pages/PedidosVenda.tsx`
+- `frontend/src/modules/estoque/pages/AnaliseEstoqueFisico.tsx`
+
+### Pendente (aguardando imagens do cliente)
+- Capa de rota / espelhos do NewOxxy para implementar: salvar a roteirização (Nova Entrega →
+  Roteirizar persistindo no backend) e mostrar em "Entregas Programadas" só rotas já roteirizadas.
+
+---
+
 ## [2026-06-29] — Módulo Pedido de Venda completo (itens, estoque, crédito)
 
 ### O que mudou

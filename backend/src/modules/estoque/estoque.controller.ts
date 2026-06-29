@@ -44,6 +44,12 @@ export class EstoqueController {
     return this.service.getAlertasValidade(tenantId, filialId, dias ? Number(dias) : 5);
   }
 
+  @Get(':filialId/a-comprar')
+  @ApiOperation({ summary: 'Produtos com estoque negativo ou abaixo do mínimo (a comprar/repor)' })
+  aComprar(@CurrentTenant() tenantId: string, @Param('filialId') filialId: string) {
+    return this.service.getAComprar(tenantId, filialId);
+  }
+
   @Get(':filialId/movimentacoes')
   @ApiOperation({ summary: 'Extrato de movimentações da filial' })
   movimentacoes(

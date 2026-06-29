@@ -274,7 +274,8 @@ export class PedidosService {
     });
   }
 
-  // Aprovar = CONFIRMADO. Valida crédito e estoque antes.
+  // Aprovar = CONFIRMADO. Bloqueia só por crédito. Estoque pode ficar NEGATIVO
+  // (gera aviso de "precisa comprar") em vez de impedir a aprovação.
   async confirmar(tenantId: string, id: string) {
     const pedido = await this.findOne(tenantId, id);
 
@@ -284,24 +285,47 @@ export class PedidosService {
       );
     }
 
-    // Valida estoque disponível de cada item na filial de origem
+    const avisosEstoque: { produtoId: string; descricao: string; disponivelAntes: number; pedido: number; faltam: number }[] = [];
+
+    // Reserva cada item — permitindo o disponível ficar NEGATIVO
     for (const item of pedido.itens) {
-      const saldos = await this.prisma.estoqueSaldo.findMany({
-        where: { tenantId, filialId: pedido.filialOrigemId, produtoId: item.produtoId },
-        select: { quantidade: true, quantidadeReservada: true },
+      let saldo = await this.prisma.estoqueSaldo.findFirst({
+        where: { tenantId, filialId: pedido.filialOrigemId, produtoId: item.produtoId, loteId: null },
       });
-      const disponivel = saldos.reduce(
-        (s, e) => s + (Number(e.quantidade) - Number(e.quantidadeReservada)),
-        0,
-      );
-      if (disponivel < Number(item.quantidade)) {
-        throw new BadRequestException(
-          `Estoque insuficiente para "${item.descricao}" (disponível ${disponivel}, pedido ${item.quantidade}).`,
-        );
+      if (!saldo) {
+        saldo = await this.prisma.estoqueSaldo.create({
+          data: {
+            tenantId, filialId: pedido.filialOrigemId, produtoId: item.produtoId,
+            quantidade: 0, quantidadeReservada: 0, quantidadeDisponivel: 0,
+          },
+        });
+      }
+      const disponivelAntes = Number(saldo.quantidade) - Number(saldo.quantidadeReservada);
+      const qtd = Number(item.quantidade);
+      const novaReservada = Number(saldo.quantidadeReservada) + qtd;
+      const novoDisponivel = Number(saldo.quantidade) - novaReservada; // pode ser < 0
+
+      await this.prisma.estoqueSaldo.update({
+        where: { id: saldo.id },
+        data: { quantidadeReservada: novaReservada, quantidadeDisponivel: novoDisponivel },
+      });
+
+      if (novoDisponivel < 0) {
+        avisosEstoque.push({
+          produtoId: item.produtoId,
+          descricao: item.descricao,
+          disponivelAntes,
+          pedido: qtd,
+          faltam: Math.abs(novoDisponivel),
+        });
       }
     }
 
-    return this.updateStatus(tenantId, id, 'CONFIRMADO');
+    const atualizado = await this.prisma.pedido.update({
+      where: { id },
+      data: { status: 'CONFIRMADO' as any },
+    });
+    return { ...atualizado, avisosEstoque };
   }
 
   async cancelar(tenantId: string, id: string) {
