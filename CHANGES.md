@@ -20,6 +20,26 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-29] — Controle de Carga usa pedidos REAIS (fim do mock)
+
+### O que mudou
+- A grade do **Controle de Carga** não usa mais os 22 pedidos fictícios fixos.
+- Agora carrega da API (`GET /pedidos`) só os pedidos da **data de carga** selecionada,
+  com status CONFIRMADO / EM_SEPARACAO / SEPARADO / FATURADO.
+- Trocar a data de carga recarrega a lista automaticamente; "Atualizar Lista" também.
+- Cor da linha por status: faturado = verde (AurCarga Ok), separado = impresso, demais = impressão pendente.
+- Mensagem amigável quando não há pedidos para a data.
+- "Limpar a Grade" agora esvazia a grade (não recarrega o mock).
+
+### Pendência conhecida
+- Coluna **Peso** mostra 0,0 — o peso (Kg) informado no Pedido de Venda ainda não é
+  persistido no backend (campo não existe no create). Corrigir em etapa futura.
+
+### Arquivos
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx`
+
+---
+
 ## [2026-06-29] — Tela de Clientes com edição (CRUD completo)
 
 ### O que mudou

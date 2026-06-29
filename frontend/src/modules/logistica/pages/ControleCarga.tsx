@@ -57,8 +57,46 @@ const SEGMENTOS = [
   '4-Hotéis', '5-Indústria', '6-Mercados', '7-Padarias',
 ];
 
-// ─── Dados mock da grade (replicando o NewOxxy exato) ──
-const MOCK_PEDIDOS: PedidoCarga[] = [
+// ─── Mapeia um pedido do backend para a linha da grade de carga ──
+function mapPedidoToCarga(p: any, dataCargaFallback: string): PedidoCarga {
+  const faturado = p.status === 'FATURADO';
+  const separado = p.status === 'SEPARADO' || p.status === 'EM_SEPARACAO';
+  return {
+    id: p.id,
+    numero: p.numero,
+    data: p.dataEntrega ? String(p.dataEntrega).split('T')[0] : dataCargaFallback,
+    liberadoEm: p.createdAt ? new Date(p.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+    nomeFantasia: p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '—',
+    referencia: String(p.numero).padStart(5, '0'),
+    volumes: p._count?.itens || 0,
+    pesoKg: Number(p.valorTotal || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+    empresa: 'Hetr.',
+    tipoFaturamento: p.tipo === 'VENDA' ? 'NFe' : p.tipo,
+    autorizacao: '',
+    status: faturado ? 'FIN' : '',
+    statusCarga: faturado ? 'AURCARGA_OK' : separado ? 'IMPRESSO' : 'IMPRESSAO_PENDENTE',
+    aurCargaOk: faturado,
+    regiao: '',
+    cep: '',
+    bairro: '',
+    subRegiao: '',
+    onda: 1,
+    periodo: 'MANHA',
+    rota: '',
+    recebimento: '',
+    motorista: '',
+    andamento: 0,
+    valorTotal: Number(p.valorTotal || 0),
+    idMltvenda: '',
+    idVenda: String(p.numero),
+  };
+}
+
+// Status de pedido que aparecem na grade de carga (RASCUNHO/CANCELADO ficam de fora)
+const STATUS_CARGA_VALIDOS = ['CONFIRMADO', 'EM_SEPARACAO', 'SEPARADO', 'FATURADO'];
+
+// ─── (array de pedidos mock removido — a grade agora vem da API) ──
+const _MOCK_PEDIDOS_UNUSED: PedidoCarga[] = [
   { id:'1',  numero:29, data:'2026-06-26', liberadoEm:'10:25', nomeFantasia:'ALMENUTRICAO',         referencia:'REPO', volumes:30,  pesoKg:'35,6',  empresa:'Hetr.', tipoFaturamento:'NFe e...', autorizacao:'', status:'', statusCarga:'IMPRESSAO_PENDENTE', aurCargaOk:false, regiao:'GUARULHOS',   cep:'07021050', bairro:'VILA PEDR.',  subRegiao:'SANTA RIT.',  onda:1, periodo:'MANHA', rota:'',       recebimento:'06:00-0.', motorista:'CLIENTES D.', andamento:0, valorTotal:1200, idMltvenda:'', idVenda:'29' },
   { id:'2',  numero:29, data:'2026-06-26', liberadoEm:'12:03', nomeFantasia:'BOTECO...',             referencia:'REPO', volumes:1,   pesoKg:'1,00',  empresa:'Hetr.', tipoFaturamento:'Repo.',    autorizacao:'', status:'', statusCarga:'IMPRESSAO_PENDENTE', aurCargaOk:false, regiao:'ZONA OESTE',  cep:'05417001', bairro:'PINHEIROS',   subRegiao:'PINHEIROS',   onda:1, periodo:'MANHA', rota:'',       recebimento:'07:30-1.', motorista:'REDE TUY',    andamento:1, valorTotal:450,  idMltvenda:'', idVenda:'29' },
   { id:'3',  numero:29, data:'2026-06-26', liberadoEm:'12:04', nomeFantasia:'BOTECO...',             referencia:'20856',volumes:22,  pesoKg:'21,7',  empresa:'Hetr.', tipoFaturamento:'NFe',      autorizacao:'', status:'', statusCarga:'IMPRESSAO_PENDENTE', aurCargaOk:false, regiao:'ZONA OESTE',  cep:'05417001', bairro:'PINHEIROS',   subRegiao:'PINHEIROS',   onda:1, periodo:'MANHA', rota:'',       recebimento:'07:30-1.', motorista:'REDE TUY',    andamento:1, valorTotal:2100, idMltvenda:'', idVenda:'29' },
@@ -130,12 +168,29 @@ export default function ControleCarga() {
   const [permitirDesconto, setPermitirDesconto]     = useState(false);
 
   // ── Estado da grade ──
-  const [pedidos, setPedidos]         = useState<PedidoCarga[]>(MOCK_PEDIDOS);
+  const [pedidos, setPedidos]         = useState<PedidoCarga[]>([]);
+  const [carregando, setCarregando]   = useState(false);
   const [rotas]                       = useState<RotaMotorista[]>(MOCK_ROTAS);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [abaRota, setAbaRota]         = useState<'rotas' | 'horario'>('rotas');
   const [rotaExpandida, setRotaExpandida] = useState<string | null>(null);
   const [buscaRota, setBuscaRota]     = useState('');
+
+  // ── Carrega os pedidos REAIS da data de carga (somente confirmados em diante) ──
+  const carregar = () => {
+    if (!filialAtiva) return;
+    setCarregando(true);
+    api.get('/pedidos', { params: { filialId: filialAtiva.id, dataInicio: dataCarga, dataFim: dataCarga } })
+      .then(r => {
+        const relevantes = (r.data as any[]).filter(p => STATUS_CARGA_VALIDOS.includes(p.status));
+        setPedidos(relevantes.map(p => mapPedidoToCarga(p, dataCarga)));
+      })
+      .catch(() => setPedidos([]))
+      .finally(() => setCarregando(false));
+    setSelecionados(new Set());
+  };
+
+  useEffect(() => { carregar(); }, [filialAtiva?.id, dataCarga]);
 
   // ── Filtrar pedidos conforme checkboxes ──
   const pedidosFiltrados = useMemo(() => {
@@ -174,8 +229,7 @@ export default function ControleCarga() {
 
   // ── Ações ──
   const handleAtualizar = () => {
-    setPedidos([...MOCK_PEDIDOS]);
-    setSelecionados(new Set());
+    carregar();
   };
 
   const handleAutorizar = () => {
@@ -191,7 +245,7 @@ export default function ControleCarga() {
   };
 
   const handleLimpar = () => {
-    setPedidos(MOCK_PEDIDOS);
+    setPedidos([]);
     setSelecionados(new Set());
   };
 
@@ -328,6 +382,15 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
                 </tr>
               </thead>
               <tbody>
+                {pedidosFiltrados.length === 0 && (
+                  <tr>
+                    <td colSpan={22} className="px-4 py-10 text-center text-gray-400 italic bg-white">
+                      {carregando
+                        ? 'Carregando pedidos da data de carga...'
+                        : `Nenhum pedido confirmado para ${new Date(dataCarga + 'T00:00:00').toLocaleDateString('pt-BR')}. Confirme pedidos em "Pedidos de Venda" com esta data de entrega.`}
+                    </td>
+                  </tr>
+                )}
                 {pedidosFiltrados.map(p => {
                   const sel = selecionados.has(p.id);
                   return (
