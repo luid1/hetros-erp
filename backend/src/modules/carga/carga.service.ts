@@ -235,6 +235,66 @@ export class CargaService {
     };
   }
 
+  /**
+   * Fechamento de Frete por motorista/rota (estilo planilha):
+   * uma linha por romaneio com motorista, veículo, clientes, NF-E (soma) e frete.
+   */
+  async getFechamentoFrete(tenantId: string, filialId: string, data: string) {
+    const { inicio, fim } = this.intervaloDia(data);
+    const romaneios = await this.prisma.romaneio.findMany({
+      where: { tenantId, filialId, dataEntrega: { gte: inicio, lte: fim } },
+      include: {
+        itens: {
+          orderBy: { ordemEntrega: 'asc' },
+          include: { pedido: { select: { valorTotal: true, cliente: { select: { nomeFantasia: true, razaoSocial: true } } } } },
+        },
+      },
+      orderBy: { numero: 'asc' },
+    });
+
+    const linhas = romaneios.map((r) => {
+      const nfeTotal = r.itens.reduce((s, i: any) => s + Number(i.pedido?.valorTotal || 0), 0);
+      const frete = Number(r.valorFrete || 0);
+      const clientes = r.itens
+        .map((i: any) => i.pedido?.cliente?.nomeFantasia || i.pedido?.cliente?.razaoSocial || '—')
+        .join(' / ');
+      return {
+        id: r.id,
+        numero: r.numero,
+        data: r.dataEntrega,
+        motorista: r.motorista || '—',
+        veiculo: r.tipoVeiculo || '—',
+        placaVeiculo: r.placaVeiculo,
+        clientes,
+        qtdEntregas: r.itens.length,
+        nfeTotal,
+        valorFrete: frete,
+        percentual: nfeTotal > 0 ? (frete / nfeTotal) * 100 : 0,
+      };
+    });
+
+    const totalNfe = linhas.reduce((s, l) => s + l.nfeTotal, 0);
+    const totalFrete = linhas.reduce((s, l) => s + l.valorFrete, 0);
+    return {
+      linhas,
+      totais: {
+        nfeTotal: totalNfe,
+        valorFrete: totalFrete,
+        percentual: totalNfe > 0 ? (totalFrete / totalNfe) * 100 : 0,
+      },
+    };
+  }
+
+  /** Lança/atualiza o valor do frete de uma rota */
+  async setFrete(tenantId: string, romaneioId: string, valorFrete: number) {
+    const r = await this.prisma.romaneio.findFirst({ where: { id: romaneioId, tenantId } });
+    if (!r) throw new NotFoundException('Romaneio não encontrado.');
+    return this.prisma.romaneio.update({
+      where: { id: romaneioId },
+      data: { valorFrete: valorFrete || 0 },
+    });
+  }
+
   /** Remove uma rota (desfaz a roteirização) */
   async excluirRomaneio(tenantId: string, romaneioId: string) {
     const r = await this.prisma.romaneio.findFirst({ where: { id: romaneioId, tenantId } });

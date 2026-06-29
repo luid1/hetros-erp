@@ -20,6 +20,26 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-29] — Roteirizado fica verde + tela Frete por Motorista
+
+### O que mudou
+- **Controle de Carga**: pedidos já roteirizados aparecem em **VERDE** (status "ROTA",
+  com rota e motorista preenchidos); só os não roteirizados ficam vermelhos. A grade agora
+  carrega via `/carga/grade` (sabe quem tem romaneio).
+- Nova tela **Frete por Motorista** (`/logistica/frete`), estilo planilha (dourada):
+  colunas DATA, MOTORISTA, VEÍCULO, CLIENTE, FRETE (editável), NF-E, PERCENTUAL + linha TOTAL.
+  - Uma linha por rota (romaneio) do dia. NF-E = soma dos pedidos da rota.
+  - Frete digitado por rota, **salvo automaticamente** (PATCH /carga/romaneio/:id/frete).
+  - Percentual = frete ÷ NF-E (calculado na hora).
+- Schema: `valorFrete` no Romaneio. Backend: `getFechamentoFrete` + `setFrete`.
+
+### Arquivos
+- `backend/prisma/schema.prisma`, `backend/src/modules/carga/{service,controller}.ts`
+- `frontend/src/modules/logistica/pages/{ControleCarga,FreteMotoristas}.tsx`
+- `frontend/src/App.tsx`, `frontend/src/components/layout/AppShell.tsx`
+
+---
+
 ## [2026-06-29] — Pedido: preço só leitura + desconto bloqueado por senha
 
 ### O que mudou

@@ -855,6 +855,7 @@ model Romaneio {
   dataMovimento     DateTime?
   dataEntrega       DateTime?
   autorizacaoCarga  String?
+  valorFrete        Decimal   @default(0) @db.Decimal(12, 2)
   createdAt         DateTime  @default(now())
 
   itens             RomaneioItem[]

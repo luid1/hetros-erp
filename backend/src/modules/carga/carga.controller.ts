@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Query, Param } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Query, Param } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CargaService } from './carga.service';
 import { CurrentTenant, Modulo } from '../../common/decorators/context.decorator';
@@ -52,6 +52,22 @@ export class CargaController {
   @ApiOperation({ summary: 'Cria uma rota (Romaneio) com motorista/veículo e os pedidos selecionados' })
   criarRomaneio(@CurrentTenant() tenantId: string, @Body() body: any) {
     return this.service.criarRomaneio(tenantId, body);
+  }
+
+  @Get(':filialId/fechamento-frete')
+  @ApiOperation({ summary: 'Fechamento de frete por motorista/rota do dia' })
+  fechamentoFrete(
+    @CurrentTenant() tenantId: string,
+    @Param('filialId') filialId: string,
+    @Query('data') data: string,
+  ) {
+    return this.service.getFechamentoFrete(tenantId, filialId, data || new Date().toISOString().split('T')[0]);
+  }
+
+  @Patch('romaneio/:id/frete')
+  @ApiOperation({ summary: 'Lança o valor do frete de uma rota' })
+  setFrete(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() body: { valorFrete: number }) {
+    return this.service.setFrete(tenantId, id, body.valorFrete);
   }
 
   @Get('romaneio/:id/capa')

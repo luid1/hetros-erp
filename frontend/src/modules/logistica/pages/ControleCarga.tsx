@@ -97,6 +97,41 @@ function mapPedidoToCarga(p: any, dataCargaFallback: string): PedidoCarga {
 // Status de pedido que aparecem na grade de carga (RASCUNHO/CANCELADO ficam de fora)
 const STATUS_CARGA_VALIDOS = ['CONFIRMADO', 'EM_SEPARACAO', 'SEPARADO', 'FATURADO'];
 
+// ─── Mapeia uma linha de /carga/grade para a grade (roteirizado = VERDE) ──
+function mapGradeToCarga(g: any): PedidoCarga {
+  const faturado = g.statusPedido === 'FATURADO';
+  return {
+    id: g.id,
+    numero: g.numero,
+    data: g.data,
+    liberadoEm: '',
+    nomeFantasia: g.nomeFantasia,
+    referencia: g.referencia,
+    volumes: g.volumes,
+    pesoKg: Number(g.pesoKg || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+    empresa: g.empresa || 'Hetr.',
+    tipoFaturamento: g.tipoFaturamento,
+    autorizacao: '',
+    status: faturado ? 'FIN' : g.roteirizado ? 'ROTA' : '',
+    // roteirizado OU faturado => verde (AURCARGA_OK); senão pendente (vermelho)
+    statusCarga: (g.roteirizado || faturado) ? 'AURCARGA_OK' : 'IMPRESSAO_PENDENTE',
+    aurCargaOk: !!g.roteirizado || faturado,
+    regiao: g.regiao || '',
+    cep: g.cep || '',
+    bairro: g.bairro || '',
+    subRegiao: g.subRegiao || '',
+    onda: g.onda || 1,
+    periodo: g.periodo === 'TARDE' ? 'TARDE' : 'MANHA',
+    rota: g.rota || '',
+    recebimento: '',
+    motorista: g.motorista || '',
+    andamento: g.andamento || 0,
+    valorTotal: Number(g.valorTotal || 0),
+    idMltvenda: '',
+    idVenda: String(g.numero),
+  };
+}
+
 // ─── (array de pedidos mock removido — a grade agora vem da API) ──
 const _MOCK_PEDIDOS_UNUSED: PedidoCarga[] = [
   { id:'1',  numero:29, data:'2026-06-26', liberadoEm:'10:25', nomeFantasia:'ALMENUTRICAO',         referencia:'REPO', volumes:30,  pesoKg:'35,6',  empresa:'Hetr.', tipoFaturamento:'NFe e...', autorizacao:'', status:'', statusCarga:'IMPRESSAO_PENDENTE', aurCargaOk:false, regiao:'GUARULHOS',   cep:'07021050', bairro:'VILA PEDR.',  subRegiao:'SANTA RIT.',  onda:1, periodo:'MANHA', rota:'',       recebimento:'06:00-0.', motorista:'CLIENTES D.', andamento:0, valorTotal:1200, idMltvenda:'', idVenda:'29' },
@@ -179,15 +214,12 @@ export default function ControleCarga() {
   const [rotaExpandida, setRotaExpandida] = useState<string | null>(null);
   const [buscaRota, setBuscaRota]     = useState('');
 
-  // ── Carrega os pedidos REAIS da data de carga (somente confirmados em diante) ──
+  // ── Carrega a grade do dia (via carga/grade — sabe quem já está roteirizado) ──
   const carregar = () => {
     if (!filialAtiva) return;
     setCarregando(true);
-    api.get('/pedidos', { params: { filialId: filialAtiva.id, dataInicio: dataCarga, dataFim: dataCarga } })
-      .then(r => {
-        const relevantes = (r.data as any[]).filter(p => STATUS_CARGA_VALIDOS.includes(p.status));
-        setPedidos(relevantes.map(p => mapPedidoToCarga(p, dataCarga)));
-      })
+    api.get(`/carga/${filialAtiva.id}/grade`, { params: { data: dataCarga } })
+      .then(r => setPedidos((r.data as any[]).map(mapGradeToCarga)))
       .catch(() => setPedidos([]))
       .finally(() => setCarregando(false));
     carregarRotas();
