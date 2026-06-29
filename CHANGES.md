@@ -20,6 +20,33 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-28] — Pedidos de Venda + Carga só roteiriza
+
+### O que mudou
+- **Tela Pedidos de Venda** (`/logistica/pedidos`) — onde o comercial lança tudo:
+  - Busca de clientes (399 do banco)
+  - Campos: Data Entrega, Período, Tipo Faturamento, Peso (Kg), Volumes, Região
+  - Valor Frete (R$), Percentual (%), Forma de Pagamento (Boleto/PIX/Dinheiro/Cartão/Cheque/Depósito/A Prazo)
+  - Observações (PESAR, NOIVA, etc.)
+  - Tabela com filtro por status (Rascunho/Confirmado/Separado/Faturado/Cancelado)
+  - Botão Confirmar e Cancelar por pedido
+- **Controle de Carga redesenhado** — agora é SÓ para roteirizar:
+  - Modal "Roteirizar Pedidos" busca pedidos CONFIRMADOS do banco
+  - Tabela com checkbox para selecionar múltiplos pedidos
+  - Coluna direita com motoristas para atribuir
+  - Botão "Roteirizar N Pedidos" move para a grade com motorista atribuído
+  - NÃO tem mais campos de peso/frete/pagamento (isso vem do pedido)
+- **Separação clara de responsabilidades**:
+  - Comercial lança pedido em Pedidos de Venda → confirma
+  - Logística roteiriza em Controle de Carga → atribui motorista
+
+### Arquivos criados/modificados
+- `frontend/src/modules/logistica/pages/PedidosVenda.tsx` — tela nova completa
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx` — modal reescrito para roteirização
+- `frontend/src/App.tsx` — rota `/logistica/pedidos` conectada
+
+---
+
 ## [2026-06-27] — Nova Entrega: Peso obrigatório + Frete + % + Pagamento
 
 ### O que mudou

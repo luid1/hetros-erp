@@ -549,20 +549,9 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
   );
 }
 
-// ─── Tipo para item da lista de entregas no modal ───
-interface EntregaItem {
-  cliente: any;
-  volumes: number;
-  pesoKg: number;
-  tipoFat: string;
-  regiao: string;
-  observacoes: string;
-  valorFrete: number;
-  percentual: number;
-  formaPagamento: string;
-}
+// ─── Tipo para pedido a roteirizar ───
 
-// ─── Modal Nova Entrega (motorista fixo + múltiplos clientes) ───
+// ─── Modal Roteirizar (busca pedidos CONFIRMADOS e atribui a motorista) ───
 function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
   dataCarga: string;
   rotas: RotaMotorista[];
@@ -570,155 +559,105 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
   onCriado: (pedidos: PedidoCarga[]) => void;
 }) {
   const { filialAtiva } = useAuth();
-  const REGIOES = ['GUARULHOS', 'ZONA NORTE', 'ZONA SUL', 'ZONA OESTE', 'CENTRO', 'ARUJÁ', 'ZONA LESTE', 'ABC'];
 
-  // Motorista fixo
+  // Motorista selecionado
   const [rotaSelId, setRotaSelId] = useState<string>('none');
   const rotaSel = rotas.find(r => r.id === rotaSelId) || null;
 
-  // Dados compartilhados
-  const [dataEntrega, setDataEntrega] = useState(dataCarga);
-  const [periodo, setPeriodo]         = useState('MANHA');
-  const [recebimento, setRecebimento] = useState('07:00');
+  // Pedidos disponíveis (CONFIRMADOS sem rota)
+  const [pedidosDisp, setPedidosDisp] = useState<any[]>([]);
+  const [loadingPed, setLoadingPed]   = useState(true);
+  const [busca, setBusca]             = useState('');
 
-  // Busca de clientes
-  const [clientes, setClientes]         = useState<any[]>([]);
-  const [buscaCliente, setBuscaCliente] = useState('');
-  const [loadingCli, setLoadingCli]     = useState(false);
+  // Pedidos selecionados para roteirizar
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
+  const [salvando, setSalvando]         = useState(false);
+  const [erro, setErro]                 = useState('');
 
-  // Formulário do cliente atual sendo adicionado
-  const [volumes, setVolumes]           = useState('1');
-  const [pesoKg, setPesoKg]             = useState('');
-  const [tipoFat, setTipoFat]           = useState('NFe');
-  const [regiao, setRegiao]             = useState('');
-  const [obs, setObs]                   = useState('');
-  const [valorFrete, setValorFrete]     = useState('');
-  const [percentual, setPercentual]     = useState('');
-  const [formaPagamento, setFormaPag]   = useState('BOLETO');
-
-  // Lista de entregas acumuladas
-  const [entregas, setEntregas] = useState<EntregaItem[]>([]);
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro]         = useState('');
-
-  // Busca clientes
+  // Carrega pedidos confirmados
   useEffect(() => {
-    setLoadingCli(true);
-    const t = setTimeout(() => {
-      api.get('/clientes', { params: { search: buscaCliente || undefined } })
-        .then(r => setClientes(r.data))
-        .catch(() => setClientes([]))
-        .finally(() => setLoadingCli(false));
-    }, 200);
-    return () => clearTimeout(t);
-  }, [buscaCliente]);
+    if (!filialAtiva) return;
+    setLoadingPed(true);
+    api.get('/pedidos', { params: { filialId: filialAtiva.id, status: 'CONFIRMADO' } })
+      .then(r => setPedidosDisp(r.data))
+      .catch(() => setPedidosDisp([]))
+      .finally(() => setLoadingPed(false));
+  }, [filialAtiva?.id]);
 
-  // IDs dos clientes já adicionados
-  const idsAdicionados = new Set(entregas.map(e => e.cliente.id));
+  // Filtro por busca
+  const pedidosFiltrados = useMemo(() => {
+    if (!busca) return pedidosDisp;
+    const q = busca.toLowerCase();
+    return pedidosDisp.filter((p: any) =>
+      (p.cliente?.razaoSocial || '').toLowerCase().includes(q) ||
+      (p.cliente?.nomeFantasia || '').toLowerCase().includes(q) ||
+      String(p.numero).includes(q)
+    );
+  }, [pedidosDisp, busca]);
 
-  // Adiciona cliente à lista
-  const handleAddCliente = (c: any) => {
-    const end: any = c.enderecoJson || {};
-    let reg = regiao;
-    if (end.cidade) {
-      const cidade = end.cidade.toUpperCase();
-      if (cidade.includes('GUARULHOS')) reg = 'GUARULHOS';
-      else if (cidade.includes('ARUJÁ') || cidade.includes('ARUJA')) reg = 'ARUJÁ';
-    }
-
-    if (!pesoKg || parseFloat(pesoKg) <= 0) {
-      setErro('Informe o peso (Kg) antes de adicionar.');
-      return;
-    }
-
-    setEntregas(prev => [...prev, {
-      cliente: c,
-      volumes: parseInt(volumes) || 1,
-      pesoKg: parseFloat(pesoKg) || 0,
-      tipoFat,
-      regiao: reg,
-      observacoes: obs,
-      valorFrete: parseFloat(valorFrete) || 0,
-      percentual: parseFloat(percentual) || 0,
-      formaPagamento,
-    }]);
-
-    // Limpa para próximo
-    setPesoKg('');
-    setVolumes('1');
-    setObs('');
-    setRegiao('');
-    setValorFrete('');
-    setPercentual('');
-    setBuscaCliente('');
-    setErro('');
+  const toggleSel = (id: string) => {
+    setSelecionados(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleAll = () => {
+    setSelecionados(selecionados.size === pedidosFiltrados.length ? new Set() : new Set(pedidosFiltrados.map((p: any) => p.id)));
   };
 
-  // Remove da lista
-  const handleRemove = (idx: number) => {
-    setEntregas(prev => prev.filter((_, i) => i !== idx));
-  };
+  const pedidosSel = pedidosFiltrados.filter((p: any) => selecionados.has(p.id));
+  const pesoTotal = pedidosSel.reduce((s: number, p: any) => s + Number(p.valorTotal || 0), 0);
 
-  // Totais
-  const pesoTotal = entregas.reduce((s, e) => s + e.pesoKg, 0);
-  const volumesTotal = entregas.reduce((s, e) => s + e.volumes, 0);
+  // Roteirizar: move pedidos selecionados para a grade com motorista atribuído
+  const handleRoteirizar = () => {
+    if (selecionados.size === 0) { setErro('Selecione pelo menos um pedido.'); return; }
+    setSalvando(true);
 
-  // Salvar TODOS de uma vez
-  const handleSalvarTodos = async () => {
-    if (entregas.length === 0) { setErro('Adicione pelo menos um cliente.'); return; }
-    if (!filialAtiva) { setErro('Nenhuma filial selecionada.'); return; }
-    setSalvando(true); setErro('');
-
-    const pedidosCriados: PedidoCarga[] = [];
     const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const novosPedidos: PedidoCarga[] = pedidosSel.map((p: any) => ({
+      id: p.id,
+      numero: p.numero,
+      data: p.dataEntrega || dataCarga,
+      liberadoEm: hora,
+      nomeFantasia: p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '—',
+      referencia: String(p.numero).padStart(5, '0'),
+      volumes: p._count?.itens || 0,
+      pesoKg: Number(p.valorTotal || 0).toFixed(1).replace('.', ','),
+      empresa: 'Hetr.',
+      tipoFaturamento: p.tipo === 'VENDA' ? 'NFe' : p.tipo,
+      autorizacao: '',
+      status: '',
+      statusCarga: 'IMPRESSAO_PENDENTE' as const,
+      aurCargaOk: false,
+      regiao: '',
+      cep: '',
+      bairro: '',
+      subRegiao: '',
+      onda: 1,
+      periodo: 'MANHA' as const,
+      rota: rotaSel ? String(rotaSel.numero) : '',
+      recebimento: '',
+      motorista: rotaSel ? rotaSel.motorista : '',
+      andamento: 0,
+      valorTotal: Number(p.valorTotal || 0),
+      idMltvenda: '',
+      idVenda: String(p.numero),
+    }));
 
-    try {
-      for (const entrega of entregas) {
-        const res = await api.post('/pedidos', {
-          filialOrigemId: filialAtiva.id,
-          clienteId: entrega.cliente.id,
-          tipo: 'VENDA',
-          dataEntrega,
-          observacoes: entrega.observacoes,
-        });
-        const pedido = res.data;
-        const end: any = entrega.cliente.enderecoJson || {};
-
-        pedidosCriados.push({
-          id: pedido.id, numero: pedido.numero, data: dataEntrega, liberadoEm: hora,
-          nomeFantasia: entrega.cliente.nomeFantasia || entrega.cliente.razaoSocial,
-          referencia: String(pedido.numero).padStart(5, '0'),
-          volumes: entrega.volumes,
-          pesoKg: entrega.pesoKg.toFixed(1).replace('.', ','),
-          empresa: 'Hetr.', tipoFaturamento: entrega.tipoFat, autorizacao: '', status: '',
-          statusCarga: 'IMPRESSAO_PENDENTE', aurCargaOk: false,
-          regiao: entrega.regiao || end.cidade || '', cep: end.cep || '', bairro: end.bairro || '',
-          subRegiao: '', onda: 1, periodo: periodo as any,
-          rota: rotaSel ? String(rotaSel.numero) : '',
-          recebimento: recebimento ? recebimento + '-1.' : '',
-          motorista: rotaSel ? rotaSel.motorista : '',
-          andamento: 0, valorTotal: 0, idMltvenda: '', idVenda: String(pedido.numero),
-        });
-      }
-      onCriado(pedidosCriados);
-    } catch (e: any) {
-      setErro(`Erro ao criar: ${e.response?.data?.message || e.message}. ${pedidosCriados.length} de ${entregas.length} criados.`);
-      if (pedidosCriados.length > 0) onCriado(pedidosCriados);
-    } finally { setSalvando(false); }
+    onCriado(novosPedidos);
+    setSalvando(false);
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
-      <div className="bg-white border border-gray-300 rounded-xl shadow-2xl w-full max-w-5xl max-h-[95vh] flex flex-col">
+      <div className="bg-white border border-gray-300 rounded-xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col">
 
-        {/* ═══ HEADER ═══ */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50 rounded-t-xl shrink-0">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-gray-50 rounded-t-xl shrink-0">
           <div className="flex items-center gap-2">
-            <PlusCircle className="h-5 w-5 text-green-600" />
-            <h2 className="font-bold text-gray-900 text-sm">Nova Entrega — Montagem de Carga</h2>
-            {entregas.length > 0 && (
-              <span className="bg-green-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full ml-2">
-                {entregas.length} cliente{entregas.length !== 1 ? 's' : ''} · {pesoTotal.toFixed(1)}Kg
+            <RotateCcw className="h-5 w-5 text-blue-600" />
+            <h2 className="font-bold text-gray-900 text-sm">Roteirizar Pedidos</h2>
+            <span className="text-xs text-gray-400">Selecione os pedidos confirmados e atribua ao motorista</span>
+            {selecionados.size > 0 && (
+              <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                {selecionados.size} selecionado{selecionados.size !== 1 ? 's' : ''}
               </span>
             )}
           </div>
@@ -727,35 +666,77 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
           </button>
         </div>
 
-        {/* ═══ CORPO: 3 colunas ═══ */}
+        {/* Corpo: 2 colunas */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
 
-          {/* ── Col 1: Motorista + Config (fixo) ── */}
-          <div className="w-64 shrink-0 border-r border-gray-200 flex flex-col bg-gray-50">
-            {/* Dados compartilhados */}
-            <div className="p-3 space-y-2 border-b border-gray-200 shrink-0">
-              <div>
-                <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Data Entrega</label>
-                <input type="date" value={dataEntrega} onChange={e => setDataEntrega(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-xs" />
+          {/* ── Col esquerda: Pedidos confirmados ── */}
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            {/* Busca */}
+            <div className="p-3 border-b border-gray-200 bg-white shrink-0 flex gap-2 items-center">
+              <div className="flex-1 relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Filtrar pedidos por cliente ou número..."
+                  className="w-full border border-gray-300 rounded pl-8 pr-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-400" />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Período</label>
-                  <select value={periodo} onChange={e => setPeriodo(e.target.value)} className="w-full border border-gray-300 rounded px-1 py-1 text-xs">
-                    <option value="MANHA">MANHÃ</option><option value="TARDE">TARDE</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-600 uppercase mb-0.5">Receb.</label>
-                  <input type="time" value={recebimento} onChange={e => setRecebimento(e.target.value)} className="w-full border border-gray-300 rounded px-1 py-1 text-xs" />
-                </div>
-              </div>
+              <span className="text-xs text-gray-400 shrink-0">{pedidosFiltrados.length} pedido{pedidosFiltrados.length !== 1 ? 's' : ''} disponíve{pedidosFiltrados.length !== 1 ? 'is' : 'l'}</span>
             </div>
 
-            {/* Motoristas */}
-            <div className="bg-gray-200 px-3 py-1.5 border-b border-gray-300 shrink-0">
+            {/* Tabela de pedidos */}
+            <div className="flex-1 overflow-auto">
+              {loadingPed ? (
+                <div className="flex justify-center py-12"><div className="animate-spin h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full" /></div>
+              ) : pedidosFiltrados.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                  <ClipboardList className="h-10 w-10 text-gray-200 mb-2" />
+                  <p className="text-sm font-medium">Nenhum pedido confirmado</p>
+                  <p className="text-xs mt-1">Lance pedidos em <strong>Pedidos de Venda</strong> e confirme para roteirizar</p>
+                </div>
+              ) : (
+                <table className="w-full text-[11px] border-collapse">
+                  <thead className="bg-gray-100 sticky top-0 z-10">
+                    <tr>
+                      <th className="w-8 px-2 py-1.5 border-b border-gray-200">
+                        <input type="checkbox" checked={selecionados.size === pedidosFiltrados.length && pedidosFiltrados.length > 0}
+                          onChange={toggleAll} className="accent-blue-600 h-3 w-3 cursor-pointer" />
+                      </th>
+                      {['Nº', 'Cliente', 'Data Entrega', 'Valor', 'Frete', 'Status'].map(h => (
+                        <th key={h} className="px-2 py-1.5 text-left font-semibold text-gray-600 border-b border-gray-200 whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pedidosFiltrados.map((p: any) => {
+                      const sel = selecionados.has(p.id);
+                      return (
+                        <tr key={p.id} onClick={() => toggleSel(p.id)}
+                          className={`border-b border-gray-100 cursor-pointer transition-colors ${sel ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                          <td className="px-2 py-1.5" onClick={e => e.stopPropagation()}>
+                            <input type="checkbox" checked={sel} onChange={() => toggleSel(p.id)} className="accent-blue-600 h-3 w-3 cursor-pointer" />
+                          </td>
+                          <td className="px-2 py-1.5 font-bold text-blue-700">{p.numero}</td>
+                          <td className="px-2 py-1.5">
+                            <p className="font-semibold text-gray-900 truncate max-w-[200px]">{p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '—'}</p>
+                          </td>
+                          <td className="px-2 py-1.5 whitespace-nowrap">{p.dataEntrega ? new Date(p.dataEntrega).toLocaleDateString('pt-BR') : '—'}</td>
+                          <td className="px-2 py-1.5 text-right font-mono">{Number(p.valorTotal || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                          <td className="px-2 py-1.5 text-right font-mono text-blue-600">{Number(p.valorFrete || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                          <td className="px-2 py-1.5">
+                            <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full text-[9px] font-bold">{p.status}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+
+          {/* ── Col direita: Motoristas ── */}
+          <div className="w-64 shrink-0 border-l border-gray-200 flex flex-col bg-gray-50">
+            <div className="bg-gray-200 px-3 py-2 border-b border-gray-300 shrink-0">
               <p className="text-[10px] font-bold text-gray-700 uppercase flex items-center gap-1">
-                <Truck className="h-3 w-3" /> Motorista / Rota
+                <Truck className="h-3 w-3" /> Atribuir ao Motorista
               </p>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -783,165 +764,33 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
                 );
               })}
             </div>
-          </div>
 
-          {/* ── Col 2: Busca + Add cliente ── */}
-          <div className="flex-1 flex flex-col border-r border-gray-200 min-w-0 overflow-hidden">
-            {/* Barra de add */}
-            <div className="p-3 border-b border-gray-200 bg-white shrink-0 space-y-2">
-              {/* Linha 1: Busca + Peso + Volumes */}
-              <div className="flex gap-1.5">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-                  <input type="text" value={buscaCliente} onChange={e => setBuscaCliente(e.target.value)}
-                    placeholder="Buscar cliente..."
-                    className="w-full border border-gray-300 rounded pl-8 pr-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-400 focus:border-blue-400" />
+            {/* Resumo */}
+            <div className="bg-gray-200 border-t border-gray-300 px-3 py-2 shrink-0 text-[10px] space-y-0.5">
+              {rotaSel ? (
+                <div className="flex items-center gap-1">
+                  <Truck className={`h-3.5 w-3.5 ${rotaSel.refrigerado ? 'text-cyan-600' : 'text-blue-600'}`} />
+                  <strong>{rotaSel.motorista}</strong>
                 </div>
-                <div className="relative">
-                  <input type="number" step="0.1" value={pesoKg} onChange={e => setPesoKg(e.target.value)}
-                    placeholder="0,0"
-                    className={`w-20 border rounded px-2 py-1.5 text-xs text-right font-bold ${!pesoKg ? 'border-red-400 bg-red-50 placeholder:text-red-300' : 'border-gray-300'}`} />
-                  <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 pointer-events-none">Kg</span>
-                </div>
-                <input type="number" min="0" value={volumes} onChange={e => setVolumes(e.target.value)}
-                  placeholder="Vol" className="w-12 border border-gray-300 rounded px-1.5 py-1.5 text-xs text-right" title="Volumes" />
-              </div>
-
-              {/* Linha 2: Frete + % + Pagamento + Região */}
-              <div className="flex gap-1.5">
-                <div className="relative">
-                  <input type="number" step="0.01" value={valorFrete} onChange={e => setValorFrete(e.target.value)}
-                    placeholder="0,00"
-                    className="w-24 border border-gray-300 rounded px-2 py-1.5 text-xs text-right" />
-                  <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 pointer-events-none">R$</span>
-                </div>
-                <div className="relative">
-                  <input type="number" step="0.1" value={percentual} onChange={e => setPercentual(e.target.value)}
-                    placeholder="0"
-                    className="w-16 border border-gray-300 rounded px-2 py-1.5 text-xs text-right" title="Percentual" />
-                  <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 pointer-events-none">%</span>
-                </div>
-                <select value={formaPagamento} onChange={e => setFormaPag(e.target.value)}
-                  className="w-24 border border-gray-300 rounded px-1 py-1.5 text-xs" title="Forma de Pagamento">
-                  <option value="BOLETO">Boleto</option>
-                  <option value="PIX">PIX</option>
-                  <option value="DINHEIRO">Dinheiro</option>
-                  <option value="CARTAO">Cartão</option>
-                  <option value="CHEQUE">Cheque</option>
-                  <option value="DEPOSITO">Depósito</option>
-                  <option value="A_PRAZO">A Prazo</option>
-                </select>
-                <select value={regiao} onChange={e => setRegiao(e.target.value)} className="flex-1 border border-gray-300 rounded px-1 py-1.5 text-xs">
-                  <option value="">Região</option>
-                  {REGIOES.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-
-              {/* Labels */}
-              <div className="flex gap-1.5 text-[9px] text-gray-400 -mt-1">
-                <span className="flex-1">Cliente</span>
-                <span className="w-20 text-right">Peso *</span>
-                <span className="w-12 text-right">Vol</span>
-              </div>
-
-              {erro && <p className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded">{erro}</p>}
+              ) : (
+                <p className="text-gray-500 italic">Sem motorista</p>
+              )}
+              <p className="text-gray-500">Pedidos a roteirizar: <strong>{selecionados.size}</strong></p>
             </div>
-
-            {/* Lista de clientes p/ adicionar */}
-            <div className="flex-1 overflow-y-auto">
-              {loadingCli ? (
-                <div className="flex items-center justify-center py-8"><div className="animate-spin h-5 w-5 border-2 border-blue-500 border-t-transparent rounded-full" /></div>
-              ) : clientes.length === 0 ? (
-                <p className="text-center text-gray-400 text-xs py-6">Nenhum cliente encontrado.</p>
-              ) : clientes.slice(0, 60).map(c => {
-                const jaAdd = idsAdicionados.has(c.id);
-                return (
-                  <button key={c.id} onClick={() => !jaAdd && handleAddCliente(c)} disabled={jaAdd}
-                    className={`w-full text-left px-3 py-2 border-b border-gray-100 flex items-center justify-between group transition-colors ${jaAdd ? 'bg-green-50 opacity-60' : 'hover:bg-blue-50'}`}>
-                    <div className="flex items-center gap-2.5">
-                      <div className={`h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0 ${jaAdd ? 'bg-green-200 text-green-700' : 'bg-gray-100 text-gray-600 group-hover:bg-blue-100 group-hover:text-blue-700'}`}>
-                        {jaAdd ? '✔' : (c.nomeFantasia || c.razaoSocial || '?')[0].toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className={`text-xs font-semibold truncate ${jaAdd ? 'text-green-700' : 'text-gray-900'}`}>{c.nomeFantasia || c.razaoSocial}</p>
-                        <p className="text-[10px] text-gray-400">{c.cnpjCpf}</p>
-                      </div>
-                    </div>
-                    {!jaAdd && <span className="text-[10px] text-blue-600 opacity-0 group-hover:opacity-100 font-bold">+ Adicionar</span>}
-                    {jaAdd && <span className="text-[10px] text-green-600 font-bold">Adicionado</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ── Col 3: Lista de entregas acumuladas ── */}
-          <div className="w-72 shrink-0 flex flex-col bg-white">
-            <div className="bg-green-600 text-white px-3 py-2 shrink-0 flex items-center justify-between">
-              <p className="text-xs font-bold">Entregas desta carga</p>
-              <span className="text-[10px] bg-white/20 px-1.5 py-0.5 rounded">{entregas.length} · {pesoTotal.toFixed(1)}Kg</span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              {entregas.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-gray-400 px-4 text-center">
-                  <div>
-                    <Truck className="h-8 w-8 mx-auto mb-2 text-gray-200" />
-                    <p className="text-xs">Busque e clique nos clientes à esquerda para montar a carga</p>
-                  </div>
-                </div>
-              ) : entregas.map((e, idx) => (
-                <div key={idx} className="px-3 py-2 border-b border-gray-100">
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-gray-900 truncate">{e.cliente.nomeFantasia || e.cliente.razaoSocial}</p>
-                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
-                        <span className="text-[10px] text-gray-600 font-semibold">{e.pesoKg.toFixed(1)}Kg</span>
-                        <span className="text-[10px] text-gray-400">{e.volumes} vol</span>
-                        {e.regiao && <span className="text-[10px] text-gray-400">{e.regiao}</span>}
-                      </div>
-                      <div className="flex flex-wrap gap-x-2 mt-0.5">
-                        {e.valorFrete > 0 && <span className="text-[9px] bg-blue-50 text-blue-700 px-1 rounded font-medium">Frete: R${e.valorFrete.toFixed(2)}</span>}
-                        {e.percentual > 0 && <span className="text-[9px] bg-purple-50 text-purple-700 px-1 rounded font-medium">{e.percentual}%</span>}
-                        <span className="text-[9px] bg-gray-100 text-gray-600 px-1 rounded">{e.formaPagamento}</span>
-                        <span className="text-[9px] text-gray-400">{e.tipoFat}</span>
-                      </div>
-                    </div>
-                    <button onClick={() => handleRemove(idx)} className="text-gray-400 hover:text-red-600 shrink-0 mt-0.5">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Totais */}
-            {entregas.length > 0 && (
-              <div className="bg-gray-100 border-t border-gray-200 px-3 py-2 shrink-0 grid grid-cols-2 gap-1 text-[10px]">
-                <div><span className="text-gray-500">Clientes:</span> <strong>{entregas.length}</strong></div>
-                <div><span className="text-gray-500">Peso:</span> <strong>{pesoTotal.toFixed(1)}Kg</strong></div>
-                <div><span className="text-gray-500">Volumes:</span> <strong>{volumesTotal}</strong></div>
-                <div><span className="text-gray-500">Frete:</span> <strong>R${entregas.reduce((s, e) => s + e.valorFrete, 0).toFixed(2)}</strong></div>
-                <div className="col-span-2"><span className="text-gray-500">Motorista:</span> <strong className="truncate">{rotaSel?.motorista || '—'}</strong></div>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* ═══ FOOTER ═══ */}
-        <div className="flex items-center justify-between px-4 py-2 border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0">
+        {/* Footer */}
+        <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0">
           <div className="text-xs text-gray-500">
-            {rotaSel && <span className="flex items-center gap-1"><Truck className="h-3 w-3 text-blue-600" /> <strong>{rotaSel.motorista}</strong> — {rotaSel.tipoVeiculo} · #{rotaSel.numero}</span>}
+            {rotaSel && <span>🚛 <strong>{rotaSel.motorista}</strong> — {rotaSel.tipoVeiculo} · #{rotaSel.numero}</span>}
           </div>
           {erro && <span className="text-xs text-red-600">{erro}</span>}
           <div className="flex gap-2">
             <button onClick={onClose} className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50 font-medium">Cancelar</button>
-            <button onClick={handleSalvarTodos} disabled={salvando || entregas.length === 0}
-              className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold disabled:opacity-40 flex items-center gap-1.5 shadow-sm">
-              {salvando
-                ? <><span className="animate-spin h-3 w-3 border-2 border-white/30 border-t-white rounded-full" /> Criando {entregas.length}...</>
-                : <><PlusCircle className="h-3.5 w-3.5" /> Criar {entregas.length} Entrega{entregas.length !== 1 ? 's' : ''}</>
-              }
+            <button onClick={handleRoteirizar} disabled={salvando || selecionados.size === 0}
+              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-40 flex items-center gap-1.5 shadow-sm">
+              <RotateCcw className="h-3.5 w-3.5" /> Roteirizar {selecionados.size} Pedido{selecionados.size !== 1 ? 's' : ''}
             </button>
           </div>
         </div>

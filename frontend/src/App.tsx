@@ -6,6 +6,7 @@ import DashboardPage from './pages/DashboardPage';
 import PosicaoEstoque from './modules/estoque/pages/PosicaoEstoque';
 import ControleCarga from './modules/logistica/pages/ControleCarga';
 import AnaliseEstoqueFisico from './modules/estoque/pages/AnaliseEstoqueFisico';
+import PedidosVenda from './modules/logistica/pages/PedidosVenda';
 
 const Placeholder = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-64">
@@ -55,7 +56,7 @@ export default function App() {
             <Route path="wms/analise-estoque" element={<AnaliseEstoqueFisico />} />
 
             {/* Logística */}
-            <Route path="logistica/pedidos" element={<Placeholder title="Pedidos de Venda" />} />
+            <Route path="logistica/pedidos" element={<PedidosVenda />} />
             <Route path="logistica/carga" element={<ControleCarga />} />
             <Route path="logistica/romaneios" element={<Placeholder title="Romaneios de Carga" />} />
             <Route path="logistica/frotas" element={<Placeholder title="Frotas & Veículos" />} />
