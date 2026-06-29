@@ -20,6 +20,23 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-29] — Tela de Clientes com edição (CRUD completo)
+
+### O que mudou
+- Nova tela **Clientes** (`/cadastros/clientes`) — antes era placeholder.
+  - Lista os 399 clientes com busca (razão social / fantasia / CNPJ-CPF).
+  - **Editar**: modal com todos os campos (tipo PF/PJ, CNPJ/CPF, razão social,
+    nome fantasia, IE, telefone, celular, e-mail, contato/cargo, endereço completo,
+    limite de crédito, prazo médio, situação ativo/inativo, observações).
+  - **Novo Cliente** e **Excluir** (com confirmação).
+  - Usa endpoints já existentes: GET/POST/PUT/DELETE `/clientes`.
+
+### Arquivos
+- `frontend/src/modules/cadastros/pages/Clientes.tsx` (novo)
+- `frontend/src/App.tsx` (rota cadastros/clientes)
+
+---
+
 ## [2026-06-29] — Frete sai do Pedido de Venda → só na Logística
 
 ### O que mudou

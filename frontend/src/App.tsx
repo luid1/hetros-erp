@@ -7,6 +7,7 @@ import PosicaoEstoque from './modules/estoque/pages/PosicaoEstoque';
 import ControleCarga from './modules/logistica/pages/ControleCarga';
 import AnaliseEstoqueFisico from './modules/estoque/pages/AnaliseEstoqueFisico';
 import PedidosVenda from './modules/logistica/pages/PedidosVenda';
+import Clientes from './modules/cadastros/pages/Clientes';
 
 const Placeholder = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-64">
@@ -41,7 +42,7 @@ export default function App() {
             <Route path="dashboard" element={<DashboardPage />} />
 
             {/* Cadastros */}
-            <Route path="cadastros/clientes" element={<Placeholder title="Clientes" />} />
+            <Route path="cadastros/clientes" element={<Clientes />} />
             <Route path="cadastros/fornecedores" element={<Placeholder title="Fornecedores" />} />
             <Route path="cadastros/transportadoras" element={<Placeholder title="Transportadoras" />} />
             <Route path="cadastros/produtos" element={<Placeholder title="Produtos & NCM" />} />
