@@ -20,6 +20,50 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-29] — Módulo Pedido de Venda completo (itens, estoque, crédito)
+
+### O que mudou
+**Schema (Pedido)**: + formaPagamento, condicaoPagamento, numeroParcelas, periodo, regiao,
+pesoTotal, volumes, enderecoEntregaJson, observacoesNf, dataEmissao, bloqueioCredito,
+motivoBloqueio. **ItemPedido**: + descontoTipo (VALOR/PERCENT) e descontoPercent.
+(Aplicado via `prisma db push`.)
+
+**Seed**: 4 unidades de medida + 12 produtos FLV (BATATA, TOMATE, CEBOLA, BANANA, MAÇÃ,
+LARANJA, CENOURA, ALFACE, MAMÃO, MELANCIA, OVO, PIMENTÃO) com saldo de estoque na filial.
+
+**Backend**:
+- `GET /produtos/search?q=&filialId=` — autocomplete por nome/código/cód. barras, já com
+  estoque disponível (quantidade − reservada).
+- `pedidos.service` reescrito: cria/edita pedido COM itens, calcula subtotal por linha
+  (qtd × preço − desconto %/R$), total líquido = itens − desconto geral + frete, peso total.
+- **Análise de crédito**: ao salvar, checa duplicatas vencidas e limite de crédito do cliente
+  → marca `bloqueioCredito` + motivo.
+- **Validação de estoque** ao aprovar (CONFIRMADO): bloqueia se faltar saldo; bloqueia se
+  houver bloqueio de crédito.
+- `PUT /pedidos/:id` para editar rascunho.
+
+**Frontend** (`PedidosVenda.tsx` reescrito) — modal em 4 seções:
+- A · Dados gerais (cliente lookup com limite, emissão, entrega, período, região)
+- B · Itens: busca de produto (autocomplete) + grid editável (qtd com aviso de estoque,
+  preço, desconto R$/%, subtotal por linha, remover)
+- C · Pagamento e entrega (forma, parcelas conforme forma, CIF/FOB, frete, endereço — puxa
+  o endereço do cliente)
+- D · Observações internas e da NF
+- Rodapé fixo com **totais reativos**: total dos itens, desconto geral, frete, TOTAL LÍQUIDO.
+- Lista com Editar/Aprovar, selo "Crédito bloqueado", status CONFIRMADO exibido como APROVADO.
+
+### Resolve
+A pendência dos valores zerados: agora o pedido tem itens e valor real, que somam no
+Controle de Carga e na Nova Entrega.
+
+### Arquivos
+- `backend/prisma/schema.prisma`, `backend/prisma/seed.ts`
+- `backend/src/modules/produtos/{service,controller}.ts`
+- `backend/src/modules/pedidos/{service,controller}.ts`
+- `frontend/src/modules/logistica/pages/PedidosVenda.tsx`
+
+---
+
 ## [2026-06-29] — Fluxo Nova Entrega: motorista 1º + soma do valor total
 
 ### O que mudou

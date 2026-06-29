@@ -38,3 +38,5 @@ desktop.ini
 
 # Docker override local
 docker-compose.override.yml
+
+frontend/vite.log

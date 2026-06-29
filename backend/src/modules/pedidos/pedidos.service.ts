@@ -1,27 +1,125 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
+interface ItemDto {
+  produtoId: string;
+  descricao?: string;
+  quantidade: number;
+  unidade?: string;
+  precoUnitario: number;
+  descontoTipo?: 'VALOR' | 'PERCENT';
+  descontoPercent?: number;
+  desconto?: number; // R$
+}
+
+interface PedidoDto {
+  filialOrigemId: string;
+  clienteId: string;
+  usuarioId: string;
+  tipo?: string;
+  dataEmissao?: string;
+  dataEntrega?: string;
+  periodo?: string;
+  regiao?: string;
+  volumes?: number;
+  formaPagamento?: string;
+  condicaoPagamento?: string;
+  numeroParcelas?: number;
+  tipoFrete?: string;
+  valorFrete?: number;
+  descontoTotal?: number;
+  observacoes?: string;
+  observacoesNf?: string;
+  enderecoEntregaJson?: any;
+  itens?: ItemDto[];
+}
+
 @Injectable()
 export class PedidosService {
   constructor(private prisma: PrismaService) {}
 
-  async create(tenantId: string, dto: {
-    filialOrigemId: string;
-    clienteId: string;
-    usuarioId: string;
-    tipo?: string;
-    observacoes?: string;
-    tipoFrete?: string;
-    dataEntrega?: string;
-    itens?: Array<{
-      produtoId: string;
-      descricao: string;
-      quantidade: number;
-      unidade: string;
-      precoUnitario: number;
-    }>;
-  }) {
-    // Próximo número do pedido na filial
+  // ── Resolve desconto do item em R$ ──
+  private descontoEmReais(item: ItemDto): number {
+    const bruto = item.quantidade * item.precoUnitario;
+    if (item.descontoTipo === 'PERCENT') {
+      return bruto * ((item.descontoPercent || 0) / 100);
+    }
+    return item.desconto || 0;
+  }
+
+  // ── Calcula linhas + totais do pedido ──
+  private async montarItensETotais(tenantId: string, dto: PedidoDto) {
+    const itensInput = dto.itens || [];
+    if (itensInput.length === 0) {
+      return { itensData: [] as any[], subtotal: 0, pesoTotal: 0, valorTotal: 0 };
+    }
+
+    const produtoIds = itensInput.map((i) => i.produtoId);
+    const produtos = await this.prisma.produto.findMany({
+      where: { tenantId, id: { in: produtoIds } },
+      include: { unidadeMedida: { select: { sigla: true } } },
+    });
+    const mapProd = new Map(produtos.map((p) => [p.id, p]));
+
+    let subtotal = 0;
+    let pesoTotal = 0;
+    const itensData = itensInput.map((item) => {
+      const prod = mapProd.get(item.produtoId);
+      if (!prod) throw new BadRequestException(`Produto ${item.produtoId} não encontrado.`);
+      const bruto = item.quantidade * item.precoUnitario;
+      const descontoR$ = this.descontoEmReais(item);
+      const valorLinha = Math.max(0, bruto - descontoR$);
+      subtotal += valorLinha;
+      pesoTotal += Number(prod.pesoBruto || 0) * item.quantidade;
+      return {
+        produtoId: item.produtoId,
+        descricao: item.descricao || prod.descricao,
+        quantidade: item.quantidade,
+        unidade: item.unidade || prod.unidadeMedida?.sigla || 'UN',
+        precoUnitario: item.precoUnitario,
+        desconto: descontoR$,
+        descontoTipo: item.descontoTipo || 'VALOR',
+        descontoPercent: item.descontoPercent || 0,
+        valorTotal: valorLinha,
+        cfop: prod.cfop,
+      };
+    });
+
+    const descontoGeral = dto.descontoTotal || 0;
+    const frete = dto.valorFrete || 0;
+    const valorTotal = Math.max(0, subtotal - descontoGeral + frete);
+    return { itensData, subtotal, pesoTotal, valorTotal };
+  }
+
+  // ── Análise de crédito do cliente ──
+  // Retorna { bloqueado, motivo } com base em limite de crédito e duplicatas vencidas.
+  private async analisarCredito(tenantId: string, clienteId: string, valorPedido: number) {
+    const cliente = await this.prisma.cliente.findFirst({ where: { id: clienteId, tenantId } });
+    if (!cliente) return { bloqueado: false, motivo: null as string | null };
+
+    const hoje = new Date();
+    const abertas = await this.prisma.contaReceber.findMany({
+      where: { tenantId, clienteId, status: 'ABERTO' },
+      select: { valorOriginal: true, valorPago: true, dataVencimento: true },
+    });
+
+    const totalAberto = abertas.reduce((s, c) => s + (Number(c.valorOriginal) - Number(c.valorPago)), 0);
+    const vencidas = abertas.filter((c) => c.dataVencimento < hoje);
+    const limite = Number(cliente.limiteCredito || 0);
+
+    if (vencidas.length > 0) {
+      return { bloqueado: true, motivo: `Cliente possui ${vencidas.length} duplicata(s) vencida(s).` };
+    }
+    if (limite > 0 && totalAberto + valorPedido > limite) {
+      return {
+        bloqueado: true,
+        motivo: `Limite de crédito excedido (limite R$ ${limite.toFixed(2)}, em aberto + pedido R$ ${(totalAberto + valorPedido).toFixed(2)}).`,
+      };
+    }
+    return { bloqueado: false, motivo: null };
+  }
+
+  async create(tenantId: string, dto: PedidoDto) {
     const ultimo = await this.prisma.pedido.findFirst({
       where: { tenantId, filialOrigemId: dto.filialOrigemId },
       orderBy: { numero: 'desc' },
@@ -29,18 +127,12 @@ export class PedidosService {
     });
     const numero = (ultimo?.numero || 0) + 1;
 
-    // Calcula totais dos itens
-    const itensData = (dto.itens || []).map(item => ({
-      produtoId: item.produtoId,
-      descricao: item.descricao,
-      quantidade: item.quantidade,
-      unidade: item.unidade,
-      precoUnitario: item.precoUnitario,
-      valorTotal: item.quantidade * item.precoUnitario,
-    }));
-    const subtotal = itensData.reduce((s, i) => s + i.valorTotal, 0);
+    const { itensData, subtotal, pesoTotal, valorTotal } = await this.montarItensETotais(tenantId, dto);
+    const credito = dto.clienteId
+      ? await this.analisarCredito(tenantId, dto.clienteId, valorTotal)
+      : { bloqueado: false, motivo: null };
 
-    const pedido = await this.prisma.pedido.create({
+    return this.prisma.pedido.create({
       data: {
         tenantId,
         filialOrigemId: dto.filialOrigemId,
@@ -50,10 +142,24 @@ export class PedidosService {
         tipo: dto.tipo || 'VENDA',
         status: 'RASCUNHO',
         observacoes: dto.observacoes,
+        observacoesNf: dto.observacoesNf,
         tipoFrete: dto.tipoFrete,
+        formaPagamento: dto.formaPagamento,
+        condicaoPagamento: dto.condicaoPagamento,
+        numeroParcelas: dto.numeroParcelas || 1,
+        periodo: dto.periodo,
+        regiao: dto.regiao,
+        volumes: dto.volumes || 0,
+        pesoTotal,
+        enderecoEntregaJson: dto.enderecoEntregaJson,
+        dataEmissao: dto.dataEmissao ? new Date(dto.dataEmissao) : undefined,
         dataEntrega: dto.dataEntrega ? new Date(dto.dataEntrega) : undefined,
         subtotal,
-        valorTotal: subtotal,
+        descontoTotal: dto.descontoTotal || 0,
+        valorFrete: dto.valorFrete || 0,
+        valorTotal,
+        bloqueioCredito: credito.bloqueado,
+        motivoBloqueio: credito.motivo,
         itens: itensData.length > 0 ? { create: itensData } : undefined,
       },
       include: {
@@ -62,8 +168,52 @@ export class PedidosService {
         filialOrigem: { select: { id: true, codigo: true, nome: true } },
       },
     });
+  }
 
-    return pedido;
+  async update(tenantId: string, id: string, dto: PedidoDto) {
+    const pedido = await this.findOne(tenantId, id);
+    if (pedido.status !== 'RASCUNHO') {
+      throw new BadRequestException('Só é possível editar pedidos em rascunho.');
+    }
+
+    const { itensData, subtotal, pesoTotal, valorTotal } = await this.montarItensETotais(tenantId, dto);
+    const credito = dto.clienteId
+      ? await this.analisarCredito(tenantId, dto.clienteId, valorTotal)
+      : { bloqueado: false, motivo: null };
+
+    // Recria os itens (estratégia simples para rascunho)
+    await this.prisma.itemPedido.deleteMany({ where: { pedidoId: id } });
+
+    return this.prisma.pedido.update({
+      where: { id },
+      data: {
+        clienteId: dto.clienteId,
+        observacoes: dto.observacoes,
+        observacoesNf: dto.observacoesNf,
+        tipoFrete: dto.tipoFrete,
+        formaPagamento: dto.formaPagamento,
+        condicaoPagamento: dto.condicaoPagamento,
+        numeroParcelas: dto.numeroParcelas || 1,
+        periodo: dto.periodo,
+        regiao: dto.regiao,
+        volumes: dto.volumes || 0,
+        pesoTotal,
+        enderecoEntregaJson: dto.enderecoEntregaJson,
+        dataEmissao: dto.dataEmissao ? new Date(dto.dataEmissao) : undefined,
+        dataEntrega: dto.dataEntrega ? new Date(dto.dataEntrega) : undefined,
+        subtotal,
+        descontoTotal: dto.descontoTotal || 0,
+        valorFrete: dto.valorFrete || 0,
+        valorTotal,
+        bloqueioCredito: credito.bloqueado,
+        motivoBloqueio: credito.motivo,
+        itens: itensData.length > 0 ? { create: itensData } : undefined,
+      },
+      include: {
+        cliente: { select: { id: true, razaoSocial: true, nomeFantasia: true, cnpjCpf: true } },
+        itens: true,
+      },
+    });
   }
 
   async findAll(tenantId: string, filters?: {
@@ -108,7 +258,7 @@ export class PedidosService {
       where: { id, tenantId },
       include: {
         cliente: true,
-        itens: { include: { produto: { select: { codigo: true, descricao: true } } } },
+        itens: { include: { produto: { select: { codigo: true, descricao: true, codigoBarras: true } } } },
         filialOrigem: true,
       },
     });
@@ -117,14 +267,40 @@ export class PedidosService {
   }
 
   async updateStatus(tenantId: string, id: string, status: string) {
-    const pedido = await this.findOne(tenantId, id);
+    await this.findOne(tenantId, id);
     return this.prisma.pedido.update({
       where: { id },
       data: { status: status as any },
     });
   }
 
+  // Aprovar = CONFIRMADO. Valida crédito e estoque antes.
   async confirmar(tenantId: string, id: string) {
+    const pedido = await this.findOne(tenantId, id);
+
+    if (pedido.bloqueioCredito) {
+      throw new BadRequestException(
+        `Pedido bloqueado por crédito: ${pedido.motivoBloqueio || 'análise pendente'}.`,
+      );
+    }
+
+    // Valida estoque disponível de cada item na filial de origem
+    for (const item of pedido.itens) {
+      const saldos = await this.prisma.estoqueSaldo.findMany({
+        where: { tenantId, filialId: pedido.filialOrigemId, produtoId: item.produtoId },
+        select: { quantidade: true, quantidadeReservada: true },
+      });
+      const disponivel = saldos.reduce(
+        (s, e) => s + (Number(e.quantidade) - Number(e.quantidadeReservada)),
+        0,
+      );
+      if (disponivel < Number(item.quantidade)) {
+        throw new BadRequestException(
+          `Estoque insuficiente para "${item.descricao}" (disponível ${disponivel}, pedido ${item.quantidade}).`,
+        );
+      }
+    }
+
     return this.updateStatus(tenantId, id, 'CONFIRMADO');
   }
 

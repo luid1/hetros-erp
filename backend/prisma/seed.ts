@@ -200,6 +200,72 @@ async function main() {
   }
   console.log(`✅ ${localizacoes.length} localizações físicas criadas`);
 
+  // ── 7. Unidades de medida ──────────────────────────────────────
+  const unidadesDefs = [
+    { sigla: 'KG', descricao: 'Quilograma' },
+    { sigla: 'CX', descricao: 'Caixa' },
+    { sigla: 'UN', descricao: 'Unidade' },
+    { sigla: 'DZ', descricao: 'Dúzia' },
+  ];
+  const umMap: Record<string, string> = {};
+  for (const u of unidadesDefs) {
+    const um = await prisma.unidadeMedida.upsert({
+      where: { tenantId_sigla: { tenantId: tenant.id, sigla: u.sigla } },
+      update: {},
+      create: { tenantId: tenant.id, sigla: u.sigla, descricao: u.descricao },
+    });
+    umMap[u.sigla] = um.id;
+  }
+  console.log(`✅ ${unidadesDefs.length} unidades de medida criadas`);
+
+  // ── 8. Produtos FLV + saldo de estoque ─────────────────────────
+  const produtosDefs = [
+    { codigo: 'BAT25', barras: '7890000000017', descricao: 'BATATA LAVADA ESPECIAL SC 25KG', ncm: '07019000', un: 'CX', preco: 89.90,  estoque: 320 },
+    { codigo: 'TOM20', barras: '7890000000024', descricao: 'TOMATE LONGA VIDA CX 20KG',     ncm: '07020000', un: 'CX', preco: 72.50,  estoque: 180 },
+    { codigo: 'CEB20', barras: '7890000000031', descricao: 'CEBOLA NACIONAL SC 20KG',       ncm: '07031019', un: 'CX', preco: 65.00,  estoque: 240 },
+    { codigo: 'BAN18', barras: '7890000000048', descricao: 'BANANA NANICA CX 18KG',         ncm: '08039000', un: 'CX', preco: 58.00,  estoque: 95  },
+    { codigo: 'MAC18', barras: '7890000000055', descricao: 'MAÇÃ GALA CX 18KG',             ncm: '08081000', un: 'CX', preco: 130.00, estoque: 60  },
+    { codigo: 'LAR20', barras: '7890000000062', descricao: 'LARANJA PERA SC 20KG',          ncm: '08051000', un: 'CX', preco: 48.00,  estoque: 150 },
+    { codigo: 'CENO20', barras: '7890000000079', descricao: 'CENOURA LAVADA SC 20KG',       ncm: '07061000', un: 'CX', preco: 70.00,  estoque: 110 },
+    { codigo: 'ALF', barras: '7890000000086', descricao: 'ALFACE CRESPA CX 12UN',           ncm: '07051100', un: 'CX', preco: 35.00,  estoque: 8   },
+    { codigo: 'MAM',  barras: '7890000000093', descricao: 'MAMÃO FORMOSA CX 12KG',          ncm: '08072000', un: 'CX', preco: 62.00,  estoque: 0   },
+    { codigo: 'MELA', barras: '7890000000109', descricao: 'MELANCIA GRAÚDA UN',             ncm: '08071100', un: 'UN', preco: 22.00,  estoque: 45  },
+    { codigo: 'OVO30', barras: '7890000000116', descricao: 'OVO BRANCO GRANDE CARTELA 30UN', ncm: '04072100', un: 'CX', preco: 18.50, estoque: 200 },
+    { codigo: 'PIM10', barras: '7890000000123', descricao: 'PIMENTÃO VERDE CX 10KG',        ncm: '07096010', un: 'CX', preco: 55.00,  estoque: 70  },
+  ];
+  const umCx = umMap['CX'];
+  for (const p of produtosDefs) {
+    const prod = await prisma.produto.upsert({
+      where: { tenantId_codigo: { tenantId: tenant.id, codigo: p.codigo } },
+      update: { precoVenda: p.preco, descricao: p.descricao },
+      create: {
+        tenantId: tenant.id,
+        codigo: p.codigo,
+        codigoBarras: p.barras,
+        descricao: p.descricao,
+        ncm: p.ncm,
+        cfop: '5102',
+        unidadeMedidaId: umMap[p.un] || umCx,
+        categoria: 'FLV',
+        precoVenda: p.preco,
+        precoCusto: p.preco * 0.7,
+        estoqueMinimo: 20,
+      },
+    });
+    // saldo de estoque na filial
+    const saldoExistente = await prisma.estoqueSaldo.findFirst({
+      where: { tenantId: tenant.id, filialId: filial.id, produtoId: prod.id, loteId: null },
+    });
+    if (saldoExistente) {
+      await prisma.estoqueSaldo.update({ where: { id: saldoExistente.id }, data: { quantidade: p.estoque } });
+    } else {
+      await prisma.estoqueSaldo.create({
+        data: { tenantId: tenant.id, filialId: filial.id, produtoId: prod.id, quantidade: p.estoque },
+      });
+    }
+  }
+  console.log(`✅ ${produtosDefs.length} produtos FLV criados com saldo de estoque`);
+
   console.log('\n🎉 Seed concluído com sucesso!\n');
   console.log('─────────────────────────────────────');
   console.log('🔑 Credenciais de acesso:');

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Body, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { PedidosService } from './pedidos.service';
 import { CurrentTenant, CurrentUser, Modulo } from '../../common/decorators/context.decorator';
@@ -33,6 +33,12 @@ export class PedidosController {
   @Get(':id')
   findOne(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.service.findOne(tenantId, id);
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Editar pedido (rascunho)' })
+  update(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string, @Body() dto: any) {
+    return this.service.update(tenantId, id, { ...dto, usuarioId: user.id });
   }
 
   @Patch(':id/confirmar')

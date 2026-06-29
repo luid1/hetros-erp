@@ -602,7 +602,23 @@ model Pedido {
   // Frete
   tipoFrete         String?   // CIF, FOB
   transportadoraId  String?
+  // Pagamento
+  formaPagamento    String?   // DINHEIRO, PIX, CARTAO_CREDITO, CARTAO_DEBITO, BOLETO, A_PRAZO
+  condicaoPagamento String?   // A_VISTA, 1X, 2X, 3X...
+  numeroParcelas    Int       @default(1)
+  // Logística / entrega
+  periodo           String?   // MANHA, TARDE
+  regiao            String?
+  pesoTotal         Decimal   @default(0) @db.Decimal(12, 3)
+  volumes           Int       @default(0)
+  enderecoEntregaJson Json?   // rua, numero, bairro, cidade, uf, cep
+  // Observações
+  observacoesNf     String?   // observações que vão na nota fiscal
+  // Crédito
+  bloqueioCredito   Boolean   @default(false)
+  motivoBloqueio    String?
   // Datas
+  dataEmissao       DateTime  @default(now())
   dataEntrega       DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -631,7 +647,9 @@ model ItemPedido {
   quantidadeSeparada Decimal @default(0) @db.Decimal(12, 4)
   unidade         String
   precoUnitario   Decimal   @db.Decimal(12, 4)
-  desconto        Decimal   @default(0) @db.Decimal(12, 4)
+  desconto        Decimal   @default(0) @db.Decimal(12, 4) // valor resolvido em R$
+  descontoTipo    String    @default("VALOR") // VALOR ou PERCENT
+  descontoPercent Decimal   @default(0) @db.Decimal(6, 4)
   valorTotal      Decimal   @db.Decimal(12, 2)
   // Fiscal
   cfop            String?
