@@ -8,6 +8,7 @@ import ControleCarga from './modules/logistica/pages/ControleCarga';
 import AnaliseEstoqueFisico from './modules/estoque/pages/AnaliseEstoqueFisico';
 import PedidosVenda from './modules/logistica/pages/PedidosVenda';
 import Clientes from './modules/cadastros/pages/Clientes';
+import Operacional from './modules/logistica/pages/Operacional';
 
 const Placeholder = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-64">
@@ -59,6 +60,7 @@ export default function App() {
             {/* Logística */}
             <Route path="logistica/pedidos" element={<PedidosVenda />} />
             <Route path="logistica/carga" element={<ControleCarga />} />
+            <Route path="logistica/operacional" element={<Operacional />} />
             <Route path="logistica/romaneios" element={<Placeholder title="Romaneios de Carga" />} />
             <Route path="logistica/frotas" element={<Placeholder title="Frotas & Veículos" />} />
 

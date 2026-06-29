@@ -20,6 +20,33 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-29] — Tela Operacional (separação) + endereços fictícios
+
+### O que mudou
+- **Endereços fictícios** preenchidos em 398 clientes que estavam sem endereço
+  (script `prisma/seed-enderecos.ts`) — a Capa de Rota e o Espelho saem completos.
+- Nova tela **Operacional / Separação** (`/logistica/operacional`):
+  - Lista os pedidos do dia por status de separação, com cores (NewOxxy):
+    Pendente (CONFIRMADO/vermelho), Separando (EM_SEPARACAO/azul),
+    Liberado p/ Faturamento (SEPARADO/verde), Faturado (cinza).
+  - Chips com contagem por status + filtro.
+  - Painel direito: itens do pedido selecionado (picking) + ações
+    **Iniciar Separação** → **Liberar para Faturamento**, e **Imprimir Espelho**.
+  - Persiste via `PATCH /pedidos/:id/status`.
+- Backend `getGrade`: expõe `statusPedido` e `qtdItens`.
+- Item no menu lateral: "Operacional / Separação".
+
+### Fluxo completo agora
+Pedido (com itens) → Aprovar → Controle de Carga (roteirizar → Capa de Rota) →
+Operacional (separar → liberar) → [Faturamento].
+
+### Arquivos
+- `backend/prisma/seed-enderecos.ts` (novo), `backend/src/modules/carga/carga.service.ts`
+- `frontend/src/modules/logistica/pages/Operacional.tsx` (novo)
+- `frontend/src/App.tsx`, `frontend/src/components/layout/AppShell.tsx`
+
+---
+
 ## [2026-06-29] — Roteirização persistida + Capa de Rota + Espelho
 
 ### O que mudou

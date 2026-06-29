@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, Package, Warehouse, FileText,
   DollarSign, Truck, ClipboardList, BarChart3, Settings,
   ChevronLeft, ChevronRight, LogOut, Building2, AlertTriangle,
-  Receipt, ShieldCheck, Menu, X, Zap, MapPin,
+  Receipt, ShieldCheck, Menu, X, Zap, MapPin, PackageCheck,
 } from 'lucide-react';
 
 interface NavItem { to: string; icon: React.ElementType; label: string; badge?: string; badgeColor?: string; highlight?: boolean }
@@ -44,6 +44,7 @@ const navigation: NavGroup[] = [
     items: [
       { to: '/logistica/pedidos',   icon: ClipboardList, label: 'Pedidos de Venda' },
       { to: '/logistica/carga',     icon: Truck,         label: 'Controle de Carga', highlight: true },
+      { to: '/logistica/operacional', icon: PackageCheck, label: 'Operacional / Separação' },
       { to: '/logistica/romaneios', icon: MapPin,        label: 'Romaneios' },
       { to: '/logistica/frotas',    icon: Truck,         label: 'Frotas & Veículos' },
     ],
