@@ -20,6 +20,41 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-29] — Roteirização persistida + Capa de Rota + Espelho
+
+### O que mudou
+**Schema (Romaneio)**: + codigoCondutor, foneCondutor, placaVeiculo, modeloVeiculo,
+tipoVeiculo, refrigerado, periodo, dataMovimento, dataEntrega, autorizacaoCarga (db push).
+
+**Backend (carga.service reescrito)**:
+- `getGrade` corrigido (não usa mais colunas removidas; marca roteirizado/peso/valor reais).
+- `getRotas` agora retorna os **romaneios reais do dia** (Entregas Programadas) com entregas,
+  peso, valor e qtd — filtra por `dataEntrega`.
+- `POST /carga/romaneio` — **cria a rota (Romaneio = Capa de Rota)** com motorista/veículo +
+  pedidos, gera número e autorização de carga. **Persiste a roteirização.**
+- `GET /carga/romaneio/:id/capa` — dados completos da Capa de Rota.
+- `DELETE /carga/romaneio/:id` — desfaz a rota.
+- Corrigido **bug de fuso horário** no filtro de dia (janela caía 1 dia antes em BRT).
+
+**Frontend (Controle de Carga)**:
+- "Entregas Programadas" agora mostra **só as rotas já montadas** (reais), expansíveis com
+  as entregas e valor; botão **Imprimir Capa de Rota** (layout igual ao NewOxxy).
+- Nova Entrega → Roteirizar agora **salva no backend** (não some mais ao fechar).
+- KPIs (Qtd Rotas / Peso / Qtd Entregas) vêm das rotas reais.
+- Botão **Espelho** por pedido no painel inferior (picking sheet com itens, layout NewOxxy).
+- Frota de motoristas (16) segue como lista para escolher no modal.
+
+### Observação
+A Capa de Rota mostra endereço/bairro vazios para clientes sem endereço cadastrado —
+preencher em Cadastros → Clientes para sair completa.
+
+### Arquivos
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/carga/{service,controller}.ts`
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx`
+
+---
+
 ## [2026-06-29] — Aprovar com estoque negativo + avisos "a comprar/repor"
 
 ### O que mudou

@@ -51,6 +51,8 @@ interface RotaMotorista {
   slaPercent: number;
 }
 
+const R$ = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
 // ─── Segmentos ───────────────────────────────────
 const SEGMENTOS = [
   '0-Todos', '1-Escolas', '2-Restaurantes', '3-Hospitais',
@@ -170,7 +172,8 @@ export default function ControleCarga() {
   // ── Estado da grade ──
   const [pedidos, setPedidos]         = useState<PedidoCarga[]>([]);
   const [carregando, setCarregando]   = useState(false);
-  const [rotas]                       = useState<RotaMotorista[]>(MOCK_ROTAS);
+  const frota                         = MOCK_ROTAS; // frota disponível p/ escolher no modal
+  const [rotasProgramadas, setRotasProgramadas] = useState<any[]>([]); // romaneios reais (Entregas Programadas)
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [abaRota, setAbaRota]         = useState<'rotas' | 'horario'>('rotas');
   const [rotaExpandida, setRotaExpandida] = useState<string | null>(null);
@@ -187,7 +190,16 @@ export default function ControleCarga() {
       })
       .catch(() => setPedidos([]))
       .finally(() => setCarregando(false));
+    carregarRotas();
     setSelecionados(new Set());
+  };
+
+  // ── Carrega as rotas (romaneios) já montadas para o dia ──
+  const carregarRotas = () => {
+    if (!filialAtiva) return;
+    api.get(`/carga/${filialAtiva.id}/rotas`, { params: { data: dataCarga } })
+      .then(r => setRotasProgramadas(r.data))
+      .catch(() => setRotasProgramadas([]));
   };
 
   useEffect(() => { carregar(); }, [filialAtiva?.id, dataCarga]);
@@ -207,12 +219,12 @@ export default function ControleCarga() {
     });
   }, [pedidos, somenteEscolas, mostrarFinalizados, segmento]);
 
-  // ── Filtrar rotas por busca ──
+  // ── Filtrar rotas programadas por busca ──
   const rotasFiltradas = useMemo(() => {
-    if (!buscaRota) return rotas;
+    if (!buscaRota) return rotasProgramadas;
     const q = buscaRota.toLowerCase();
-    return rotas.filter(r => r.motorista.toLowerCase().includes(q) || String(r.numero).includes(q));
-  }, [rotas, buscaRota]);
+    return rotasProgramadas.filter(r => (r.motorista || '').toLowerCase().includes(q) || String(r.numero).includes(q));
+  }, [rotasProgramadas, buscaRota]);
 
   // ── Seleção de linhas ──
   const toggleSelect = (id: string) => {
@@ -250,7 +262,114 @@ export default function ControleCarga() {
   };
 
   const handleRotear = () => {
-    alert(`Roteamento de ${selecionados.size} pedido(s) selecionados.\nFuncionalidade será integrada com o backend.`);
+    setModalNovaEntrega(true);
+  };
+
+  // ── Imprime a Capa de Rota de um romaneio ──
+  const imprimirCapaRota = async (romaneioId: string) => {
+    try {
+      const { data: c } = await api.get(`/carga/romaneio/${romaneioId}/capa`);
+      const dt = (d: any) => d ? new Date(d).toLocaleDateString('pt-BR') : '';
+      const linhas = c.unidades.map((u: any) => `
+        <tr>
+          <td>${u.unidade}</td><td></td><td></td>
+          <td style="text-align:center">${u.endereco}</td>
+          <td style="text-align:center">${u.bairro}</td>
+          <td></td><td></td><td></td><td></td><td></td>
+        </tr>`).join('');
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Capa de Rota ${c.idEntrega}</title>
+<style>
+body{font-family:Arial;font-size:11px;margin:14px;color:#000}
+.box{border:2px solid #000}
+.hd{display:flex;align-items:center;border-bottom:2px solid #000;padding:6px}
+.hd h1{flex:1;text-align:center;font-size:22px;margin:0;letter-spacing:1px}
+.logo{font-weight:bold;color:#2e7d32;font-size:18px}
+.info{padding:4px 8px;border-bottom:1px solid #000;font-size:11px}
+.info div{display:inline-block;margin-right:24px}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #000;padding:2px 4px;font-size:10px}
+th{background:#eee;text-align:center}
+.foot{display:flex;justify-content:space-between;font-weight:bold;padding:4px 8px;border-top:1px solid #000}
+@media print{button{display:none}}
+</style></head><body>
+<button onclick="window.print()" style="margin-bottom:8px;padding:6px 12px">🖨️ Imprimir</button>
+<div class="box">
+  <div class="hd"><span class="logo">🍃 HETROS</span><h1>CAPA DE ROTA</h1><span>Pág. 1</span></div>
+  <div class="info">
+    <div><b>Id Entrega:</b> ${c.idEntrega}</div><div><b>CD:</b> ${c.cd}</div>
+    <div><b>Veículo:</b> ${c.placaVeiculo || ''} ${c.modeloVeiculo ? '- ' + c.modeloVeiculo : ''}</div>
+    <div><b>Dt.Movimento:</b> ${dt(c.dataMovimento)}</div>
+    <div><b>Fone Condutor:</b> ${c.foneCondutor || ''}</div>
+  </div>
+  <div class="info">
+    <div><b>Condutor:</b> ${c.codigoCondutor ? c.codigoCondutor + ' - ' : ''}${c.motorista || ''}</div>
+    <div><b>Dt.Entrega:</b> ${dt(c.dataEntrega)}</div>
+    <div><b>Rota:</b> ${c.regiaoRota || ''}</div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>UNIDADE</th><th>Hora De</th><th>Hora Até</th><th>ENDEREÇO</th><th>BAIRRO</th>
+      <th>ROTA</th><th>Hora Entrada</th><th>Hora Saída</th><th>Caixas Saída</th><th>Caixas Retorno</th>
+    </tr></thead>
+    <tbody>${linhas}</tbody>
+  </table>
+  <div class="foot"><span>QTDE DE ENTREGAS: ${c.qtdEntregas}</span><span>Autorização de Carga: ${c.autorizacaoCarga || ''}</span></div>
+</div>
+</body></html>`;
+      const w = window.open('', '_blank');
+      if (w) { w.document.write(html); w.document.close(); }
+    } catch {
+      alert('Não foi possível gerar a Capa de Rota.');
+    }
+  };
+
+  // ── Imprime o Espelho (picking) de um pedido ──
+  const imprimirEspelho = async (pedidoId: string) => {
+    try {
+      const { data: p } = await api.get(`/pedidos/${pedidoId}`);
+      const end: any = p.cliente?.enderecoJson || {};
+      const itensHtml = (p.itens || []).map((it: any) => `
+        <tr>
+          <td>${it.produto?.codigo || ''}</td>
+          <td>${it.descricao}</td>
+          <td style="text-align:right">${Number(it.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 3 })}</td>
+          <td>${it.unidade}</td>
+          <td></td>
+        </tr>`).join('');
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Espelho Pedido ${p.numero}</title>
+<style>
+body{font-family:Arial;font-size:12px;margin:18px;color:#000}
+.center{text-align:center}
+h2{margin:2px 0}
+table{width:100%;border-collapse:collapse;margin-top:10px}
+th,td{padding:3px 6px;font-size:11px;border-bottom:1px solid #ccc;text-align:left}
+th{border-bottom:2px solid #000}
+.cab{border-bottom:2px solid #000;padding-bottom:6px}
+.linha{display:flex;justify-content:space-between;border-top:2px solid #000;border-bottom:1px solid #000;padding:3px 0;font-weight:bold;margin-top:6px}
+@media print{button{display:none}}
+</style></head><body>
+<button onclick="window.print()" style="margin-bottom:8px;padding:6px 12px">🖨️ Imprimir</button>
+<div class="cab center">
+  <div class="logo" style="font-weight:bold;font-size:16px">🍃 HETROS IMP. E EXP. LTDA</div>
+  <div>AV DOUTOR GASTAO VIDIGAL, SN - PAV HFC BOX 19 · 05316-900 - VILA LEOPOLDINA · SAO PAULO-SP</div>
+</div>
+<h2 class="center">${(p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '').toUpperCase()}</h2>
+<p class="center">${[end.rua, end.numero].filter(Boolean).join(', ')} · ${end.bairro || ''} · ${end.cidade || ''}-${end.uf || ''}</p>
+<div class="linha">
+  <span>Pedido: ${String(p.numero).padStart(8, '0')}</span>
+  <span>Venda: ${p.dataEntrega ? new Date(p.dataEntrega).toLocaleDateString('pt-BR') : ''}</span>
+  <span>Itens: ${String((p.itens || []).length).padStart(3, '0')}</span>
+</div>
+<table>
+  <thead><tr><th>Produto</th><th>Descrição</th><th>Qtde</th><th>UN</th><th>Obs</th></tr></thead>
+  <tbody>${itensHtml}</tbody>
+</table>
+</body></html>`;
+      const w = window.open('', '_blank');
+      if (w) { w.document.write(html); w.document.close(); }
+    } catch {
+      alert('Não foi possível gerar o Espelho do pedido.');
+    }
   };
 
   const handleImprimirSel = () => {
@@ -271,21 +390,18 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
   // ── Modal Nova Entrega ──
   const [modalNovaEntrega, setModalNovaEntrega] = useState(false);
 
-  const handleNovasEntregasCriadas = (novosPedidos: PedidoCarga[]) => {
-    setPedidos(prev => [...novosPedidos, ...prev]);
+  const handleRotaCriada = () => {
     setModalNovaEntrega(false);
+    carregar(); // recarrega grade + rotas
   };
 
-  // ── KPIs do painel inferior direito ──
-  const kpis = useMemo(() => {
-    const totalPeso = entregasSelecionadas.reduce((s, p) => s + parseFloat(p.pesoKg.replace(',', '.').replace('...', '')) || 0, 0);
-    return {
-      qtdRotas: rotas.length,
-      pesoCargaKg: totalPeso,
-      qtdEntregas: entregasSelecionadas.length,
-      slaPercent: 0,
-    };
-  }, [rotas, entregasSelecionadas]);
+  // ── KPIs do painel inferior direito (rotas reais) ──
+  const kpis = useMemo(() => ({
+    qtdRotas: rotasProgramadas.length,
+    pesoCargaKg: rotasProgramadas.reduce((s, r) => s + Number(r.pesoKg || 0), 0),
+    qtdEntregas: rotasProgramadas.reduce((s, r) => s + Number(r.qtdEntregas || 0), 0),
+    slaPercent: 0,
+  }), [rotasProgramadas]);
 
   return (
     <div className="flex flex-col h-full bg-gray-100 text-[11px] select-none overflow-hidden">
@@ -470,6 +586,11 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
               Entregas Programadas
             </div>
 
+            {rotasFiltradas.length === 0 && (
+              <div className="px-3 py-6 text-center text-gray-400 text-[10px] italic">
+                Nenhuma rota montada para o dia.<br />Use <strong>Nova Entrega</strong> para roteirizar.
+              </div>
+            )}
             {rotasFiltradas.map(r => (
               <div key={r.id} className={`border-b border-gray-200 cursor-pointer transition-colors ${rotaExpandida === r.id ? 'bg-blue-100' : 'hover:bg-gray-100'}`} onClick={() => setRotaExpandida(rotaExpandida === r.id ? null : r.id)}>
                 <div className="flex items-center gap-1 px-2 py-1.5 text-[11px]">
@@ -477,23 +598,31 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
                   <Truck className={`h-3 w-3 shrink-0 ${r.refrigerado ? 'text-cyan-600' : 'text-gray-500'}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 flex-wrap">
-                      <span className="font-bold text-gray-800 truncate" style={{ maxWidth: 130 }}>{r.motorista}</span>
+                      <span className="font-bold text-gray-800 truncate" style={{ maxWidth: 120 }}>{r.motorista}</span>
                       <span className={`text-[9px] font-bold px-1 rounded ${r.refrigerado ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-200 text-gray-600'}`}>
-                        {r.tipoVeiculo.length > 14 ? r.tipoVeiculo.slice(0, 14) : r.tipoVeiculo}
+                        {(r.tipoVeiculo || 'VAN').slice(0, 14)}
                       </span>
                     </div>
                     <div className="text-gray-500 mt-0.5">
-                      {r.pesoKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}Kg &nbsp;–&nbsp; {r.numero}
+                      {Number(r.pesoKg || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}Kg · {r.qtdEntregas} entr. · #{r.numero}
                     </div>
                   </div>
                 </div>
                 {rotaExpandida === r.id && (
-                  <div className="bg-blue-50 px-4 py-1.5 text-[10px] text-gray-600 space-y-0.5 border-t border-blue-200">
-                    <div>Rota nº: <strong>{r.numero}</strong></div>
-                    <div>Veículo: <strong>{r.tipoVeiculo}</strong>{r.refrigerado && ' ❄️'}</div>
-                    <div>Entregas: <strong>{r.qtdEntregas}</strong></div>
-                    <div>Peso: <strong>{r.pesoKg.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} kg</strong></div>
-                    <div>Período: <strong>{r.periodo}</strong></div>
+                  <div className="bg-blue-50 px-3 py-1.5 text-[10px] text-gray-600 space-y-1 border-t border-blue-200">
+                    <div className="flex justify-between"><span>Valor total</span><strong className="text-green-700">{R$(Number(r.valorTotal || 0))}</strong></div>
+                    <div className="border-t border-blue-200 pt-1 space-y-0.5">
+                      {(r.entregas || []).map((e: any) => (
+                        <div key={e.pedidoId} className="flex justify-between gap-1">
+                          <span className="truncate">{e.ordem}. {e.cliente}</span>
+                          <span className="font-mono shrink-0">{R$(e.valor)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={(ev) => { ev.stopPropagation(); imprimirCapaRota(r.id); }}
+                      className="w-full mt-1 bg-blue-600 hover:bg-blue-700 text-white rounded px-2 py-1 font-bold flex items-center justify-center gap-1">
+                      <Printer className="h-3 w-3" /> Imprimir Capa de Rota
+                    </button>
                   </div>
                 )}
               </div>
@@ -514,7 +643,7 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
             <table className="w-full border-collapse text-[11px]">
               <thead className="bg-gray-300 sticky top-0">
                 <tr>
-                  {['Data Entrega','Rota','Nome Fantasia','Id Mltvenda','Id Venda','Volumes','Peso Total','Empresa','Tipo Faturamento','Vlr Tot Pedido','Autorização de Carga'].map(h => (
+                  {['Data Entrega','Rota','Nome Fantasia','Id Mltvenda','Id Venda','Volumes','Peso Total','Empresa','Tipo Faturamento','Vlr Tot Pedido','Autorização de Carga','Espelho'].map(h => (
                     <th key={h} className="px-2 py-1 text-left font-semibold text-gray-700 border-r border-gray-400 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -532,10 +661,15 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
                     <td className="px-2 py-1 border-r border-gray-300">{p.empresa}</td>
                     <td className="px-2 py-1 border-r border-gray-300">{p.tipoFaturamento}</td>
                     <td className="px-2 py-1 border-r border-gray-300 text-right font-mono">{p.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                    <td className="px-2 py-1">{p.aurCargaOk ? '✔' : ''}</td>
+                    <td className="px-2 py-1 border-r border-gray-300">{p.aurCargaOk ? '✔' : ''}</td>
+                    <td className="px-2 py-1">
+                      <button onClick={() => imprimirEspelho(p.id)} className="text-blue-600 hover:text-blue-800 flex items-center gap-0.5 font-semibold">
+                        <Printer className="h-3 w-3" /> Espelho
+                      </button>
+                    </td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={11} className="px-4 py-6 text-center text-gray-400 italic">Nenhum Registro Encontrado</td></tr>
+                  <tr><td colSpan={12} className="px-4 py-6 text-center text-gray-400 italic">Selecione pedidos na grade acima para ver e imprimir o espelho</td></tr>
                 )}
               </tbody>
             </table>
@@ -603,9 +737,10 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
       {modalNovaEntrega && (
         <ModalNovaEntrega
           dataCarga={dataCarga}
-          rotas={rotas}
+          filialId={filialAtiva?.id}
+          rotas={frota}
           onClose={() => setModalNovaEntrega(false)}
-          onCriado={handleNovasEntregasCriadas}
+          onCriado={handleRotaCriada}
         />
       )}
     </div>
@@ -615,11 +750,12 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
 // ─── Tipo para pedido a roteirizar ───
 
 // ─── Modal Roteirizar (busca pedidos CONFIRMADOS e atribui a motorista) ───
-function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
+function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
   dataCarga: string;
+  filialId?: string;
   rotas: RotaMotorista[];
   onClose: () => void;
-  onCriado: (pedidos: PedidoCarga[]) => void;
+  onCriado: () => void;
 }) {
   const { filialAtiva } = useAuth();
 
@@ -676,44 +812,30 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
   // Só permite clicar nos pedidos depois de escolher o motorista
   const motoristaEscolhido = rotaSelId !== 'none' && !!rotaSel;
 
-  // Roteirizar: move pedidos selecionados para a grade com motorista atribuído
-  const handleRoteirizar = () => {
+  // Roteirizar: PERSISTE a rota (cria o Romaneio / Capa de Rota) no backend
+  const handleRoteirizar = async () => {
+    if (!motoristaEscolhido || !rotaSel) { setErro('Escolha o motorista.'); return; }
     if (selecionados.size === 0) { setErro('Selecione pelo menos um pedido.'); return; }
-    setSalvando(true);
-
-    const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    const novosPedidos: PedidoCarga[] = pedidosSel.map((p: any) => ({
-      id: p.id,
-      numero: p.numero,
-      data: p.dataEntrega || dataCarga,
-      liberadoEm: hora,
-      nomeFantasia: p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '—',
-      referencia: String(p.numero).padStart(5, '0'),
-      volumes: p._count?.itens || 0,
-      pesoKg: Number(p.valorTotal || 0).toFixed(1).replace('.', ','),
-      empresa: 'Hetr.',
-      tipoFaturamento: p.tipo === 'VENDA' ? 'NFe' : p.tipo,
-      autorizacao: '',
-      status: '',
-      statusCarga: 'IMPRESSAO_PENDENTE' as const,
-      aurCargaOk: false,
-      regiao: '',
-      cep: '',
-      bairro: '',
-      subRegiao: '',
-      onda: 1,
-      periodo: 'MANHA' as const,
-      rota: rotaSel ? String(rotaSel.numero) : '',
-      recebimento: '',
-      motorista: rotaSel ? rotaSel.motorista : '',
-      andamento: 0,
-      valorTotal: Number(p.valorTotal || 0),
-      idMltvenda: '',
-      idVenda: String(p.numero),
-    }));
-
-    onCriado(novosPedidos);
-    setSalvando(false);
+    if (!filialId) return;
+    setSalvando(true); setErro('');
+    try {
+      await api.post('/carga/romaneio', {
+        filialId,
+        motorista: rotaSel.motorista,
+        codigoCondutor: String(rotaSel.numero),
+        tipoVeiculo: rotaSel.tipoVeiculo,
+        refrigerado: rotaSel.refrigerado,
+        periodo: rotaSel.periodo,
+        dataMovimento: new Date().toISOString(),
+        dataEntrega: dataCarga,
+        pedidoIds: Array.from(selecionados),
+      });
+      onCriado();
+    } catch (e: any) {
+      setErro(e.response?.data?.message || 'Erro ao salvar a rota.');
+    } finally {
+      setSalvando(false);
+    }
   };
 
   return (

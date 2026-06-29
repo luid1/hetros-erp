@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Query, Param } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CargaService } from './carga.service';
 import { CurrentTenant, Modulo } from '../../common/decorators/context.decorator';
@@ -48,15 +48,21 @@ export class CargaController {
     return this.service.getTotais(tenantId, filialId, data || new Date().toISOString().split('T')[0]);
   }
 
-  @Post('autorizar')
-  @ApiOperation({ summary: 'Autoriza carga dos pedidos selecionados' })
-  autorizar(@CurrentTenant() tenantId: string, @Body() body: { pedidoIds: string[] }) {
-    return this.service.autorizarCarga(tenantId, body.pedidoIds);
+  @Post('romaneio')
+  @ApiOperation({ summary: 'Cria uma rota (Romaneio) com motorista/veículo e os pedidos selecionados' })
+  criarRomaneio(@CurrentTenant() tenantId: string, @Body() body: any) {
+    return this.service.criarRomaneio(tenantId, body);
   }
 
-  @Post('rotear')
-  @ApiOperation({ summary: 'Associa pedidos a romaneio/motorista' })
-  rotear(@CurrentTenant() tenantId: string, @Body() body: { pedidoIds: string[]; romaneioId: string }) {
-    return this.service.rotear(tenantId, body.pedidoIds, body.romaneioId);
+  @Get('romaneio/:id/capa')
+  @ApiOperation({ summary: 'Dados da Capa de Rota para impressão' })
+  capaRota(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    return this.service.getCapaRota(tenantId, id);
+  }
+
+  @Delete('romaneio/:id')
+  @ApiOperation({ summary: 'Exclui a rota (desfaz roteirização)' })
+  excluirRomaneio(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    return this.service.excluirRomaneio(tenantId, id);
   }
 }

@@ -844,6 +844,17 @@ model Romaneio {
   motorista         String?
   pesoTotalKg       Decimal?  @db.Decimal(12, 2)
   observacoes       String?
+  // Dados da Capa de Rota (denormalizados)
+  codigoCondutor    String?
+  foneCondutor      String?
+  placaVeiculo      String?
+  modeloVeiculo     String?
+  tipoVeiculo       String?   // VAN, KOMBI, MINI-VAN, VAN REFRIGERADA
+  refrigerado       Boolean   @default(false)
+  periodo           String?   // MANHA, TARDE
+  dataMovimento     DateTime?
+  dataEntrega       DateTime?
+  autorizacaoCarga  String?
   createdAt         DateTime  @default(now())
 
   itens             RomaneioItem[]

@@ -1,9 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class CargaService {
   constructor(private prisma: PrismaService) {}
+
+  private intervaloDia(data: string) {
+    // Interpreta a data como dia LOCAL (evita o shift de fuso do `new Date('YYYY-MM-DD')` em UTC)
+    const dia = data.split('T')[0];
+    const inicio = new Date(`${dia}T00:00:00`);
+    const fim = new Date(`${dia}T23:59:59.999`);
+    return { inicio, fim };
+  }
 
   /** Grade de pedidos do dia para Controle de Carga */
   async getGrade(tenantId: string, filialId: string, data: string, filtros: {
@@ -12,86 +20,98 @@ export class CargaService {
     somenteEscolas?: boolean;
     mostrarFinalizados?: boolean;
   }) {
-    const dataObj = new Date(data);
-    const inicio  = new Date(dataObj); inicio.setHours(0, 0, 0, 0);
-    const fim     = new Date(dataObj); fim.setHours(23, 59, 59, 999);
+    const { inicio, fim } = this.intervaloDia(data);
 
     const pedidos = await this.prisma.pedido.findMany({
       where: {
         tenantId,
         filialOrigemId: filialId,
         dataEntrega: { gte: inicio, lte: fim },
-        ...(filtros.mostrarFinalizados ? {} : { status: { not: 'CANCELADO' } }),
+        status: { in: ['CONFIRMADO', 'EM_SEPARACAO', 'SEPARADO', 'FATURADO'] },
       },
       include: {
         cliente: { select: { razaoSocial: true, nomeFantasia: true, cnpjCpf: true, enderecoJson: true } },
-        itens: { select: { quantidade: true, valorTotal: true } },
+        romaneios: { include: { romaneio: { select: { numero: true, motorista: true } } } },
+        _count: { select: { itens: true } },
       },
       orderBy: [{ createdAt: 'asc' }],
     });
 
     return pedidos.map((p) => {
       const end: any = p.cliente?.enderecoJson || {};
+      const rItem: any = (p as any).romaneios?.[0];
+      const faturado = p.status === 'FATURADO';
       return {
         id: p.id,
         numero: p.numero,
         data: p.dataEntrega,
-        liberadoEm: (p as any).liberadoEm,
         nomeFantasia: p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '—',
         referencia: String(p.numero).padStart(5, '0'),
         volumes: (p as any).volumes || 0,
-        pesoKg: Number((p as any).pesoKg || 0).toFixed(3),
+        pesoKg: Number((p as any).pesoTotal || 0).toFixed(3),
         empresa: 'Hetr.',
         tipoFaturamento: p.tipo === 'VENDA' ? 'NFe' : p.tipo,
-        status: p.status,
-        statusCarga: (p as any).statusCarga || 'IMPRESSAO_PENDENTE',
-        aurCargaOk: (p as any).aurCargaOk || false,
+        status: faturado ? 'FIN' : '',
+        statusCarga: faturado ? 'AURCARGA_OK' : rItem ? 'IMPRESSO' : 'IMPRESSAO_PENDENTE',
+        roteirizado: !!rItem,
         regiao: (p as any).regiao || '',
         cep: end.cep || '',
         bairro: end.bairro || '',
-        subRegiao: (p as any).subRegiao || '',
-        onda: (p as any).onda || 1,
+        subRegiao: '',
+        onda: 1,
         periodo: (p as any).periodo || 'MANHA',
-        rota: null,
-        recebimento: null,
-        motorista: null,
+        rota: rItem?.romaneio?.numero ? String(rItem.romaneio.numero) : '',
+        motorista: rItem?.romaneio?.motorista || '',
         andamento: 0,
         valorTotal: Number(p.valorTotal),
       };
     });
   }
 
-  /** Rotas do dia com motoristas e pesos */
+  /** Rotas (romaneios) do dia — Entregas Programadas: só rotas já criadas */
   async getRotas(tenantId: string, filialId: string, data: string) {
-    const dataObj = new Date(data);
-    const inicio  = new Date(dataObj); inicio.setHours(0, 0, 0, 0);
-    const fim     = new Date(dataObj); fim.setHours(23, 59, 59, 999);
+    const { inicio, fim } = this.intervaloDia(data);
 
-    const romaneios: any[] = await this.prisma.romaneio.findMany({
-      where: { tenantId, filialId, createdAt: { gte: inicio, lte: fim } },
+    const romaneios = await this.prisma.romaneio.findMany({
+      where: { tenantId, filialId, dataEntrega: { gte: inicio, lte: fim } },
       include: {
-        transportadora: { select: { razaoSocial: true } },
-        itens: { include: { pedido: true } },
+        itens: {
+          include: {
+            pedido: {
+              select: {
+                id: true, numero: true, pesoTotal: true, valorTotal: true, periodo: true,
+                cliente: { select: { razaoSocial: true, nomeFantasia: true } },
+              },
+            },
+          },
+          orderBy: { ordemEntrega: 'asc' },
+        },
       },
       orderBy: { numero: 'asc' },
     });
 
-    return romaneios.map((r: any) => {
-      const pesoTotal = (r.itens || []).reduce((s: number, i: any) => s + Number(i.pedido?.pesoKg || 0), 0);
-      return {
-        id: r.id,
-        numero: r.numero,
-        motorista: r.motorista || '—',
-        tipoVeiculo: 'VAN',
-        refrigerado: false,
-        pesoKg: pesoTotal,
-        qtdEntregas: (r.itens || []).length,
-        periodo: r.periodo || 'MANHA',
-        horaInicio: r.horaInicio,
-        status: r.status,
-        slaPercent: Number(r.slaPercent || 0),
-      };
-    });
+    return romaneios.map((r) => ({
+      id: r.id,
+      numero: r.numero,
+      motorista: r.motorista || '—',
+      codigoCondutor: r.codigoCondutor,
+      tipoVeiculo: r.tipoVeiculo || 'VAN',
+      placaVeiculo: r.placaVeiculo,
+      refrigerado: r.refrigerado,
+      periodo: r.periodo || 'MANHA',
+      status: r.status,
+      pesoKg: (r.itens || []).reduce((s, i: any) => s + Number(i.pedido?.pesoTotal || 0), 0),
+      valorTotal: (r.itens || []).reduce((s, i: any) => s + Number(i.pedido?.valorTotal || 0), 0),
+      qtdEntregas: (r.itens || []).length,
+      entregas: (r.itens || []).map((i: any) => ({
+        pedidoId: i.pedidoId,
+        numero: i.pedido?.numero,
+        ordem: i.ordemEntrega,
+        cliente: i.pedido?.cliente?.nomeFantasia || i.pedido?.cliente?.razaoSocial || '—',
+        peso: Number(i.pedido?.pesoTotal || 0),
+        valor: Number(i.pedido?.valorTotal || 0),
+      })),
+    }));
   }
 
   /** Totalizadores para o painel inferior */
@@ -101,34 +121,124 @@ export class CargaService {
       qtdRotas: rotas.length,
       pesoCargaKg: rotas.reduce((s, r) => s + r.pesoKg, 0),
       qtdEntregas: rotas.reduce((s, r) => s + r.qtdEntregas, 0),
-      slaPercent: rotas.length
-        ? rotas.reduce((s, r) => s + r.slaPercent, 0) / rotas.length
-        : 0,
+      slaPercent: 0,
     };
   }
 
-  /** Autoriza carga de pedidos selecionados */
-  async autorizarCarga(tenantId: string, pedidoIds: string[]) {
-    await this.prisma.pedido.updateMany({
-      where: { id: { in: pedidoIds }, tenantId },
-      data: { aurCargaOk: true, statusCarga: 'AURCARGA_OK' } as any,
+  /**
+   * Cria uma rota (Romaneio) com os pedidos selecionados e o motorista/veículo.
+   * É a "Capa de Rota". Persiste a roteirização.
+   */
+  async criarRomaneio(tenantId: string, dto: {
+    filialId: string;
+    motorista: string;
+    codigoCondutor?: string;
+    foneCondutor?: string;
+    placaVeiculo?: string;
+    modeloVeiculo?: string;
+    tipoVeiculo?: string;
+    refrigerado?: boolean;
+    periodo?: string;
+    regiaoRota?: string;
+    dataMovimento?: string;
+    dataEntrega?: string;
+    pedidoIds: string[];
+  }) {
+    const ultimo = await this.prisma.romaneio.findFirst({
+      where: { tenantId, filialId: dto.filialId },
+      orderBy: { numero: 'desc' },
+      select: { numero: true },
     });
-    return { autorizados: pedidoIds.length };
+    const numero = (ultimo?.numero || 3500) + 1;
+    const autorizacao = `${new Date().getFullYear()}${String(numero).padStart(6, '0')}`;
+
+    const pesoTotal = await this.prisma.pedido.aggregate({
+      where: { id: { in: dto.pedidoIds }, tenantId },
+      _sum: { pesoTotal: true },
+    });
+
+    const romaneio = await this.prisma.romaneio.create({
+      data: {
+        tenantId,
+        filialId: dto.filialId,
+        numero,
+        status: 'ABERTO',
+        motorista: dto.motorista,
+        codigoCondutor: dto.codigoCondutor,
+        foneCondutor: dto.foneCondutor,
+        placaVeiculo: dto.placaVeiculo,
+        modeloVeiculo: dto.modeloVeiculo,
+        tipoVeiculo: dto.tipoVeiculo,
+        refrigerado: dto.refrigerado || false,
+        periodo: dto.periodo,
+        regiaoRota: dto.regiaoRota,
+        autorizacaoCarga: autorizacao,
+        pesoTotalKg: pesoTotal._sum.pesoTotal || 0,
+        dataMovimento: dto.dataMovimento ? new Date(dto.dataMovimento) : new Date(),
+        // ancora no meio-dia local para não escorregar de dia por fuso
+        dataEntrega: dto.dataEntrega ? new Date(`${dto.dataEntrega.split('T')[0]}T12:00:00`) : undefined,
+        itens: {
+          create: dto.pedidoIds.map((pedidoId, idx) => ({ pedidoId, ordemEntrega: idx + 1 })),
+        },
+      },
+      include: { itens: true },
+    });
+
+    return romaneio;
   }
 
-  /** Rotear: associa pedidos a um romaneio/motorista */
-  async rotear(tenantId: string, pedidoIds: string[], romaneioId: string) {
-    for (const id of pedidoIds) {
-      const existe = await this.prisma.romaneioItem.findFirst({
-        where: { romaneioId, pedidoId: id },
-      });
-      if (!existe) {
-        const ultimo = await this.prisma.romaneioItem.count({ where: { romaneioId } });
-        await this.prisma.romaneioItem.create({
-          data: { romaneioId, pedidoId: id, ordemEntrega: ultimo + 1 },
-        });
-      }
-    }
-    return { roteados: pedidoIds.length };
+  /** Capa de Rota completa para impressão */
+  async getCapaRota(tenantId: string, romaneioId: string) {
+    const r = await this.prisma.romaneio.findFirst({
+      where: { id: romaneioId, tenantId },
+      include: {
+        filial: { select: { nome: true, codigo: true } },
+        itens: {
+          orderBy: { ordemEntrega: 'asc' },
+          include: {
+            pedido: {
+              include: {
+                cliente: { select: { razaoSocial: true, nomeFantasia: true, enderecoJson: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!r) throw new NotFoundException('Romaneio não encontrado.');
+
+    return {
+      id: r.id,
+      idEntrega: r.numero,
+      cd: r.filial?.nome || 'Hetros',
+      motorista: r.motorista,
+      codigoCondutor: r.codigoCondutor,
+      foneCondutor: r.foneCondutor,
+      placaVeiculo: r.placaVeiculo,
+      modeloVeiculo: r.modeloVeiculo,
+      dataMovimento: r.dataMovimento,
+      dataEntrega: r.dataEntrega,
+      regiaoRota: r.regiaoRota,
+      autorizacaoCarga: r.autorizacaoCarga,
+      qtdEntregas: r.itens.length,
+      unidades: r.itens.map((i: any) => {
+        const end: any = i.pedido?.cliente?.enderecoJson || {};
+        return {
+          unidade: i.pedido?.cliente?.nomeFantasia || i.pedido?.cliente?.razaoSocial || '—',
+          endereco: [end.rua, end.numero].filter(Boolean).join(', '),
+          bairro: end.bairro || '',
+          ordem: i.ordemEntrega,
+        };
+      }),
+    };
+  }
+
+  /** Remove uma rota (desfaz a roteirização) */
+  async excluirRomaneio(tenantId: string, romaneioId: string) {
+    const r = await this.prisma.romaneio.findFirst({ where: { id: romaneioId, tenantId } });
+    if (!r) throw new NotFoundException('Romaneio não encontrado.');
+    await this.prisma.romaneioItem.deleteMany({ where: { romaneioId } });
+    await this.prisma.romaneio.delete({ where: { id: romaneioId } });
+    return { ok: true };
   }
 }
