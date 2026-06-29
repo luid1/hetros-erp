@@ -637,15 +637,15 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
   const [salvando, setSalvando]         = useState(false);
   const [erro, setErro]                 = useState('');
 
-  // Carrega pedidos confirmados
+  // Carrega os pedidos CONFIRMADOS do DIA da carga
   useEffect(() => {
     if (!filialAtiva) return;
     setLoadingPed(true);
-    api.get('/pedidos', { params: { filialId: filialAtiva.id, status: 'CONFIRMADO' } })
+    api.get('/pedidos', { params: { filialId: filialAtiva.id, status: 'CONFIRMADO', dataInicio: dataCarga, dataFim: dataCarga } })
       .then(r => setPedidosDisp(r.data))
       .catch(() => setPedidosDisp([]))
       .finally(() => setLoadingPed(false));
-  }, [filialAtiva?.id]);
+  }, [filialAtiva?.id, dataCarga]);
 
   // Filtro por busca
   const pedidosFiltrados = useMemo(() => {
@@ -659,6 +659,8 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
   }, [pedidosDisp, busca]);
 
   const toggleSel = (id: string) => {
+    if (rotaSelId === 'none') { setErro('Escolha o motorista primeiro (lado direito).'); return; }
+    setErro('');
     setSelecionados(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
   const toggleAll = () => {
@@ -666,7 +668,13 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
   };
 
   const pedidosSel = pedidosFiltrados.filter((p: any) => selecionados.has(p.id));
-  const pesoTotal = pedidosSel.reduce((s: number, p: any) => s + Number(p.valorTotal || 0), 0);
+  // Valor total da entrega = soma do valor de todos os pedidos selecionados
+  const valorTotalEntrega = pedidosSel.reduce((s: number, p: any) => s + Number(p.valorTotal || 0), 0);
+  const freteTotalEntrega = pedidosSel.reduce((s: number, p: any) => s + Number(p.valorFrete || 0), 0);
+  const R$ = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  // Só permite clicar nos pedidos depois de escolher o motorista
+  const motoristaEscolhido = rotaSelId !== 'none' && !!rotaSel;
 
   // Roteirizar: move pedidos selecionados para a grade com motorista atribuído
   const handleRoteirizar = () => {
@@ -716,8 +724,12 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-gray-50 rounded-t-xl shrink-0">
           <div className="flex items-center gap-2">
             <RotateCcw className="h-5 w-5 text-blue-600" />
-            <h2 className="font-bold text-gray-900 text-sm">Roteirizar Pedidos</h2>
-            <span className="text-xs text-gray-400">Selecione os pedidos confirmados e atribua ao motorista</span>
+            <h2 className="font-bold text-gray-900 text-sm">Nova Entrega — Roteirizar</h2>
+            <span className="text-xs text-gray-400">
+              {motoristaEscolhido
+                ? `Clique nos pedidos do dia para incluir na rota de ${rotaSel?.motorista}`
+                : '1º escolha o motorista (à direita) · depois clique nos pedidos do dia'}
+            </span>
             {selecionados.size > 0 && (
               <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                 {selecionados.size} selecionado{selecionados.size !== 1 ? 's' : ''}
@@ -828,30 +840,42 @@ function ModalNovaEntrega({ dataCarga, rotas, onClose, onCriado }: {
               })}
             </div>
 
-            {/* Resumo */}
-            <div className="bg-gray-200 border-t border-gray-300 px-3 py-2 shrink-0 text-[10px] space-y-0.5">
+            {/* Resumo da entrega */}
+            <div className="bg-gray-900 text-white border-t border-gray-300 px-3 py-2 shrink-0 space-y-1">
               {rotaSel ? (
-                <div className="flex items-center gap-1">
-                  <Truck className={`h-3.5 w-3.5 ${rotaSel.refrigerado ? 'text-cyan-600' : 'text-blue-600'}`} />
-                  <strong>{rotaSel.motorista}</strong>
+                <div className="flex items-center gap-1 text-[11px]">
+                  <Truck className={`h-3.5 w-3.5 ${rotaSel.refrigerado ? 'text-cyan-400' : 'text-blue-400'}`} />
+                  <strong className="truncate">{rotaSel.motorista}</strong>
                 </div>
               ) : (
-                <p className="text-gray-500 italic">Sem motorista</p>
+                <p className="text-gray-400 italic text-[11px]">Nenhum motorista selecionado</p>
               )}
-              <p className="text-gray-500">Pedidos a roteirizar: <strong>{selecionados.size}</strong></p>
+              <div className="flex justify-between text-[10px] text-gray-300">
+                <span>Pedidos na rota</span><strong className="text-white">{selecionados.size}</strong>
+              </div>
+              <div className="flex justify-between text-[10px] text-gray-300">
+                <span>Frete total</span><strong className="text-white font-mono">{R$(freteTotalEntrega)}</strong>
+              </div>
+              <div className="border-t border-gray-700 pt-1 flex justify-between items-baseline">
+                <span className="text-[10px] text-gray-300 uppercase font-semibold">Valor total</span>
+                <strong className="text-lg font-black text-green-400 font-mono">{R$(valorTotalEntrega)}</strong>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0">
-          <div className="text-xs text-gray-500">
-            {rotaSel && <span>🚛 <strong>{rotaSel.motorista}</strong> — {rotaSel.tipoVeiculo} · #{rotaSel.numero}</span>}
+          <div className="flex items-center gap-4">
+            {rotaSel && <span className="text-xs text-gray-500">🚛 <strong>{rotaSel.motorista}</strong> — {rotaSel.tipoVeiculo} · #{rotaSel.numero}</span>}
+            <span className="text-xs text-gray-500">
+              Valor da entrega: <strong className="text-green-700 font-mono text-sm">{R$(valorTotalEntrega)}</strong>
+            </span>
           </div>
-          {erro && <span className="text-xs text-red-600">{erro}</span>}
+          {erro && <span className="text-xs text-red-600 font-semibold">{erro}</span>}
           <div className="flex gap-2">
             <button onClick={onClose} className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50 font-medium">Cancelar</button>
-            <button onClick={handleRoteirizar} disabled={salvando || selecionados.size === 0}
+            <button onClick={handleRoteirizar} disabled={salvando || selecionados.size === 0 || !motoristaEscolhido}
               className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-40 flex items-center gap-1.5 shadow-sm">
               <RotateCcw className="h-3.5 w-3.5" /> Roteirizar {selecionados.size} Pedido{selecionados.size !== 1 ? 's' : ''}
             </button>

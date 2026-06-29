@@ -20,6 +20,22 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-29] — Fluxo Nova Entrega: motorista 1º + soma do valor total
+
+### O que mudou
+- Modal "Nova Entrega" agora segue o fluxo: **1º escolhe o motorista**, depois clica
+  nos pedidos do dia para incluir na rota dele.
+- Bloqueio: enquanto não escolher motorista, clicar num pedido avisa "Escolha o motorista primeiro".
+- Conforme clica nos pedidos, soma em tempo real: **Pedidos na rota**, **Frete total**
+  e **VALOR TOTAL da entrega** (destaque verde no resumo e no rodapé).
+- Modal carrega só os pedidos CONFIRMADOS **do dia da carga** (antes trazia todos).
+- Botão "Roteirizar" só habilita com motorista escolhido + ao menos 1 pedido.
+
+### Arquivos
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx`
+
+---
+
 ## [2026-06-29] — Controle de Carga usa pedidos REAIS (fim do mock)
 
 ### O que mudou
