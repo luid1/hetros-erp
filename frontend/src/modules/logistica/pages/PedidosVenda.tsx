@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ClipboardList, Plus, Search, X, Check, Trash2, Pencil,
-  Package, Truck, FileText, ShoppingCart, AlertTriangle, Save, CreditCard, MapPin,
+  Package, Truck, FileText, ShoppingCart, AlertTriangle, Save, CreditCard, MapPin, Lock, Unlock,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 
 const R$ = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+// Senha para liberar descontos no pedido (trocar aqui conforme política da empresa)
+const SENHA_DESCONTO = 'hetros2026';
 const REGIOES = ['GUARULHOS', 'ZONA NORTE', 'ZONA SUL', 'ZONA OESTE', 'CENTRO', 'ARUJÁ', 'ZONA LESTE', 'ABC'];
 const FORMAS_PAG = [
   { v: 'DINHEIRO', label: 'Dinheiro', parcelavel: false },
@@ -294,6 +296,16 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
   const [obs, setObs] = useState('');
   const [obsNf, setObsNf] = useState('');
 
+  // Desconto bloqueado — só libera com senha
+  const [descontoLiberado, setDescontoLiberado] = useState(false);
+  const liberarDesconto = () => {
+    if (descontoLiberado) { setDescontoLiberado(false); return; }
+    const s = window.prompt('Senha para liberar descontos:');
+    if (s === null) return;
+    if (s === SENHA_DESCONTO) setDescontoLiberado(true);
+    else window.alert('Senha incorreta. Descontos continuam bloqueados.');
+  };
+
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -505,7 +517,14 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
 
           {/* ── B. Itens ── */}
           <section>
-            <h3 className="text-[11px] font-bold text-gray-400 uppercase mb-2">B · Itens do Pedido</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[11px] font-bold text-gray-400 uppercase">B · Itens do Pedido</h3>
+              <button onClick={liberarDesconto} type="button"
+                className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded border ${descontoLiberado ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                {descontoLiberado ? <><Unlock className="h-3 w-3" /> Descontos liberados</> : <><Lock className="h-3 w-3" /> Liberar descontos (senha)</>}
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 mb-2">Preço unitário é definido pela área de custo (somente leitura).</p>
             <BuscaProduto filialId={filialAtiva?.id} onSelecionar={addProduto} />
             <div className="border border-gray-200 rounded-lg overflow-hidden mt-2">
               <table className="w-full text-xs">
@@ -533,17 +552,17 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
                         </td>
                         <td className="px-2 py-1 text-gray-500">{it.unidade}</td>
                         <td className="px-2 py-1">
-                          <input type="number" min="0" step="0.01" value={it.precoUnitario}
-                            onChange={e => updItem(idx, { precoUnitario: parseFloat(e.target.value) || 0 })}
-                            className="w-20 border border-gray-300 rounded px-1.5 py-1 text-right" />
+                          {/* Preço definido pela área de custo — somente leitura */}
+                          <span className="inline-block w-20 text-right font-mono text-gray-700">{R$(it.precoUnitario)}</span>
                         </td>
                         <td className="px-2 py-1">
                           <div className="flex items-center gap-1">
-                            <input type="number" min="0" step="0.01" value={it.descontoValor}
+                            <input type="number" min="0" step="0.01" value={it.descontoValor} disabled={!descontoLiberado}
                               onChange={e => updItem(idx, { descontoValor: parseFloat(e.target.value) || 0 })}
-                              className="w-14 border border-gray-300 rounded px-1.5 py-1 text-right" />
-                            <button onClick={() => updItem(idx, { descontoTipo: it.descontoTipo === 'VALOR' ? 'PERCENT' : 'VALOR' })}
-                              className="text-[10px] font-bold bg-gray-100 border border-gray-300 rounded px-1 py-1 w-7 hover:bg-gray-200">
+                              className={`w-14 border rounded px-1.5 py-1 text-right ${descontoLiberado ? 'border-gray-300' : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'}`} />
+                            <button onClick={() => descontoLiberado && updItem(idx, { descontoTipo: it.descontoTipo === 'VALOR' ? 'PERCENT' : 'VALOR' })}
+                              disabled={!descontoLiberado}
+                              className="text-[10px] font-bold bg-gray-100 border border-gray-300 rounded px-1 py-1 w-7 hover:bg-gray-200 disabled:opacity-40">
                               {it.descontoTipo === 'VALOR' ? 'R$' : '%'}
                             </button>
                           </div>
@@ -629,8 +648,12 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
             <div className="flex items-center gap-5 text-xs text-gray-600">
               <div><span className="block text-[10px] uppercase text-gray-400">Total dos Itens</span><strong className="font-mono text-sm">{R$(totalBruto)}</strong></div>
               <div className="flex flex-col">
-                <span className="text-[10px] uppercase text-gray-400">Desc. Geral (R$)</span>
-                <input type="number" min="0" step="0.01" value={descontoGeral} onChange={e => setDescontoGeral(e.target.value)} className="w-24 border border-gray-300 rounded px-2 py-1 text-right text-sm" />
+                <span className="text-[10px] uppercase text-gray-400 flex items-center gap-1">
+                  Desc. Geral (R$) {!descontoLiberado && <Lock className="h-2.5 w-2.5" />}
+                </span>
+                <input type="number" min="0" step="0.01" value={descontoGeral} disabled={!descontoLiberado}
+                  onChange={e => setDescontoGeral(e.target.value)}
+                  className={`w-24 border rounded px-2 py-1 text-right text-sm ${descontoLiberado ? 'border-gray-300' : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'}`} />
               </div>
               <div><span className="block text-[10px] uppercase text-gray-400">Frete</span><strong className="font-mono text-sm text-blue-600">{R$(parseFloat(valorFrete) || 0)}</strong></div>
               <div className="border-l border-gray-300 pl-5">

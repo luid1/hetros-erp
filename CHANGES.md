@@ -20,6 +20,22 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-29] — Pedido: preço só leitura + desconto bloqueado por senha
+
+### O que mudou
+- **Preço unitário** no item do pedido agora é **somente leitura** (definido pela área de
+  custo) — não há mais input editável, só o valor exibido.
+- **Descontos bloqueados**: campos de desconto por item, o toggle R$/% e o Desconto Geral
+  ficam desabilitados. Só liberam após senha.
+  - Botão "Liberar descontos (senha)" na seção de itens; pede senha (`SENHA_DESCONTO`,
+    padrão `hetros2026`, trocável no topo de PedidosVenda.tsx).
+  - Senha correta → campos habilitam e botão vira "Descontos liberados".
+
+### Arquivos
+- `frontend/src/modules/logistica/pages/PedidosVenda.tsx`
+
+---
+
 ## [2026-06-29] — Tela Operacional (separação) + endereços fictícios
 
 ### O que mudou
