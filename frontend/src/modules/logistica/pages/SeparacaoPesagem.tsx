@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-  X, Check, Scissors, ChevronRight, Wifi, WifiOff, Truck, ArrowLeft, Keyboard,
+  X, Check, Scissors, ChevronRight, Wifi, WifiOff, Truck, Keyboard, Undo2,
 } from 'lucide-react';
 import api from '../../../services/api';
 import { useBalanca } from '../../../hooks/useBalanca';
@@ -27,10 +27,10 @@ function pesoVendidoRef(it: ItemSep): number {
 }
 const precisaPesar = (it: ItemSep) => (it.unidade || '').toUpperCase().startsWith('KG');
 
-export default function SeparacaoPesagem({ pedidoId, onClose, onFinalizado }: {
+/** Painel de separação/pesagem embutido na página Operacional (não é tela cheia). */
+export default function SeparacaoPainel({ pedidoId, onMudou }: {
   pedidoId: string;
-  onClose: () => void;
-  onFinalizado: () => void;
+  onMudou: () => void;
 }) {
   const [pedido, setPedido] = useState<any>(null);
   const [itens, setItens] = useState<ItemSep[]>([]);
@@ -47,6 +47,7 @@ export default function SeparacaoPesagem({ pedidoId, onClose, onFinalizado }: {
   const conferidos = itens.filter(i => i.separado || i.cortado).length;
   const pct = itens.length ? Math.round((conferidos / itens.length) * 100) : 0;
   const tudoPronto = itens.length > 0 && conferidos === itens.length;
+  const jaSeparado = pedido?.status === 'SEPARADO' || pedido?.status === 'FATURADO';
 
   const salvarItem = async (itemId: string, body: any) => {
     setSalvando(true);
@@ -60,34 +61,39 @@ export default function SeparacaoPesagem({ pedidoId, onClose, onFinalizado }: {
   const liberar = async () => {
     if (salvando) return;
     setSalvando(true);
-    try {
-      await api.patch(`/pedidos/${pedidoId}/status`, { status: 'SEPARADO' });
-      onFinalizado(); onClose();
-    } finally { setSalvando(false); }
+    try { await api.patch(`/pedidos/${pedidoId}/status`, { status: 'SEPARADO' }); await carregar(); onMudou(); }
+    finally { setSalvando(false); }
+  };
+  const reabrir = async () => {
+    if (salvando) return;
+    setSalvando(true);
+    try { await api.patch(`/pedidos/${pedidoId}/status`, { status: 'EM_SEPARACAO' }); await carregar(); onMudou(); }
+    finally { setSalvando(false); }
   };
 
   const st = (it: ItemSep) => it.cortado ? 'cortado' : it.separado ? 'ok' : 'pendente';
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-100 flex flex-col select-none">
-      {/* ═══ Cabeçalho ═══ */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 shrink-0 shadow-sm">
+    <div className="flex flex-col h-full bg-slate-50">
+      {/* Cabeçalho do pedido */}
+      <div className="bg-white border-b border-slate-200 px-6 py-4 shrink-0">
         <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0">
-            <button onClick={onClose} className="h-12 w-12 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 shrink-0">
-              <ArrowLeft className="h-6 w-6" />
-            </button>
-            <div className="min-w-0">
-              <p className="text-2xl font-black text-slate-800 leading-tight truncate">{pedido?.cliente?.nomeFantasia || pedido?.cliente?.razaoSocial || '—'}</p>
-              <p className="text-base text-slate-400">Pedido nº {pedido?.numero} · {itens.length} itens</p>
-            </div>
+          <div className="min-w-0">
+            <p className="text-2xl font-black text-slate-800 leading-tight truncate">{pedido?.cliente?.nomeFantasia || pedido?.cliente?.razaoSocial || '—'}</p>
+            <p className="text-base text-slate-400">Pedido nº {pedido?.numero} · {itens.length} itens</p>
           </div>
-          <button onClick={liberar} disabled={salvando || !tudoPronto}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl px-7 py-4 text-xl font-black disabled:opacity-30 active:scale-95 transition-transform shrink-0">
-            <Truck className="h-6 w-6" /> Finalizar
-          </button>
+          {jaSeparado ? (
+            <button onClick={reabrir} disabled={salvando}
+              className="flex items-center gap-2 bg-white border-2 border-slate-300 text-slate-600 rounded-2xl px-6 py-4 text-lg font-bold disabled:opacity-40 active:scale-95 transition-transform shrink-0">
+              <Undo2 className="h-5 w-5" /> Reabrir
+            </button>
+          ) : (
+            <button onClick={liberar} disabled={salvando || !tudoPronto}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl px-7 py-4 text-xl font-black disabled:opacity-30 active:scale-95 transition-transform shrink-0">
+              <Truck className="h-6 w-6" /> Finalizar
+            </button>
+          )}
         </div>
-        {/* Barra de progresso */}
         <div className="mt-3">
           <div className="flex justify-between text-sm text-slate-500 mb-1">
             <span>{conferidos} de {itens.length} itens confirmados</span>
@@ -99,7 +105,7 @@ export default function SeparacaoPesagem({ pedidoId, onClose, onFinalizado }: {
         </div>
       </div>
 
-      {/* ═══ Lista de itens ═══ */}
+      {/* Lista de itens */}
       <div className="flex-1 overflow-auto p-4 space-y-3">
         {itens.map((it, idx) => {
           const status = st(it);
@@ -134,13 +140,10 @@ export default function SeparacaoPesagem({ pedidoId, onClose, onFinalizado }: {
             </button>
           );
         })}
-        {!tudoPronto && itens.length > 0 && (
-          <p className="text-center text-slate-400 text-base pt-2">Toque em cada item para pesar/conferir. Confirme ou corte todos para finalizar.</p>
-        )}
         {itens.length === 0 && <p className="text-center text-slate-400 text-xl pt-10">Pedido sem itens.</p>}
       </div>
 
-      {/* ═══ Modal de pesagem do item ═══ */}
+      {/* Modal de pesagem do item */}
       {pesandoIdx !== null && itens[pesandoIdx] && (
         <ModalPesoItem
           item={itens[pesandoIdx]}
@@ -148,12 +151,14 @@ export default function SeparacaoPesagem({ pedidoId, onClose, onFinalizado }: {
           salvando={salvando}
           onConfirmar={async (peso) => {
             const novos = await salvarItem(itens[pesandoIdx].id, { pesoAferido: peso, separado: true, cortado: false });
+            onMudou();
             const prox = novos.findIndex((i) => !i.separado && !i.cortado);
             setPesandoIdx(prox >= 0 ? prox : null);
           }}
           onCortar={async () => {
             const it = itens[pesandoIdx];
             const novos = await salvarItem(it.id, { cortado: !it.cortado, separado: false, pesoAferido: 0 });
+            onMudou();
             const prox = novos.findIndex((i) => !i.separado && !i.cortado);
             setPesandoIdx(!it.cortado ? (prox >= 0 ? prox : null) : pesandoIdx);
           }}
@@ -183,7 +188,6 @@ function ModalPesoItem({ item, ref0, salvando, onConfirmar, onCortar, onClose }:
   return (
     <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl">
-        {/* topo */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
           <button onClick={onClose} className="h-10 w-10 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500">
             <X className="h-5 w-5" />
@@ -195,7 +199,6 @@ function ModalPesoItem({ item, ref0, salvando, onConfirmar, onCortar, onClose }:
         </div>
 
         <div className="px-6 py-5">
-          {/* status balança */}
           <div className="flex items-center justify-between mb-3">
             <div className="relative">
               <button onClick={() => setCfg(v => !v)} className={`flex items-center gap-2 text-sm font-bold ${conectado ? 'text-emerald-600' : 'text-slate-400'}`}>
@@ -216,7 +219,6 @@ function ModalPesoItem({ item, ref0, salvando, onConfirmar, onCortar, onClose }:
             </button>
           </div>
 
-          {/* peso */}
           {manual ? (
             <div className="text-center py-4">
               <input autoFocus type="number" inputMode="decimal" value={manualVal} onChange={e => setManualVal(e.target.value)}
@@ -234,7 +236,6 @@ function ModalPesoItem({ item, ref0, salvando, onConfirmar, onCortar, onClose }:
             </div>
           )}
 
-          {/* divergência + barra */}
           <div className="mt-3">
             <div className={`rounded-xl py-2 text-center text-xl font-black ${semDiv ? 'bg-slate-100 text-slate-500' : div > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
               {ref0 <= 0 ? 'Sem peso de referência' : semDiv ? '✓ sem divergência'
@@ -250,7 +251,6 @@ function ModalPesoItem({ item, ref0, salvando, onConfirmar, onCortar, onClose }:
             )}
           </div>
 
-          {/* ações */}
           <div className="grid grid-cols-3 gap-3 mt-5">
             <button onClick={onCortar} disabled={salvando}
               className={`flex items-center justify-center gap-2 rounded-2xl py-5 text-lg font-bold ${item.cortado ? 'bg-amber-500 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}>
