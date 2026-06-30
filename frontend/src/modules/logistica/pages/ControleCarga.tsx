@@ -796,11 +796,12 @@ function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
   const [salvando, setSalvando]         = useState(false);
   const [erro, setErro]                 = useState('');
 
-  // Carrega os pedidos CONFIRMADOS do DIA da carga
+  // Carrega os pedidos do DIA da carga que ainda podem entrar numa rota
+  // (CONFIRMADO, EM_SEPARACAO ou SEPARADO — exclui rascunho, faturado e cancelado)
   useEffect(() => {
     if (!filialAtiva) return;
     setLoadingPed(true);
-    api.get('/pedidos', { params: { filialId: filialAtiva.id, status: 'CONFIRMADO', dataInicio: dataCarga, dataFim: dataCarga } })
+    api.get('/pedidos', { params: { filialId: filialAtiva.id, status: 'CONFIRMADO,EM_SEPARACAO,SEPARADO', dataInicio: dataCarga, dataFim: dataCarga } })
       .then(r => setPedidosDisp(r.data))
       .catch(() => setPedidosDisp([]))
       .finally(() => setLoadingPed(false));

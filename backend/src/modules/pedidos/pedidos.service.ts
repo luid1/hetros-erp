@@ -226,7 +226,10 @@ export class PedidosService {
   }) {
     const where: any = { tenantId };
     if (filters?.filialId) where.filialOrigemId = filters.filialId;
-    if (filters?.status) where.status = filters.status;
+    if (filters?.status) {
+      const lista = filters.status.split(',').map((s) => s.trim()).filter(Boolean);
+      where.status = lista.length > 1 ? { in: lista } : lista[0];
+    }
     if (filters?.clienteId) where.clienteId = filters.clienteId;
     if (filters?.search) {
       where.OR = [
