@@ -79,8 +79,8 @@ export default function SeparacaoPainel({ pedidoId, onMudou }: {
       <div className="bg-white border-b border-slate-200 px-6 py-4 shrink-0">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-2xl font-black text-slate-800 leading-tight truncate">{pedido?.cliente?.nomeFantasia || pedido?.cliente?.razaoSocial || '—'}</p>
-            <p className="text-base text-slate-400">Pedido nº {pedido?.numero} · {itens.length} itens</p>
+            <p className="text-3xl font-black text-slate-800 leading-tight truncate">{pedido?.cliente?.nomeFantasia || pedido?.cliente?.razaoSocial || '—'}</p>
+            <p className="text-lg text-slate-400">Pedido nº {pedido?.numero} · {itens.length} itens</p>
           </div>
           {jaSeparado ? (
             <button onClick={reabrir} disabled={salvando}
@@ -95,11 +95,11 @@ export default function SeparacaoPainel({ pedidoId, onMudou }: {
           )}
         </div>
         <div className="mt-3">
-          <div className="flex justify-between text-sm text-slate-500 mb-1">
+          <div className="flex justify-between text-lg text-slate-500 mb-1">
             <span>{conferidos} de {itens.length} itens confirmados</span>
             <span className="font-bold">{pct}%</span>
           </div>
-          <div className="h-3 bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-4 bg-slate-200 rounded-full overflow-hidden">
             <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
           </div>
         </div>
@@ -114,29 +114,29 @@ export default function SeparacaoPainel({ pedidoId, onMudou }: {
           const div = af - ref;
           return (
             <button key={it.id} onClick={() => setPesandoIdx(idx)}
-              className={`w-full flex items-center gap-4 bg-white rounded-2xl px-5 py-4 text-left shadow-sm border-2 active:scale-[0.99] transition-transform
+              className={`w-full flex items-center gap-5 bg-white rounded-2xl px-6 py-6 text-left shadow-sm border-2 active:scale-[0.99] transition-transform
                 ${status === 'ok' ? 'border-emerald-300' : status === 'cortado' ? 'border-amber-300 opacity-70' : 'border-transparent hover:border-slate-300'}`}>
-              <div className={`h-14 w-14 rounded-full flex items-center justify-center text-xl font-black shrink-0
+              <div className={`h-20 w-20 rounded-full flex items-center justify-center text-3xl font-black shrink-0
                 ${status === 'cortado' ? 'bg-amber-500 text-white' : status === 'ok' ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
                 {status === 'cortado' ? '✕' : status === 'ok' ? '✓' : idx + 1}
               </div>
               <div className="flex-1 min-w-0">
-                <p className={`text-2xl font-bold truncate ${status === 'cortado' ? 'line-through text-slate-400' : 'text-slate-800'}`}>{it.descricao}</p>
-                <p className="text-lg text-slate-400">Pedido: {kg(Number(it.quantidade))} {it.unidade}{ref > 0 ? ` · esperado ${kg(ref)} kg` : ''}</p>
+                <p className={`text-4xl font-black truncate ${status === 'cortado' ? 'line-through text-slate-400' : 'text-slate-800'}`}>{it.descricao}</p>
+                <p className="text-2xl text-slate-400 mt-1">Pedido: {kg(Number(it.quantidade))} {it.unidade}{ref > 0 ? ` · esperado ${kg(ref)} kg` : ''}</p>
               </div>
               <div className="text-right shrink-0">
                 {status === 'ok' ? (
                   <>
-                    <p className={`text-3xl font-black tabular-nums ${div > 0.005 ? 'text-emerald-600' : div < -0.005 ? 'text-red-500' : 'text-slate-800'}`}>{kg(af)}</p>
-                    <p className="text-sm text-slate-400">kg aferido</p>
+                    <p className={`text-5xl font-black tabular-nums ${div > 0.005 ? 'text-emerald-600' : div < -0.005 ? 'text-red-500' : 'text-slate-800'}`}>{kg(af)}</p>
+                    <p className="text-base text-slate-400">kg aferido</p>
                   </>
                 ) : status === 'cortado' ? (
-                  <p className="text-xl font-bold text-amber-500">CORTADO</p>
+                  <p className="text-2xl font-bold text-amber-500">CORTADO</p>
                 ) : (
-                  <p className="text-xl text-slate-300">—</p>
+                  <p className="text-2xl text-slate-300">—</p>
                 )}
               </div>
-              <ChevronRight className="h-7 w-7 text-slate-300 shrink-0" />
+              <ChevronRight className="h-9 w-9 text-slate-300 shrink-0" />
             </button>
           );
         })}
@@ -186,8 +186,8 @@ function ModalPesoItem({ item, ref0, salvando, onConfirmar, onCortar, onClose }:
   const barra = ref0 > 0 ? Math.min(100, (pesoFoco / ref0) * 100) : (pesoFoco > 0 ? 100 : 0);
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl">
+    <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
           <button onClick={onClose} className="h-10 w-10 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500">
             <X className="h-5 w-5" />

@@ -99,13 +99,13 @@ export default function Operacional() {
               const sel = selId === l.id;
               return (
                 <button key={l.id} onClick={() => abrirPedido(l)}
-                  className={`w-full text-left bg-white rounded-2xl p-4 border-2 shadow-sm active:scale-[0.99] transition-transform
+                  className={`w-full text-left bg-white rounded-2xl p-5 border-2 shadow-sm active:scale-[0.99] transition-transform
                     ${sel ? 'border-emerald-500 ring-2 ring-emerald-200' : 'border-transparent hover:border-slate-300'}`}>
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-lg font-black text-slate-800 leading-tight truncate">{l.nomeFantasia}</p>
-                    <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold border ${st(l.statusPedido).chip}`}>{st(l.statusPedido).label}</span>
+                    <p className="text-xl font-black text-slate-800 leading-tight truncate">{l.nomeFantasia}</p>
+                    <span className={`shrink-0 px-2 py-1 rounded-full text-[11px] font-bold border ${st(l.statusPedido).chip}`}>{st(l.statusPedido).label}</span>
                   </div>
-                  <div className="flex items-center justify-between mt-2 text-sm text-slate-500">
+                  <div className="flex items-center justify-between mt-2 text-base text-slate-500">
                     <span>Pedido nº {l.idVenda || l.numero} · {l.qtdItens} itens</span>
                     <span className="font-bold text-slate-700">{R$(l.valorTotal)}</span>
                   </div>
