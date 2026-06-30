@@ -69,6 +69,11 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 ### Observação
 - Continua **modo teste**: nada é transmitido à SEFAZ, sem certificado A1/A3. Chave, protocolo,
   XML, boleto e PIX são gerados de forma fictícia (sem validade fiscal).
+- A validação exige **CNPJ na filial emitente** (bloqueio). A filial 1001 (CEAGESP Box 42) foi
+  configurada com CNPJ/IE de teste e regime Simples Nacional para liberar o faturamento.
+- Para acesso pelo **monitor touch** na rede: front exposto com `vite --host` em
+  `http://<IP-da-maquina>:3000` (o proxy do Vite repassa `/api` ao backend `:3002` localmente).
+  Pode ser necessário liberar a porta 3000 no Firewall do Windows (regra de entrada TCP).
 
 ---
 
