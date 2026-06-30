@@ -11,6 +11,7 @@ import Clientes from './modules/cadastros/pages/Clientes';
 import Operacional from './modules/logistica/pages/Operacional';
 import FreteMotoristas from './modules/logistica/pages/FreteMotoristas';
 import UsuariosAcessos from './modules/gerencial/pages/UsuariosAcessos';
+import Produtos from './modules/cadastros/pages/Produtos';
 
 const Placeholder = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-64">
@@ -48,7 +49,7 @@ export default function App() {
             <Route path="cadastros/clientes" element={<Clientes />} />
             <Route path="cadastros/fornecedores" element={<Placeholder title="Fornecedores" />} />
             <Route path="cadastros/transportadoras" element={<Placeholder title="Transportadoras" />} />
-            <Route path="cadastros/produtos" element={<Placeholder title="Produtos & NCM" />} />
+            <Route path="cadastros/produtos" element={<Produtos />} />
             <Route path="cadastros/filiais" element={<Placeholder title="Filiais / Boxes" />} />
 
             {/* WMS */}
