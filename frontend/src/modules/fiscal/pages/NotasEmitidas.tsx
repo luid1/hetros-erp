@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, RefreshCw, Printer, Ban } from 'lucide-react';
+import { FileText, RefreshCw, Printer, Ban, Mail, Undo2, X, ListChecks } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { imprimirDanfe } from '../danfe';
 
 const R$ = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const dt = (v: any) => v ? new Date(v).toLocaleDateString('pt-BR') : '—';
 
 const STATUS_COR: Record<string, string> = {
   EMITIDO: 'bg-emerald-100 text-emerald-700',
@@ -18,6 +19,8 @@ export default function NotasEmitidas() {
   const { filialAtiva } = useAuth();
   const [notas, setNotas] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [detalhe, setDetalhe] = useState<any | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const carregar = useCallback(() => {
     if (!filialAtiva) return;
@@ -26,6 +29,10 @@ export default function NotasEmitidas() {
   }, [filialAtiva?.id]);
   useEffect(() => { carregar(); }, [carregar]);
 
+  const abrirDetalhe = async (id: string) => {
+    const { data } = await api.get(`/nfe/documento/${id}`);
+    setDetalhe(data);
+  };
   const abrirDanfe = async (id: string) => {
     const { data } = await api.get(`/nfe/documento/${id}`);
     imprimirDanfe(data);
@@ -33,9 +40,27 @@ export default function NotasEmitidas() {
   const cancelar = async (id: string) => {
     const motivo = prompt('Motivo do cancelamento (mín. 15 caracteres):');
     if (!motivo) return;
-    try { await api.patch(`/nfe/${id}/cancelar`, { motivo }); carregar(); }
+    try { await api.patch(`/nfe/${id}/cancelar`, { motivo }); setDetalhe(null); carregar(); }
     catch (e: any) { alert(e.response?.data?.message || 'Erro ao cancelar.'); }
   };
+  const enviarCce = async (id: string) => {
+    const correcao = prompt('Texto da correção (15 a 1000 caracteres):');
+    if (!correcao) return;
+    try { await api.post(`/nfe/${id}/carta-correcao`, { correcao }); await abrirDetalhe(id); carregar(); alert('CC-e registrada (modo teste).'); }
+    catch (e: any) { alert(e.response?.data?.message || 'Erro na CC-e.'); }
+  };
+  const devolver = async (id: string) => {
+    if (!confirm('Gerar e emitir Nota Fiscal de Devolução (total) desta NF-e? A mercadoria volta ao estoque e os títulos são anulados.')) return;
+    setBusy(true);
+    try {
+      const { data: dev } = await api.post(`/nfe/${id}/devolucao`);
+      await api.post(`/nfe/${dev.id}/devolucao/emitir`);
+      setDetalhe(null); carregar();
+      alert('NF-e de devolução emitida (modo teste).');
+    } catch (e: any) { alert(e.response?.data?.message || 'Erro na devolução.'); }
+    finally { setBusy(false); }
+  };
+  const enviarEmail = (n: any) => alert(`Modo teste: enviaria XML + DANFE para ${n.cliente?.email || 'o e-mail do cliente'}.`);
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
@@ -58,20 +83,28 @@ export default function NotasEmitidas() {
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-gray-100 text-xs text-gray-600">
-                <tr>{['Nº/Série', 'Pedido', 'Cliente', 'Chave de acesso', 'Valor', 'Status', ''].map(h => <th key={h} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{h}</th>)}</tr>
+                <tr>{['Nº/Série', 'Tipo', 'Pedido', 'Cliente', 'Chave de acesso', 'Valor', 'Status', ''].map(h => <th key={h} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{h}</th>)}</tr>
               </thead>
               <tbody>
                 {notas.map(n => (
-                  <tr key={n.id} className="border-t border-gray-100 hover:bg-sky-50/40">
+                  <tr key={n.id} className="border-t border-gray-100 hover:bg-sky-50/40 cursor-pointer" onClick={() => abrirDetalhe(n.id)}>
                     <td className="px-3 py-2 font-bold text-gray-800">{String(n.numero).padStart(6, '0')}/{n.serie}</td>
+                    <td className="px-3 py-2 text-xs">{n.finalidade === '4' ? <span className="text-orange-600 font-bold">DEVOLUÇÃO</span> : 'Venda'}</td>
                     <td className="px-3 py-2 text-gray-500">{n.pedido?.numero ? `nº ${n.pedido.numero}` : '—'}</td>
                     <td className="px-3 py-2 font-semibold text-gray-900">{n.cliente?.razaoSocial}</td>
                     <td className="px-3 py-2 font-mono text-[11px] text-gray-500 max-w-[260px] truncate">{n.chaveAcesso || '—'}</td>
                     <td className="px-3 py-2 text-right font-mono font-bold">{R$(n.valorNfe)}</td>
-                    <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COR[n.status] || 'bg-gray-100'}`}>{n.status}</span></td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <td className="px-3 py-2">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COR[n.status] || 'bg-gray-100'}`}>{n.status}</span>
+                      {n._count?.cartasCorrecao > 0 && <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">CC-e {n._count.cartasCorrecao}</span>}
+                    </td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
                       <button onClick={() => abrirDanfe(n.id)} className="text-gray-400 hover:text-sky-600 p-1" title="Imprimir DANFE"><Printer className="h-4 w-4" /></button>
-                      {n.status === 'EMITIDO' && <button onClick={() => cancelar(n.id)} className="text-gray-400 hover:text-red-600 p-1" title="Cancelar"><Ban className="h-4 w-4" /></button>}
+                      {n.status === 'EMITIDO' && n.finalidade !== '4' && <>
+                        <button onClick={() => enviarCce(n.id)} className="text-gray-400 hover:text-blue-600 p-1" title="Carta de Correção"><FileText className="h-4 w-4" /></button>
+                        <button onClick={() => devolver(n.id)} className="text-gray-400 hover:text-orange-600 p-1" title="Devolução"><Undo2 className="h-4 w-4" /></button>
+                        <button onClick={() => cancelar(n.id)} className="text-gray-400 hover:text-red-600 p-1" title="Cancelar"><Ban className="h-4 w-4" /></button>
+                      </>}
                     </td>
                   </tr>
                 ))}
@@ -80,6 +113,78 @@ export default function NotasEmitidas() {
           </div>
         )}
       </div>
+
+      {/* Modal de detalhe da nota */}
+      {detalhe && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setDetalhe(null)}>
+          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b sticky top-0 bg-white">
+              <h2 className="font-bold text-gray-900">NF-e {String(detalhe.numero).padStart(6, '0')}/{detalhe.serie} · {detalhe.cliente?.razaoSocial}</h2>
+              <button onClick={() => setDetalhe(null)}><X className="h-5 w-5 text-gray-400" /></button>
+            </div>
+            <div className="p-5 space-y-4 text-sm">
+              <div className="grid grid-cols-3 gap-3 text-xs">
+                <Info label="Status" value={detalhe.status} />
+                <Info label="CFOP" value={detalhe.cfop} />
+                <Info label="Natureza" value={detalhe.naturezaOperacao} />
+                <Info label="Valor total" value={R$(detalhe.valorNfe)} />
+                <Info label="ICMS" value={R$(detalhe.valorIcms)} />
+                <Info label="PIS/COFINS" value={`${R$(detalhe.valorPis)} / ${R$(detalhe.valorCofins)}`} />
+                <Info label="Emissão" value={dt(detalhe.dataEmissao)} />
+                <Info label="Chave" value={detalhe.chaveAcesso || '—'} className="col-span-2" />
+              </div>
+
+              {/* Parcelas / duplicatas */}
+              <div>
+                <h3 className="font-bold text-xs text-gray-700 mb-1 flex items-center gap-1"><ListChecks className="h-3.5 w-3.5" /> Desdobramento financeiro (duplicatas)</h3>
+                {detalhe.duplicatas?.length ? (
+                  <div className="border rounded-lg overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-100 text-gray-600"><tr>{['Parcela', 'Vencimento', 'Valor'].map(h => <th key={h} className="px-2 py-1 text-left font-semibold">{h}</th>)}</tr></thead>
+                      <tbody>
+                        {detalhe.duplicatas.map((d: any) => (
+                          <tr key={d.id} className="border-t border-gray-100">
+                            <td className="px-2 py-1 font-mono">{d.numero}</td>
+                            <td className="px-2 py-1">{dt(d.dataVenc)}</td>
+                            <td className="px-2 py-1 text-right font-mono">{R$(d.valor)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : <p className="text-xs text-gray-400">Sem parcelas registradas.</p>}
+              </div>
+
+              {/* Cartas de correção */}
+              {detalhe.cartasCorrecao?.length > 0 && (
+                <div>
+                  <h3 className="font-bold text-xs text-gray-700 mb-1">Cartas de Correção (CC-e)</h3>
+                  <div className="space-y-1">
+                    {detalhe.cartasCorrecao.map((c: any) => (
+                      <div key={c.id} className="text-xs bg-blue-50 rounded px-2 py-1">
+                        <b>#{c.sequencia}</b> · {dt(c.dataEvento)} — {c.correcao}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="px-5 py-3 border-t flex flex-wrap justify-end gap-2 sticky bottom-0 bg-white">
+              <button onClick={() => abrirDanfe(detalhe.id)} className="px-3 py-2 rounded-lg border text-gray-600 text-sm flex items-center gap-1"><Printer className="h-4 w-4" /> DANFE</button>
+              <button onClick={() => enviarEmail(detalhe)} className="px-3 py-2 rounded-lg border text-gray-600 text-sm flex items-center gap-1"><Mail className="h-4 w-4" /> Enviar e-mail</button>
+              {detalhe.status === 'EMITIDO' && detalhe.finalidade !== '4' && <>
+                <button onClick={() => enviarCce(detalhe.id)} className="px-3 py-2 rounded-lg border border-blue-300 text-blue-700 text-sm flex items-center gap-1"><FileText className="h-4 w-4" /> CC-e</button>
+                <button disabled={busy} onClick={() => devolver(detalhe.id)} className="px-3 py-2 rounded-lg border border-orange-300 text-orange-700 text-sm flex items-center gap-1 disabled:opacity-40"><Undo2 className="h-4 w-4" /> Devolução</button>
+                <button onClick={() => cancelar(detalhe.id)} className="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm flex items-center gap-1"><Ban className="h-4 w-4" /> Cancelar</button>
+              </>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function Info({ label, value, className = '' }: { label: string; value: any; className?: string }) {
+  return <div className={className}><div className="text-[10px] uppercase text-gray-400 font-semibold">{label}</div><div className="font-mono text-gray-800 break-all">{value}</div></div>;
 }

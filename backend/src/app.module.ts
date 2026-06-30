@@ -14,6 +14,7 @@ import { MovimentacoesModule } from './modules/movimentacoes/movimentacoes.modul
 import { InventarioModule } from './modules/inventario/inventario.module';
 import { PedidosModule } from './modules/pedidos/pedidos.module';
 import { NFeModule } from './modules/nfe/nfe.module';
+import { FiscalModule } from './modules/fiscal/fiscal.module';
 import { RomaneiosModule } from './modules/romaneios/romaneios.module';
 import { ContasReceberModule } from './modules/contas-receber/contas-receber.module';
 import { ContasPagarModule } from './modules/contas-pagar/contas-pagar.module';
@@ -42,6 +43,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     InventarioModule,
     PedidosModule,
     NFeModule,
+    FiscalModule,
     RomaneiosModule,
     ContasReceberModule,
     ContasPagarModule,

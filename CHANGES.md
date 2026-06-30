@@ -20,6 +20,58 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-30] — Faturamento aprofundado: motor fiscal, validação, parcelas, CC-e e devolução (modo teste)
+
+### O que mudou
+- **Motor de Regras Fiscais** (novo módulo `fiscal`): matriz fiscal por **NCM/UF/operação**
+  que resolve **CFOP** (interno × interestadual), **CST/CSOSN** e calcula **ICMS, ICMS-ST,
+  IPI, PIS e COFINS** item a item. Nova tela **Matriz Fiscal** (`/fiscal/matriz`) com CRUD
+  das regras + botão "Regras-padrão" (semeia FLV/Simples Nacional). Fallback para as alíquotas
+  do próprio produto quando não há regra.
+  - Detecta **interestadual** (UF filial × UF cliente) e **consumidor final** (cliente sem IE),
+    com suporte a **DIFAL** e **ICMS-ST** (MVA).
+- **Validação anti-erro** antes de faturar: checklist (status, cliente ativo, CNPJ/CPF, endereço,
+  IE/Sintegra, **bloqueio de crédito**, **estoque físico** por item, NCM válido, CNPJ do emitente).
+  Bloqueios impedem o faturamento; avisos só alertam. A geração da NF-e **roda a validação no
+  backend** e barra se houver bloqueio. Tela de Faturamento ganhou botão **Conferir** (modal com
+  o checklist + **preview dos impostos** calculados).
+- **Desdobramento financeiro (parcelas)**: a NF-e gera **duplicatas** conforme a condição de
+  pagamento (`30/60/90` ou `numeroParcelas` em passos de 30 dias; à vista vence hoje). Na emissão,
+  cria **uma Conta a Receber por parcela**, com **boleto/PIX fake** (modo teste).
+- **Eventos de exceção**:
+  - **Cancelamento**: agora **estorna o estoque** (entrada de devolução), **cancela os títulos**
+    em aberto e devolve o pedido para SEPARADO (via evento `nfe.cancelada`).
+  - **Carta de Correção Eletrônica (CC-e)**: registra correções (15–1000 caR, máx. 20/nota),
+    com sequência e histórico exibido no detalhe da nota.
+  - **Nota Fiscal de Devolução**: gera NF-e espelho de **entrada** (finalidade 4, CFOP 5202/6202)
+    referenciando a original; ao emitir, **reentra o estoque** e **anula o financeiro**
+    (evento `nfe.devolvida`).
+- **NF-e Emitidas** reformulada: clique abre **detalhe** (impostos, duplicatas, CC-e) com ações
+  DANFE, Enviar e-mail (mock), CC-e, Devolução e Cancelar. Coluna Tipo (Venda/Devolução) e badge CC-e.
+- **XML** de teste agora sai com itens e impostos (antes era um stub).
+
+### Backend / schema
+- `Filial`: + `regimeTributario`, `crt`.
+- `NFe`: + `tipoOperacao`, `finalidade`, `nfeReferenciadaId`/`chaveReferenciada` (self-relation
+  devolução), `valorIcmsSt`, `valorIpi`, relação `cartasCorrecao`.
+- `ItemNFe`: usa `origemProd`, bases e CST de PIS/COFINS calculados.
+- Novos models: **`RegraFiscal`** (matriz fiscal) e **`CartaCorrecao`** (CC-e). Aplicado via `prisma db push`.
+- Arquitetura **Event-Driven** mantida: `nfe.emitida`, `nfe.cancelada`, `nfe.devolvida`.
+
+### Arquivos
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/fiscal/*` (novo módulo: service + controller + module)
+- `backend/src/modules/nfe/{nfe.service.ts, nfe.controller.ts, nfe.module.ts}`
+- `backend/src/app.module.ts`
+- `frontend/src/modules/fiscal/pages/{Faturamento.tsx, NotasEmitidas.tsx, MatrizFiscal.tsx (novo)}`
+- `frontend/src/App.tsx`, `frontend/src/components/layout/AppShell.tsx`, `frontend/src/config/telas.ts`
+
+### Observação
+- Continua **modo teste**: nada é transmitido à SEFAZ, sem certificado A1/A3. Chave, protocolo,
+  XML, boleto e PIX são gerados de forma fictícia (sem validade fiscal).
+
+---
+
 ## [2026-06-30] — Área de Usuários & Acessos (perfis + controle de telas)
 
 ### O que mudou

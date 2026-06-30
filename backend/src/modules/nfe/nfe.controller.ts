@@ -50,12 +50,43 @@ export class NFeController {
   }
 
   @Patch(':id/cancelar')
-  @ApiOperation({ summary: 'Cancela NF-e no SEFAZ' })
+  @ApiOperation({ summary: 'Cancela NF-e no SEFAZ → estorna estoque + cancela títulos' })
   cancelar(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
     @Body('motivo') motivo: string,
   ) {
     return this.service.cancelar(tenantId, id, motivo);
+  }
+
+  // ---- Carta de Correção Eletrônica (CC-e) ----
+  @Post(':id/carta-correcao')
+  @ApiOperation({ summary: 'Registra uma Carta de Correção Eletrônica' })
+  cce(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string, @Body('correcao') correcao: string) {
+    return this.service.emitirCartaCorrecao(tenantId, id, correcao, user.id);
+  }
+
+  @Get(':id/cartas-correcao')
+  @ApiOperation({ summary: 'Lista as CC-e de uma NF-e' })
+  listarCce(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    return this.service.listarCartasCorrecao(tenantId, id);
+  }
+
+  // ---- Nota Fiscal de Devolução ----
+  @Post(':id/devolucao')
+  @ApiOperation({ summary: 'Gera NF-e de devolução (espelho de entrada) a partir da nota original' })
+  gerarDevolucao(
+    @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body('itens') itens?: { itemNfeId: string; quantidade: number }[],
+  ) {
+    return this.service.gerarDevolucao(tenantId, id, user.id, itens);
+  }
+
+  @Post(':id/devolucao/emitir')
+  @ApiOperation({ summary: 'Emite a NF-e de devolução → reentra estoque + anula financeiro' })
+  emitirDevolucao(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string) {
+    return this.service.emitirDevolucao(tenantId, id, user.id);
   }
 }

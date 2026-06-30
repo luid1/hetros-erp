@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Receipt, RefreshCw, FileText, Printer, Check, AlertTriangle, Loader2 } from 'lucide-react';
+import { Receipt, RefreshCw, FileText, Printer, Check, AlertTriangle, Loader2, ShieldCheck, X, XCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { imprimirDanfe } from '../danfe';
@@ -16,6 +16,10 @@ export default function Faturamento() {
   const [processando, setProcessando] = useState(false);
   const [resultado, setResultado] = useState<{ ok: number; erros: string[] } | null>(null);
   const [andamento, setAndamento] = useState<string>('');
+  const [conferindo, setConferindo] = useState<any | null>(null); // pedido em conferência
+  const [validacao, setValidacao] = useState<any | null>(null);
+  const [preview, setPreview] = useState<any | null>(null);
+  const [carregandoConf, setCarregandoConf] = useState(false);
 
   const carregar = useCallback(() => {
     if (!filialAtiva) return;
@@ -54,6 +58,18 @@ export default function Faturamento() {
     setResultado({ ok, erros });
     carregar();
     if (ok === 1 && ultima) imprimirDanfe(ultima); // 1 só → já abre a DANFE
+  };
+
+  const conferir = async (pedido: any) => {
+    setConferindo(pedido); setValidacao(null); setPreview(null); setCarregandoConf(true);
+    try {
+      const [v, p] = await Promise.all([
+        api.get(`/fiscal/validar/${pedido.id}`),
+        api.get(`/fiscal/preview/${pedido.id}`),
+      ]);
+      setValidacao(v.data); setPreview(p.data);
+    } catch { /* ignore */ }
+    finally { setCarregandoConf(false); }
   };
 
   const faturarLinha = async (pedidoId: string) => {
@@ -134,10 +150,16 @@ export default function Faturamento() {
                     <td className="px-3 py-2 text-right font-mono">{(Number(p.pesoTotal) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 3 })}</td>
                     <td className="px-3 py-2 text-right font-mono font-bold">{R$(p.valorTotal)}</td>
                     <td className="px-3 py-2 text-right">
-                      <button onClick={() => faturarLinha(p.id)} disabled={processando}
-                        className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded px-3 py-1.5 text-xs font-bold disabled:opacity-40 ml-auto">
-                        <Check className="h-3.5 w-3.5" /> Faturar
-                      </button>
+                      <div className="flex items-center gap-1 justify-end">
+                        <button onClick={() => conferir(p)} disabled={processando}
+                          className="flex items-center gap-1 bg-white border border-violet-300 text-violet-700 hover:bg-violet-50 rounded px-2.5 py-1.5 text-xs font-bold disabled:opacity-40">
+                          <ShieldCheck className="h-3.5 w-3.5" /> Conferir
+                        </button>
+                        <button onClick={() => faturarLinha(p.id)} disabled={processando}
+                          className="flex items-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded px-3 py-1.5 text-xs font-bold disabled:opacity-40">
+                          <Check className="h-3.5 w-3.5" /> Faturar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -147,6 +169,94 @@ export default function Faturamento() {
         )}
         <p className="text-[11px] text-gray-400 mt-3 flex items-center gap-1"><Printer className="h-3 w-3" /> Ao faturar, a DANFE (modo teste) abre para impressão. As notas ficam em "NF-e Emitidas".</p>
       </div>
+
+      {/* Modal de conferência: checklist anti-erro + preview de impostos */}
+      {conferindo && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setConferindo(null)}>
+          <div className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b sticky top-0 bg-white">
+              <h2 className="font-bold text-gray-900 flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-violet-500" /> Conferência — Pedido {conferindo.numero} · {conferindo.cliente?.nomeFantasia || conferindo.cliente?.razaoSocial}</h2>
+              <button onClick={() => setConferindo(null)}><X className="h-5 w-5 text-gray-400" /></button>
+            </div>
+
+            {carregandoConf ? (
+              <div className="flex justify-center py-16"><div className="animate-spin h-6 w-6 border-2 border-violet-500 border-t-transparent rounded-full" /></div>
+            ) : (
+              <div className="p-5 space-y-5">
+                {/* Checklist */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-bold text-sm text-gray-700">Validação anti-erro</h3>
+                    {validacao && (
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${validacao.podeFaturar ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                        {validacao.podeFaturar ? 'Liberado para faturar' : `${validacao.bloqueios} bloqueio(s)`}
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    {validacao?.checks.map((c: any) => (
+                      <div key={c.id} className={`flex items-start gap-2 text-sm px-2 py-1 rounded ${c.ok ? '' : c.severidade === 'BLOQUEIO' ? 'bg-red-50' : 'bg-amber-50'}`}>
+                        {c.ok ? <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" /> : c.severidade === 'BLOQUEIO' ? <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" /> : <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />}
+                        <div className="flex-1">
+                          <span className={c.ok ? 'text-gray-700' : 'font-semibold text-gray-800'}>{c.label}</span>
+                          {c.detalhe && <span className="text-xs text-gray-400 ml-1">— {c.detalhe}</span>}
+                        </div>
+                        {!c.ok && <span className={`text-[10px] font-bold ${c.severidade === 'BLOQUEIO' ? 'text-red-500' : 'text-amber-600'}`}>{c.severidade}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preview de impostos */}
+                {preview && (
+                  <div>
+                    <h3 className="font-bold text-sm text-gray-700 mb-2">Impostos calculados <span className="text-xs font-normal text-gray-400">({preview.contexto.interestadual ? 'interestadual' : 'interna'} · {preview.contexto.ufOrigem}→{preview.contexto.ufDestino}{preview.contexto.consumidorFinal ? ' · consumidor final' : ''})</span></h3>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-100 text-gray-600">
+                          <tr>{['Item', 'NCM', 'CFOP', 'CST', 'Vlr', 'ICMS', 'PIS', 'COFINS'].map(h => <th key={h} className="px-2 py-1.5 text-left font-semibold">{h}</th>)}</tr>
+                        </thead>
+                        <tbody>
+                          {preview.itens.map((it: any, i: number) => (
+                            <tr key={i} className="border-t border-gray-100">
+                              <td className="px-2 py-1 font-semibold text-gray-800 max-w-[180px] truncate">{it.descricao}</td>
+                              <td className="px-2 py-1 font-mono">{it.ncm}</td>
+                              <td className="px-2 py-1 font-mono">{it.cfop}</td>
+                              <td className="px-2 py-1 font-mono">{it.cstCsosn}</td>
+                              <td className="px-2 py-1 text-right font-mono">{R$(it.valorTotal)}</td>
+                              <td className="px-2 py-1 text-right font-mono">{R$(it.valorIcms)}</td>
+                              <td className="px-2 py-1 text-right font-mono">{R$(it.valorPis)}</td>
+                              <td className="px-2 py-1 text-right font-mono">{R$(it.valorCofins)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50 font-bold">
+                          <tr className="border-t border-gray-200">
+                            <td className="px-2 py-1.5" colSpan={5}>Totais — ST {R$(preview.totais.valorIcmsSt)} · IPI {R$(preview.totais.valorIpi)} · DIFAL {R$(preview.totais.valorDifal)}</td>
+                            <td className="px-2 py-1.5 text-right font-mono">{R$(preview.totais.valorIcms)}</td>
+                            <td className="px-2 py-1.5 text-right font-mono">{R$(preview.totais.valorPis)}</td>
+                            <td className="px-2 py-1.5 text-right font-mono">{R$(preview.totais.valorCofins)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="px-5 py-3 border-t flex justify-end gap-2 sticky bottom-0 bg-white">
+              <button onClick={() => setConferindo(null)} className="px-4 py-2 rounded-lg border text-gray-600 text-sm">Fechar</button>
+              <button
+                disabled={!validacao?.podeFaturar || processando}
+                onClick={async () => { const id = conferindo.id; setConferindo(null); await faturarLinha(id); }}
+                className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm disabled:opacity-40">
+                Faturar este pedido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

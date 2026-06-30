@@ -153,6 +153,9 @@ model Filial {
   ie              String?
   endereco        Json      // rua, numero, bairro, cidade, uf, cep, complemento
   tipo            String    @default("DEPOSITO") // MATRIZ, FILIAL, DEPOSITO, BOX_CEASA
+  // Fiscal
+  regimeTributario String   @default("SIMPLES_NACIONAL") // SIMPLES_NACIONAL, LUCRO_PRESUMIDO, LUCRO_REAL
+  crt             String    @default("1") // 1=Simples Nacional, 2=Simples excesso, 3=Regime Normal
   ativo           Boolean   @default(true)
   createdAt       DateTime  @default(now())
 
@@ -690,6 +693,14 @@ model NFe {
   chaveAcesso     String?   @unique // 44 dígitos
   protocolo       String?
   status          StatusDFe @default(RASCUNHO)
+  // Finalidade / tipo da operação
+  tipoOperacao    String    @default("SAIDA") // SAIDA (1) ou ENTRADA (0 — devolução)
+  finalidade      String    @default("1")     // 1=Normal, 2=Complementar, 3=Ajuste, 4=Devolução
+  // Referência (devolução espelha a NF-e original)
+  nfeReferenciadaId String?
+  nfeReferenciada   NFe?    @relation("NFeDevolucao", fields: [nfeReferenciadaId], references: [id])
+  devolucoes        NFe[]   @relation("NFeDevolucao")
+  chaveReferenciada String?
   naturezaOperacao String
   cfop            String
   // Emitente (da filial)
@@ -704,6 +715,8 @@ model NFe {
   valorSeguro     Decimal   @default(0) @db.Decimal(12, 2)
   valorDesconto   Decimal   @default(0) @db.Decimal(12, 2)
   valorIcms       Decimal   @default(0) @db.Decimal(12, 2)
+  valorIcmsSt     Decimal   @default(0) @db.Decimal(12, 2)
+  valorIpi        Decimal   @default(0) @db.Decimal(12, 2)
   valorPis        Decimal   @default(0) @db.Decimal(12, 2)
   valorCofins     Decimal   @default(0) @db.Decimal(12, 2)
   valorNfe        Decimal   @db.Decimal(12, 2)
@@ -726,6 +739,7 @@ model NFe {
   movimentacoes   MovimentacaoEstoque[]
   contasReceber   ContaReceber[]
   duplicatas      DuplicataNFe[]
+  cartasCorrecao  CartaCorrecao[]
 
   @@unique([tenantId, filialId, serie, numero, modelo])
   @@index([tenantId, filialId])
@@ -781,6 +795,68 @@ model DuplicataNFe {
   valor       Decimal   @db.Decimal(12, 2)
 
   @@index([nfeId])
+}
+
+// Carta de Correção Eletrônica (CC-e) — evento de correção sem alterar valores/impostos
+model CartaCorrecao {
+  id          String    @id @default(uuid())
+  tenantId    String
+  nfeId       String
+  nfe         NFe       @relation(fields: [nfeId], references: [id], onDelete: Cascade)
+  sequencia   Int       // sequência do evento (1, 2, 3...) — máx 20 por NF-e
+  correcao    String    @db.Text // texto da correção (15 a 1000 caracteres)
+  protocolo   String?
+  xml         String?   @db.Text
+  status      String    @default("REGISTRADO") // REGISTRADO, REJEITADO
+  dataEvento  DateTime  @default(now())
+  usuarioId   String?
+
+  @@unique([nfeId, sequencia])
+  @@index([tenantId])
+  @@index([nfeId])
+}
+
+// Matriz fiscal — regra tributária por NCM (e opcionalmente UF destino / CFOP).
+// Resolve CFOP, CST/CSOSN e alíquotas na geração da NF-e (motor de regras fiscais).
+model RegraFiscal {
+  id              String    @id @default(uuid())
+  tenantId        String
+  descricao       String    // ex: "FLV — venda interna SP", "Revenda interestadual"
+  // Critérios de match (null = curinga)
+  ncm             String?   // NCM do produto (prefixo ou completo); null = qualquer
+  ufDestino       String?   // UF de destino; null = qualquer
+  tipoOperacao    String    @default("VENDA") // VENDA, DEVOLUCAO, TRANSFERENCIA, BONIFICACAO
+  consumidorFinal Boolean?  // true=consumidor final; null=qualquer
+  // Resultado — CFOP
+  cfopInterno         String   @default("5102")
+  cfopInterestadual   String   @default("6102")
+  // ICMS
+  cstIcms         String   @default("102") // CSOSN (Simples) ou CST (normal)
+  origemProd      String   @default("0")
+  aliquotaIcms    Decimal  @default(0) @db.Decimal(6, 4)
+  reducaoBaseIcms Decimal  @default(0) @db.Decimal(6, 4) // % de redução da base
+  // ICMS-ST
+  temSt           Boolean  @default(false)
+  mvaSt           Decimal  @default(0) @db.Decimal(6, 4) // Margem de Valor Agregado
+  aliquotaIcmsSt  Decimal  @default(0) @db.Decimal(6, 4)
+  // DIFAL (consumidor final interestadual)
+  temDifal        Boolean  @default(false)
+  // IPI
+  cstIpi          String?
+  aliquotaIpi     Decimal  @default(0) @db.Decimal(6, 4)
+  // PIS / COFINS
+  cstPis          String   @default("07") // 07 = isento/alíquota zero
+  aliquotaPis     Decimal  @default(0) @db.Decimal(6, 4)
+  cstCofins       String   @default("07")
+  aliquotaCofins  Decimal  @default(0) @db.Decimal(6, 4)
+  // Controle
+  prioridade      Int      @default(0) // maior = aplicada primeiro quando há empate de match
+  ativo           Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, ncm])
 }
 
 model CTe {
