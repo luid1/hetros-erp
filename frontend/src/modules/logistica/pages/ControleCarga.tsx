@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
-  RefreshCw, Printer, Truck, CheckSquare,
+  Printer, Truck, CheckSquare,
   ChevronDown, RotateCcw, Trash2,
   PlusCircle, ShieldCheck, Eraser, Clock, Check,
-  X, Search, UserPlus,
+  X, Search, UserPlus, ClipboardList,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
@@ -197,7 +197,7 @@ export default function ControleCarga() {
   // ── Estado dos filtros ──
   const [segmento, setSegmento]                     = useState('0-Todos');
   const [dataCarga, setDataCarga]                   = useState(hojeStr);
-  const [dataEntrega, setDataEntrega]               = useState('');
+  const [dataEntrega, setDataEntrega]               = useState(hojeStr);
   const [mostrarFinalizados, setMostrarFinalizados] = useState(true);
   const [mostrarGrade, setMostrarGrade]             = useState(true);
   const [rotaPendente, setRotaPendente]             = useState(true);
@@ -272,10 +272,6 @@ export default function ControleCarga() {
   }, [pedidosFiltrados, selecionados]);
 
   // ── Ações ──
-  const handleAtualizar = () => {
-    carregar();
-  };
-
   const handleAutorizar = () => {
     setPedidos(prev => prev.map(p =>
       selecionados.has(p.id) ? { ...p, aurCargaOk: true, statusCarga: 'AURCARGA_OK' as const } : p
@@ -450,11 +446,6 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
         </label>
 
         <span className="w-px h-5 bg-gray-400" />
-
-        {/* Atualizar Lista */}
-        <button onClick={handleAtualizar} className="flex items-center gap-1 bg-white border border-gray-400 hover:bg-blue-50 px-2.5 py-1 rounded text-gray-700 font-medium">
-          <RefreshCw className="h-3.5 w-3.5 text-blue-600" /> Atualizar Lista
-        </button>
 
         {/* Checkboxes */}
         <label className="flex items-center gap-1 cursor-pointer text-gray-700 font-medium">

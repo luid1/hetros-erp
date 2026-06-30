@@ -18,6 +18,10 @@ const FORMAS_PAG = [
   { v: 'BOLETO', label: 'Boleto', parcelavel: true },
   { v: 'A_PRAZO', label: 'Faturado / A Prazo', parcelavel: true },
 ];
+const hojeISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 const STATUS_CORES: Record<string, string> = {
   RASCUNHO: 'bg-gray-200 text-gray-700',
   CONFIRMADO: 'bg-blue-100 text-blue-800',
@@ -50,6 +54,7 @@ export default function PedidosVenda() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [dataFiltro, setDataFiltro] = useState(hojeISO());
   const [modalAberto, setModalAberto] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [aComprar, setAComprar] = useState<any[]>([]);
@@ -57,18 +62,24 @@ export default function PedidosVenda() {
   const carregarPedidos = useCallback(() => {
     if (!filialAtiva) return;
     setLoading(true);
-    api.get('/pedidos', { params: { filialId: filialAtiva.id, status: statusFilter || undefined, search: search || undefined } })
+    api.get('/pedidos', { params: {
+      filialId: filialAtiva.id,
+      status: statusFilter || undefined,
+      search: search || undefined,
+      dataInicio: dataFiltro || undefined,
+      dataFim: dataFiltro || undefined,
+    } })
       .then(r => setPedidos(r.data))
       .catch(() => setPedidos([]))
       .finally(() => setLoading(false));
-  }, [filialAtiva?.id, statusFilter, search]);
+  }, [filialAtiva?.id, statusFilter, search, dataFiltro]);
 
   const carregarAComprar = useCallback(() => {
     if (!filialAtiva) return;
     api.get(`/estoque/${filialAtiva.id}/a-comprar`).then(r => setAComprar(r.data)).catch(() => setAComprar([]));
   }, [filialAtiva?.id]);
 
-  useEffect(() => { carregarPedidos(); }, [filialAtiva?.id, statusFilter]);
+  useEffect(() => { carregarPedidos(); }, [filialAtiva?.id, statusFilter, dataFiltro]);
   useEffect(() => { carregarAComprar(); }, [filialAtiva?.id]);
 
   const pedidosFiltrados = useMemo(() => {
@@ -111,7 +122,10 @@ export default function PedidosVenda() {
           <h1 className="text-base font-bold text-gray-900 flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-sky-500" /> Pedidos de Venda
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">{filialAtiva?.nome || '—'} · {pedidosFiltrados.length} pedido{pedidosFiltrados.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {filialAtiva?.nome || '—'} · {pedidosFiltrados.length} pedido{pedidosFiltrados.length !== 1 ? 's' : ''}
+            {dataFiltro ? ` · entrega ${new Date(dataFiltro + 'T00:00:00').toLocaleDateString('pt-BR')}` : ' · todas as datas'}
+          </p>
         </div>
         <button onClick={abrirNovo} className="btn-primary text-xs py-2">
           <Plus className="h-3.5 w-3.5" /> Novo Pedido
@@ -132,7 +146,20 @@ export default function PedidosVenda() {
             </button>
           ))}
         </div>
-        <button onClick={carregarPedidos} className="text-xs text-gray-500 hover:text-blue-600">↻ Atualizar</button>
+        <div className="flex items-center gap-1.5 ml-auto">
+          <span className="text-xs text-gray-500">Entrega:</span>
+          <input type="date" value={dataFiltro} onChange={e => setDataFiltro(e.target.value)}
+            className="border border-gray-300 rounded px-2 py-1.5 text-xs bg-white focus:ring-2 focus:ring-blue-400" />
+          <button onClick={() => setDataFiltro(hojeISO())}
+            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${dataFiltro === hojeISO() ? 'bg-sky-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+            Hoje
+          </button>
+          <button onClick={() => setDataFiltro('')}
+            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${!dataFiltro ? 'bg-sky-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+            Todos
+          </button>
+          <button onClick={carregarPedidos} className="text-xs text-gray-500 hover:text-blue-600 ml-1">↻ Atualizar</button>
+        </div>
       </div>
 
       {/* ── Caixinha de aviso: produtos a comprar (estoque negativo / abaixo do mínimo) ── */}
@@ -188,7 +215,7 @@ export default function PedidosVenda() {
                   <td className="px-3 py-2 text-right font-mono">{R$(Number(p.subtotal))}</td>
                   <td className="px-3 py-2 text-right font-mono text-blue-600">{R$(Number(p.valorFrete))}</td>
                   <td className="px-3 py-2 text-right font-mono font-bold">{R$(Number(p.valorTotal))}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{p.dataEntrega ? new Date(p.dataEntrega).toLocaleDateString('pt-BR') : '—'}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">{p.dataEntrega ? new Date(p.dataEntrega).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—'}</td>
                   <td className="px-3 py-2">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_CORES[p.status] || 'bg-gray-100'}`}>
                       {p.status === 'CONFIRMADO' ? 'APROVADO' : p.status}
@@ -587,7 +614,7 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
           {/* ── C. Pagamento e Entrega ── */}
           <section>
             <h3 className="text-[11px] font-bold text-gray-400 uppercase mb-2">C · Pagamento e Entrega</h3>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={lbl}><CreditCard className="h-3 w-3 inline" /> Forma de Pagamento</label>
                 <select value={formaPagamento} onChange={e => { setFormaPag(e.target.value); if (!FORMAS_PAG.find(f => f.v === e.target.value)?.parcelavel) setParcelas('1'); }} className={inp}>
@@ -600,18 +627,10 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
                   {Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n === 1 ? 'À vista' : `${n}x`}</option>)}
                 </select>
               </div>
-              <div>
-                <label className={lbl}><Truck className="h-3 w-3 inline" /> Tipo de Frete</label>
-                <select value={tipoFrete} onChange={e => setTipoFrete(e.target.value)} className={inp}>
-                  <option value="CIF">CIF (remetente paga)</option>
-                  <option value="FOB">FOB (cliente paga)</option>
-                </select>
-              </div>
-              <div>
-                <label className={lbl}>Valor do Frete (R$)</label>
-                <input type="number" min="0" step="0.01" value={valorFrete} onChange={e => setValorFrete(e.target.value)} className={inp} />
-              </div>
             </div>
+            <p className="text-[10px] text-gray-400 mt-1.5 flex items-center gap-1">
+              <Truck className="h-3 w-3" /> O frete é definido na logística (Controle de Carga), não no pedido.
+            </p>
             <div className="mt-3">
               <label className={lbl}><MapPin className="h-3 w-3 inline" /> Endereço de Entrega</label>
               <div className="grid grid-cols-6 gap-2">
@@ -655,7 +674,6 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
                   onChange={e => setDescontoGeral(e.target.value)}
                   className={`w-24 border rounded px-2 py-1 text-right text-sm ${descontoLiberado ? 'border-gray-300' : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'}`} />
               </div>
-              <div><span className="block text-[10px] uppercase text-gray-400">Frete</span><strong className="font-mono text-sm text-blue-600">{R$(parseFloat(valorFrete) || 0)}</strong></div>
               <div className="border-l border-gray-300 pl-5">
                 <span className="block text-[10px] uppercase text-gray-400">Total Líquido</span>
                 <strong className="font-mono text-xl text-green-700">{R$(totalLiquido)}</strong>

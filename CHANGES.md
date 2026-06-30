@@ -20,6 +20,38 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-30] — Pedidos do dia, correção de fuso, frete fora do pedido e fix tela branca
+
+### O que mudou
+- **Pedidos de Venda — filtro "do dia"**: a tela abre filtrando pela **data de entrega = hoje**.
+  - Novo seletor de data na barra + botões **Hoje** e **Todos** (histórico completo quando quiser).
+  - Subtítulo mostra o contexto (ex.: "1 pedido · entrega 30/06/2026").
+  - Usa os parâmetros `dataInicio`/`dataFim` que o backend já suportava.
+- **Bug de fuso (off-by-one)**: a coluna **Entrega** mostrava 1 dia a menos (data gravada à
+  meia-noite UTC convertida pra BRT caía no dia anterior). Passou a formatar a data em UTC,
+  então a coluna bate com o dia real e com o filtro.
+- **Frete removido do Pedido de Venda**: tirados **Tipo de Frete** e **Valor do Frete** da
+  seção C e o **Frete** do rodapé de totais. O frete é definido na logística (Controle de
+  Carga). Pedido continua sendo salvo com `frete = 0`. Nota explicativa no lugar dos campos.
+- **Controle de Carga**:
+  - Removido o botão **"Atualizar Lista"** (a grade já recarrega ao trocar a data).
+  - Campos **Carga** e **Entrega** agora abrem pré-preenchidos com a **data de hoje**
+    (antes "Entrega" vinha vazia).
+- **Fix tela branca ao abrir "Nova Entrega"**: o ícone `ClipboardList` era usado no estado
+  vazio do modal mas **não estava importado** do `lucide-react` — quando não havia pedido
+  CONFIRMADO no dia, o modal quebrava. Import corrigido.
+
+### Arquivos
+- `frontend/src/modules/logistica/pages/PedidosVenda.tsx`
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx`
+
+### Pendente (decisão do usuário)
+- Controle de Carga abre em "hoje"; rotas antigas (3501/3502) ainda aparecem 1 dia antes por
+  terem sido gravadas à meia-noite UTC. Aguardando decisão: abrir no último dia com rotas /
+  manter hoje / migrar as 2 rotas antigas no banco.
+
+---
+
 ## [2026-06-29] — Roteirizado fica verde + tela Frete por Motorista
 
 ### O que mudou
