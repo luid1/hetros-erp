@@ -12,6 +12,8 @@ import Operacional from './modules/logistica/pages/Operacional';
 import FreteMotoristas from './modules/logistica/pages/FreteMotoristas';
 import UsuariosAcessos from './modules/gerencial/pages/UsuariosAcessos';
 import Produtos from './modules/cadastros/pages/Produtos';
+import Faturamento from './modules/fiscal/pages/Faturamento';
+import NotasEmitidas from './modules/fiscal/pages/NotasEmitidas';
 
 const Placeholder = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-64">
@@ -69,8 +71,8 @@ export default function App() {
             <Route path="logistica/frotas" element={<Placeholder title="Frotas & Veículos" />} />
 
             {/* Fiscal */}
-            <Route path="fiscal/nfe" element={<Placeholder title="NF-e Emitidas" />} />
-            <Route path="fiscal/emitir" element={<Placeholder title="Emitir NF-e" />} />
+            <Route path="fiscal/nfe" element={<NotasEmitidas />} />
+            <Route path="fiscal/emitir" element={<Faturamento />} />
             <Route path="fiscal/cte" element={<Placeholder title="CT-e / MDF-e" />} />
 
             {/* Financeiro */}

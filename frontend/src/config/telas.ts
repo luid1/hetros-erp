@@ -28,7 +28,7 @@ export const TELAS: TelaDef[] = [
   { key: '/logistica/frotas', label: 'Frotas & Veículos', grupo: 'Logística' },
   // Fiscal
   { key: '/fiscal/nfe', label: 'NF-e Emitidas', grupo: 'Fiscal / DFe' },
-  { key: '/fiscal/emitir', label: 'Emitir NF-e', grupo: 'Fiscal / DFe' },
+  { key: '/fiscal/emitir', label: 'Faturamento', grupo: 'Fiscal / DFe' },
   { key: '/fiscal/cte', label: 'CT-e / MDF-e', grupo: 'Fiscal / DFe' },
   // Financeiro
   { key: '/financeiro/receber', label: 'Contas a Receber', grupo: 'Financeiro' },

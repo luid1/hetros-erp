@@ -55,7 +55,7 @@ const navigation: NavGroup[] = [
     group: 'D · Fiscal / DFe',
     items: [
       { to: '/fiscal/nfe',    icon: Receipt,   label: 'NF-e Emitidas' },
-      { to: '/fiscal/emitir', icon: FileText,  label: 'Emitir NF-e' },
+      { to: '/fiscal/emitir', icon: Receipt,   label: 'Faturamento', highlight: true },
       { to: '/fiscal/cte',    icon: FileText,  label: 'CT-e / MDF-e' },
     ],
   },
