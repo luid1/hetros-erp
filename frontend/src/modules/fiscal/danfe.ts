@@ -90,7 +90,7 @@ export function imprimirDanfe(nfe: any) {
   <div class="b flex" style="margin-top:4px">
     <div class="grow cell" style="border:none">
       <div class="flex" style="align-items:center;gap:8px">
-        <div style="font-size:26px">🍃</div>
+        <img src="/logo-hetros-icone.png" alt="Hetros" style="height:42px;width:42px;object-fit:contain" />
         <div>
           <div class="val" style="font-size:13px">HETROS IMP. E EXP. LTDA</div>
           <div>AV DOUTOR GASTÃO VIDIGAL, SN - BOX 19</div>

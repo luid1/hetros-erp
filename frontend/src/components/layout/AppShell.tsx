@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, Package, Warehouse, FileText,
   DollarSign, Truck, ClipboardList, BarChart3, Settings,
   ChevronLeft, ChevronRight, LogOut, Building2, AlertTriangle,
-  Receipt, ShieldCheck, Menu, X, Zap, MapPin, PackageCheck,
+  Receipt, ShieldCheck, Menu, X, MapPin, PackageCheck,
 } from 'lucide-react';
 
 interface NavItem { to: string; icon: React.ElementType; label: string; badge?: string; badgeColor?: string; highlight?: boolean }
@@ -103,16 +103,14 @@ export default function AppShell() {
         <div className={`flex items-center border-b border-gray-800 h-12 px-3 shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
           {!collapsed && (
             <div className="flex items-center gap-2 min-w-0">
-              <div className="h-6 w-6 bg-sky-500 rounded-md flex items-center justify-center shrink-0">
-                <Zap className="h-3.5 w-3.5 text-white" />
-              </div>
+              <img src="/logo-hetros-icone.png" alt="Hetros" className="h-7 w-7 object-contain shrink-0" />
               <div className="min-w-0">
                 <p className="text-white text-xs font-bold leading-none truncate">Hetros WMS</p>
                 <p className="text-gray-600 text-[10px] truncate">{filialAtiva?.nome || '—'}</p>
               </div>
             </div>
           )}
-          {collapsed && <Zap className="h-4 w-4 text-sky-400" />}
+          {collapsed && <img src="/logo-hetros-icone.png" alt="Hetros" className="h-6 w-6 object-contain" />}
           <button onClick={() => setCollapsed(!collapsed)} className="hidden lg:flex h-5 w-5 items-center justify-center rounded text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors shrink-0">
             {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
           </button>

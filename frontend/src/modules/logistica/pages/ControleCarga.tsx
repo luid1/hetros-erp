@@ -322,7 +322,7 @@ th{background:#eee;text-align:center}
 </style></head><body>
 <button onclick="window.print()" style="margin-bottom:8px;padding:6px 12px">🖨️ Imprimir</button>
 <div class="box">
-  <div class="hd"><span class="logo">🍃 HETROS</span><h1>CAPA DE ROTA</h1><span>Pág. 1</span></div>
+  <div class="hd"><span class="logo" style="display:inline-flex;align-items:center;gap:6px"><img src="/logo-hetros-icone.png" style="height:22px;width:22px;object-fit:contain" />HETROS</span><h1>CAPA DE ROTA</h1><span>Pág. 1</span></div>
   <div class="info">
     <div><b>Id Entrega:</b> ${c.idEntrega}</div><div><b>CD:</b> ${c.cd}</div>
     <div><b>Veículo:</b> ${c.placaVeiculo || ''} ${c.modeloVeiculo ? '- ' + c.modeloVeiculo : ''}</div>
@@ -378,7 +378,7 @@ th{border-bottom:2px solid #000}
 </style></head><body>
 <button onclick="window.print()" style="margin-bottom:8px;padding:6px 12px">🖨️ Imprimir</button>
 <div class="cab center">
-  <div class="logo" style="font-weight:bold;font-size:16px">🍃 HETROS IMP. E EXP. LTDA</div>
+  <div class="logo" style="font-weight:bold;font-size:16px;display:flex;align-items:center;justify-content:center;gap:8px"><img src="/logo-hetros.png" style="height:34px;object-fit:contain" /></div>
   <div>AV DOUTOR GASTAO VIDIGAL, SN - PAV HFC BOX 19 · 05316-900 - VILA LEOPOLDINA · SAO PAULO-SP</div>
 </div>
 <h2 class="center">${(p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '').toUpperCase()}</h2>

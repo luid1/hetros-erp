@@ -20,6 +20,26 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-30] — Logo oficial da Hetros no sistema e nos impressos
+
+### O que mudou
+- Adicionada a **logo oficial da Hetros** (ícone mão+folhas e logo completa) em:
+  - **Login**: logo completa num badge branco no topo + ícone na barra superior.
+  - **Sidebar**: ícone no topo (expandida e recolhida), no lugar do raio (`Zap`).
+  - **DANFE**: ícone no cabeçalho, no lugar do emoji 🍃.
+  - **Capa de Rota** e **Espelho** (impressos): ícone/logo no cabeçalho.
+  - **Favicon** e título da aba.
+
+### Arquivos
+- `frontend/public/{logo-hetros.png, logo-hetros-icone.png, favicon.png}` (novos)
+- `frontend/index.html`
+- `frontend/src/pages/LoginPage.tsx`
+- `frontend/src/components/layout/AppShell.tsx`
+- `frontend/src/modules/fiscal/danfe.ts`
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx`
+
+---
+
 ## [2026-06-30] — Faturamento aprofundado: motor fiscal, validação, parcelas, CC-e e devolução (modo teste)
 
 ### O que mudou

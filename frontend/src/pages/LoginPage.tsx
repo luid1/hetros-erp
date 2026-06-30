@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff, Lock, ChevronLeft, Zap, Clock } from 'lucide-react';
+import { Eye, EyeOff, Lock, ChevronLeft, Clock } from 'lucide-react';
 import { rotaInicial } from '../config/telas';
 
 interface UsuarioCard {
@@ -131,9 +131,7 @@ export default function LoginPage() {
       {/* Top bar */}
       <div className="flex items-center justify-between px-8 py-4 border-b border-gray-800">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 bg-sky-500 rounded-lg flex items-center justify-center">
-            <Zap className="h-4 w-4 text-white" />
-          </div>
+          <img src="/logo-hetros-icone.png" alt="Hetros" className="h-9 w-9 object-contain" />
           <div>
             <p className="text-white text-sm font-bold leading-none">Hetros WMS</p>
             <p className="text-gray-500 text-xs">Sistema de Gestão Industrial</p>
@@ -155,9 +153,14 @@ export default function LoginPage() {
         {/* ── ETAPA 1: Seleção de usuário ── */}
         {!selecionado ? (
           <div className="w-full max-w-3xl space-y-8">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-white">Quem está acessando?</h1>
-              <p className="text-gray-500 text-sm mt-1">Selecione seu nome para continuar</p>
+            <div className="text-center flex flex-col items-center gap-5">
+              <div className="bg-white rounded-2xl px-7 py-4 shadow-xl">
+                <img src="/logo-hetros.png" alt="Hetros Importação e Exportação" className="h-14 object-contain" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Quem está acessando?</h1>
+                <p className="text-gray-500 text-sm mt-1">Selecione seu nome para continuar</p>
+              </div>
             </div>
 
             {loadingUsers ? (
