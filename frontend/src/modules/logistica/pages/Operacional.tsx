@@ -4,8 +4,6 @@ import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import SeparacaoPainel from './SeparacaoPesagem';
 
-const R$ = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
 const STATUS = {
   CONFIRMADO:   { label: 'Pendente',                cor: 'bg-red-500',    chip: 'bg-red-100 text-red-700 border-red-300' },
   EM_SEPARACAO: { label: 'Separando',               cor: 'bg-blue-500',   chip: 'bg-blue-100 text-blue-700 border-blue-300' },
@@ -105,9 +103,8 @@ export default function Operacional() {
                     <p className="text-xl font-black text-slate-800 leading-tight truncate">{l.nomeFantasia}</p>
                     <span className={`shrink-0 px-2 py-1 rounded-full text-[11px] font-bold border ${st(l.statusPedido).chip}`}>{st(l.statusPedido).label}</span>
                   </div>
-                  <div className="flex items-center justify-between mt-2 text-base text-slate-500">
-                    <span>Pedido nº {l.idVenda || l.numero} · {l.qtdItens} itens</span>
-                    <span className="font-bold text-slate-700">{R$(l.valorTotal)}</span>
+                  <div className="mt-2 text-base text-slate-500">
+                    Pedido nº {l.idVenda || l.numero} · {l.qtdItens} itens
                   </div>
                 </button>
               );
