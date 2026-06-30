@@ -17,6 +17,7 @@ export interface MovimentarEstoqueDto {
   filialDestinoId?: string;
   observacoes?: string;
   usuarioId: string;
+  permitirNegativo?: boolean; // permite a saída deixar o saldo negativo (venda "a comprar")
 }
 
 @Injectable()
@@ -109,14 +110,15 @@ export class EstoqueService {
       let saldo = await tx.estoqueSaldo.findFirst({ where: saldoKey });
 
       if (!saldo) {
-        if (isSaida) throw new BadRequestException(`Sem saldo para o produto ${dto.produtoId} na filial ${dto.filialId}.`);
+        if (isSaida && !dto.permitirNegativo) throw new BadRequestException(`Sem saldo para o produto ${dto.produtoId} na filial ${dto.filialId}.`);
+        // Saída com permissão de negativo cria o saldo zerado e segue (vai ficar negativo).
         saldo = await tx.estoqueSaldo.create({
           data: { ...saldoKey, quantidade: 0, quantidadeReservada: 0, quantidadeDisponivel: 0, custoMedio: dto.custoUnitario || 0 },
         });
       }
 
       const qtdAtual = Number(saldo.quantidade);
-      if (isSaida && qtdAtual < dto.quantidade) {
+      if (isSaida && qtdAtual < dto.quantidade && !dto.permitirNegativo) {
         throw new BadRequestException(
           `Saldo insuficiente. Disponível: ${qtdAtual}, Solicitado: ${dto.quantidade}`,
         );

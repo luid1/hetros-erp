@@ -225,18 +225,24 @@ export class NFeService {
   }) {
     this.logger.log(`📦 Processando nfe.emitida — NF-e ${payload.nfeId}`);
     try {
-      // 1. Baixa de estoque (SAIDA_VENDA)
+      // 1. Baixa de estoque (SAIDA_VENDA) — permite saldo negativo (venda "a comprar").
+      //    Cada item é blindado: uma falha pontual não impede o financeiro/status.
       for (const item of payload.itens) {
         if (!item.produtoId) continue;
-        await this.estoque.movimentar(payload.tenantId, {
-          filialId: payload.filialId,
-          produtoId: item.produtoId,
-          tipo: TipoMovimentacao.SAIDA_VENDA,
-          quantidade: Number(item.quantidade),
-          nfeId: payload.nfeId,
-          usuarioId: payload.usuarioId,
-          observacoes: `Baixa automática NF-e ${payload.nfeId.slice(0, 8)}`,
-        });
+        try {
+          await this.estoque.movimentar(payload.tenantId, {
+            filialId: payload.filialId,
+            produtoId: item.produtoId,
+            tipo: TipoMovimentacao.SAIDA_VENDA,
+            quantidade: Number(item.quantidade),
+            nfeId: payload.nfeId,
+            usuarioId: payload.usuarioId,
+            permitirNegativo: true,
+            observacoes: `Baixa automática NF-e ${payload.nfeId.slice(0, 8)}`,
+          });
+        } catch (e: any) {
+          this.logger.warn(`⚠️ Baixa de estoque falhou p/ produto ${item.produtoId}: ${e.message}`);
+        }
       }
 
       // 2. Contas a Receber — uma por duplicata

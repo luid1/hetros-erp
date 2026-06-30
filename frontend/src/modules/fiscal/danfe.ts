@@ -47,7 +47,8 @@ export function imprimirDanfe(nfe: any) {
 <style>
   *{box-sizing:border-box}
   body{font-family:Arial,Helvetica,sans-serif;font-size:8.5px;color:#000;margin:0;padding:10px;background:#e5e7eb}
-  .page{width:760px;margin:0 auto;background:#fff;padding:8px}
+  .page{width:760px;min-height:1060px;margin:0 auto;background:#fff;padding:8px;position:relative;overflow:hidden}
+  .logo-wm{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:.06;pointer-events:none;z-index:0}
   .b{border:1px solid #000}
   .danfe table{border-collapse:collapse;width:100%}
   .lbl{font-size:6px;text-transform:uppercase;color:#000;letter-spacing:.2px}
@@ -70,6 +71,7 @@ export function imprimirDanfe(nfe: any) {
 </style></head><body>
 <div class="toolbar"><button class="btn" onclick="window.print()">🖨️ Imprimir</button></div>
 <div class="page danfe">
+  <img class="logo-wm" src="/logo-hetros-icone.png" alt="" />
   <div class="watermark">SEM VALOR FISCAL</div>
 
   <!-- Canhoto -->

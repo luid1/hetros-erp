@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Scale, Plus, RefreshCw, Trash2, X, Sparkles, Pencil } from 'lucide-react';
+import { Scale, Plus, RefreshCw, Trash2, X, Sparkles, Pencil, Building2, Save } from 'lucide-react';
+import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 
 type Regra = {
@@ -38,15 +39,35 @@ const VAZIA: Regra = {
 };
 
 export default function MatrizFiscal() {
+  const { filialAtiva } = useAuth();
   const [regras, setRegras] = useState<Regra[]>([]);
   const [loading, setLoading] = useState(false);
   const [edit, setEdit] = useState<Regra | null>(null);
+  // Config fiscal da filial emitente
+  const [filial, setFilial] = useState<any | null>(null);
+  const [salvandoFilial, setSalvandoFilial] = useState(false);
 
   const carregar = useCallback(() => {
     setLoading(true);
     api.get('/fiscal/regras').then(r => setRegras(r.data)).catch(() => setRegras([])).finally(() => setLoading(false));
   }, []);
   useEffect(() => { carregar(); }, [carregar]);
+
+  useEffect(() => {
+    if (!filialAtiva) return;
+    api.get('/filiais').then(r => setFilial((r.data || []).find((f: any) => f.id === filialAtiva.id) || null)).catch(() => {});
+  }, [filialAtiva?.id]);
+
+  const salvarFilial = async () => {
+    if (!filial) return;
+    setSalvandoFilial(true);
+    try {
+      await api.patch(`/filiais/${filial.id}/regime`, {
+        regimeTributario: filial.regimeTributario, crt: filial.crt, cnpj: filial.cnpj, ie: filial.ie,
+      });
+    } catch (e: any) { alert(e.response?.data?.message || 'Erro ao salvar.'); }
+    finally { setSalvandoFilial(false); }
+  };
 
   const salvar = async () => {
     if (!edit) return;
@@ -89,7 +110,41 @@ export default function MatrizFiscal() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto p-4 space-y-4">
+        {/* Config fiscal da filial emitente */}
+        {filial && (
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <h3 className="font-bold text-sm text-gray-700 mb-3 flex items-center gap-2"><Building2 className="h-4 w-4 text-violet-500" /> Filial emitente — {filial.nome}</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm items-end">
+              <label className="flex flex-col gap-1"><span className="text-xs font-semibold text-gray-500">Regime tributário</span>
+                <select value={filial.regimeTributario || 'SIMPLES_NACIONAL'} onChange={e => setFilial({ ...filial, regimeTributario: e.target.value })} className={inp}>
+                  <option value="SIMPLES_NACIONAL">Simples Nacional</option>
+                  <option value="LUCRO_PRESUMIDO">Lucro Presumido</option>
+                  <option value="LUCRO_REAL">Lucro Real</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1"><span className="text-xs font-semibold text-gray-500">CRT</span>
+                <select value={filial.crt || '1'} onChange={e => setFilial({ ...filial, crt: e.target.value })} className={inp}>
+                  <option value="1">1 — Simples Nacional</option>
+                  <option value="2">2 — Simples (excesso sublimite)</option>
+                  <option value="3">3 — Regime Normal</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1"><span className="text-xs font-semibold text-gray-500">CNPJ</span>
+                <input value={filial.cnpj || ''} onChange={e => setFilial({ ...filial, cnpj: e.target.value })} className={inp} />
+              </label>
+              <label className="flex flex-col gap-1"><span className="text-xs font-semibold text-gray-500">Inscrição Estadual</span>
+                <input value={filial.ie || ''} onChange={e => setFilial({ ...filial, ie: e.target.value })} className={inp} />
+              </label>
+            </div>
+            <div className="flex justify-end mt-3">
+              <button onClick={salvarFilial} disabled={salvandoFilial} className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg font-bold text-sm disabled:opacity-40">
+                <Save className="h-4 w-4" /> {salvandoFilial ? 'Salvando…' : 'Salvar dados da filial'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-16"><div className="animate-spin h-6 w-6 border-2 border-violet-500 border-t-transparent rounded-full" /></div>
         ) : regras.length === 0 ? (

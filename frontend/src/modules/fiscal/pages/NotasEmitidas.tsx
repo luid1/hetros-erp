@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, RefreshCw, Printer, Ban, Mail, Undo2, X, ListChecks } from 'lucide-react';
+import { FileText, RefreshCw, Printer, Ban, Mail, Undo2, X, ListChecks, Search } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { imprimirDanfe } from '../danfe';
@@ -21,13 +21,32 @@ export default function NotasEmitidas() {
   const [loading, setLoading] = useState(false);
   const [detalhe, setDetalhe] = useState<any | null>(null);
   const [busy, setBusy] = useState(false);
+  // Filtros
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [statusFiltro, setStatusFiltro] = useState('');
+  const [busca, setBusca] = useState('');
 
   const carregar = useCallback(() => {
     if (!filialAtiva) return;
     setLoading(true);
-    api.get(`/nfe/${filialAtiva.id}`).then(r => setNotas(r.data)).catch(() => setNotas([])).finally(() => setLoading(false));
-  }, [filialAtiva?.id]);
+    const params: any = {};
+    if (statusFiltro) params.status = statusFiltro;
+    if (dataInicio) params.dataInicio = dataInicio;
+    if (dataFim) params.dataFim = dataFim;
+    api.get(`/nfe/${filialAtiva.id}`, { params }).then(r => setNotas(r.data)).catch(() => setNotas([])).finally(() => setLoading(false));
+  }, [filialAtiva?.id, statusFiltro, dataInicio, dataFim]);
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Busca global client-side (chave, número ou cliente)
+  const notasFiltradas = notas.filter(n => {
+    if (!busca.trim()) return true;
+    const q = busca.toLowerCase();
+    return (n.chaveAcesso || '').toLowerCase().includes(q)
+      || String(n.numero).includes(q)
+      || (n.cliente?.razaoSocial || '').toLowerCase().includes(q)
+      || (n.cliente?.cnpjCpf || '').includes(q);
+  });
 
   const abrirDetalhe = async (id: string) => {
     const { data } = await api.get(`/nfe/documento/${id}`);
@@ -67,18 +86,39 @@ export default function NotasEmitidas() {
       <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between shrink-0">
         <div>
           <h1 className="text-base font-bold text-gray-900 flex items-center gap-2"><FileText className="h-5 w-5 text-sky-500" /> NF-e Emitidas</h1>
-          <p className="text-xs text-gray-400 mt-0.5">{notas.length} nota(s)</p>
+          <p className="text-xs text-gray-400 mt-0.5">{notasFiltradas.length} de {notas.length} nota(s)</p>
         </div>
         <button onClick={carregar} className="flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 px-3 py-2 rounded-lg text-gray-700 font-medium text-sm">
           <RefreshCw className="h-4 w-4 text-sky-600" /> Atualizar
         </button>
       </div>
 
+      {/* Barra de filtros */}
+      <div className="bg-white border-b border-gray-200 px-5 py-2.5 flex flex-wrap items-center gap-3 shrink-0">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por chave, nº ou cliente..."
+            className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:border-sky-400" />
+        </div>
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 font-semibold">De
+          <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm" />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-gray-500 font-semibold">Até
+          <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm" />
+        </label>
+        <select value={statusFiltro} onChange={e => setStatusFiltro(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm">
+          <option value="">Todos os status</option>
+          {['EMITIDO', 'CANCELADO', 'RASCUNHO', 'PENDENTE_EMISSAO', 'DENEGADO'].map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <button onClick={() => { setBusca(''); setDataInicio(''); setDataFim(''); setStatusFiltro(''); }}
+          className="text-xs text-gray-500 hover:text-gray-700 underline">Limpar</button>
+      </div>
+
       <div className="flex-1 overflow-auto p-4">
         {loading ? (
           <div className="flex justify-center py-16"><div className="animate-spin h-6 w-6 border-2 border-sky-500 border-t-transparent rounded-full" /></div>
-        ) : notas.length === 0 ? (
-          <div className="text-center text-gray-400 py-16"><FileText className="h-10 w-10 mx-auto mb-2 text-gray-200" /> Nenhuma NF-e emitida ainda.</div>
+        ) : notasFiltradas.length === 0 ? (
+          <div className="text-center text-gray-400 py-16"><FileText className="h-10 w-10 mx-auto mb-2 text-gray-200" /> Nenhuma NF-e encontrada com os filtros atuais.</div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <table className="w-full text-sm">
@@ -86,7 +126,7 @@ export default function NotasEmitidas() {
                 <tr>{['Nº/Série', 'Tipo', 'Pedido', 'Cliente', 'Chave de acesso', 'Valor', 'Status', ''].map(h => <th key={h} className="px-3 py-2 text-left font-semibold whitespace-nowrap">{h}</th>)}</tr>
               </thead>
               <tbody>
-                {notas.map(n => (
+                {notasFiltradas.map(n => (
                   <tr key={n.id} className="border-t border-gray-100 hover:bg-sky-50/40 cursor-pointer" onClick={() => abrirDetalhe(n.id)}>
                     <td className="px-3 py-2 font-bold text-gray-800">{String(n.numero).padStart(6, '0')}/{n.serie}</td>
                     <td className="px-3 py-2 text-xs">{n.finalidade === '4' ? <span className="text-orange-600 font-bold">DEVOLUÇÃO</span> : 'Venda'}</td>

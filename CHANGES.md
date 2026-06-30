@@ -20,6 +20,39 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-30] — Fix baixa no faturamento + telas fiscais (filtros, painel, CT-e/MDF-e, regime)
+
+### Correção (importante)
+- **Faturar não dava baixa**: o handler `nfe.emitida` estourava na baixa de estoque quando o
+  produto estava com saldo físico abaixo do necessário (ex.: MAMÃO físico 0), **abortando** a
+  geração da conta a receber e a mudança do pedido para FATURADO. Resultado: o pedido continuava
+  na fila e gerava NF-e duplicadas a cada clique.
+  - `EstoqueService.movimentar` ganhou `permitirNegativo` — a baixa de venda pode deixar o saldo
+    **negativo** (regra "a comprar", já usada na aprovação do pedido).
+  - O handler passa `permitirNegativo: true` e **blinda cada item**: falha pontual não impede
+    mais o financeiro/status. Limpeza das NF-e fantasma geradas no teste.
+
+### Novas telas / melhorias fiscais
+- **NF-e Emitidas**: barra de **filtros** (período, status e busca global por chave/nº/cliente).
+- **Painel de Faturamento** (`/fiscal/painel`, novo): dashboard gerencial com KPIs (faturamento,
+  impostos, qtd notas, ticket médio), **gráfico por dia** e **faturamento por cliente** — sem
+  mexer na tela de emitir.
+- **CT-e / MDF-e** (`/fiscal/cte`): UI com abas (MDF-e/CT-e), simular manifesto **vinculando
+  NF-e reais**, tabela de documentos e ações Encerrar/Cancelar (mock em localStorage).
+- **Matriz Fiscal**: card da **filial emitente** no topo para definir **regime tributário**,
+  CRT, CNPJ e IE (salva via `PATCH /filiais/:id/regime`).
+- **DANFE**: logo da Hetros como **marca d'água** preenchendo a folha inteira (em pé), e altura
+  de folha A4.
+
+### Arquivos
+- `backend/src/modules/estoque/estoque.service.ts`, `backend/src/modules/nfe/nfe.service.ts`
+- `backend/src/modules/filiais/{filiais.service.ts, filiais.controller.ts}`
+- `frontend/src/modules/fiscal/pages/{NotasEmitidas, MatrizFiscal, PainelFaturamento (novo), CteMdfe (novo)}.tsx`
+- `frontend/src/modules/fiscal/danfe.ts`
+- `frontend/src/App.tsx`, `frontend/src/components/layout/AppShell.tsx`, `frontend/src/config/telas.ts`
+
+---
+
 ## [2026-06-30] — Logo oficial da Hetros no sistema e nos impressos
 
 ### O que mudou
