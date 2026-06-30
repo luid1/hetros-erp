@@ -12,6 +12,9 @@ import Operacional from './modules/logistica/pages/Operacional';
 import FreteMotoristas from './modules/logistica/pages/FreteMotoristas';
 import UsuariosAcessos from './modules/gerencial/pages/UsuariosAcessos';
 import Produtos from './modules/cadastros/pages/Produtos';
+import Fornecedores from './modules/cadastros/pages/Fornecedores';
+import Transportadoras from './modules/cadastros/pages/Transportadoras';
+import Filiais from './modules/cadastros/pages/Filiais';
 import Faturamento from './modules/fiscal/pages/Faturamento';
 import NotasEmitidas from './modules/fiscal/pages/NotasEmitidas';
 import MatrizFiscal from './modules/fiscal/pages/MatrizFiscal';
@@ -52,10 +55,10 @@ export default function App() {
 
             {/* Cadastros */}
             <Route path="cadastros/clientes" element={<Clientes />} />
-            <Route path="cadastros/fornecedores" element={<Placeholder title="Fornecedores" />} />
-            <Route path="cadastros/transportadoras" element={<Placeholder title="Transportadoras" />} />
+            <Route path="cadastros/fornecedores" element={<Fornecedores />} />
+            <Route path="cadastros/transportadoras" element={<Transportadoras />} />
             <Route path="cadastros/produtos" element={<Produtos />} />
-            <Route path="cadastros/filiais" element={<Placeholder title="Filiais / Boxes" />} />
+            <Route path="cadastros/filiais" element={<Filiais />} />
 
             {/* WMS */}
             <Route path="wms/posicao" element={<PosicaoEstoque />} />

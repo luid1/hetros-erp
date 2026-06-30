@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -6,7 +6,7 @@ export class ProdutosService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(tenantId: string, q?: string) {
-    return this.prisma.produto.findMany({
+    const produtos = await this.prisma.produto.findMany({
       where: {
         tenantId, ativo: true,
         ...(q && {
@@ -17,10 +17,65 @@ export class ProdutosService {
           ],
         }),
       },
-      include: { unidadeMedida: { select: { sigla: true } } },
+      include: {
+        unidadeMedida: { select: { sigla: true } },
+        estoques: { select: { quantidade: true } },
+      },
       orderBy: { descricao: 'asc' },
       take: 500,
     });
+    // Enriquecer com estoque total (kg) e estimativa de caixas
+    return produtos.map((p) => {
+      const estoqueKg = p.estoques.reduce((s, e) => s + Number(e.quantidade), 0);
+      const pesoCx = Number(p.pesoCaixaria) || 0;
+      const estoqueCaixas = pesoCx > 0 ? estoqueKg / pesoCx : null;
+      const { estoques, ...rest } = p as any;
+      return { ...rest, estoqueKg, estoqueCaixas };
+    });
+  }
+
+  async listarUnidades(tenantId: string) {
+    return this.prisma.unidadeMedida.findMany({ where: { tenantId }, orderBy: { sigla: 'asc' } });
+  }
+
+  async create(tenantId: string, dto: any) {
+    const num = (v: any) => (v === '' || v === null || v === undefined ? undefined : Number(v));
+    // Resolve a unidade de medida pela sigla (cria se não existir)
+    const sigla = (dto.unidadeSigla || 'KG').toUpperCase();
+    let unidade = await this.prisma.unidadeMedida.findFirst({ where: { tenantId, sigla } });
+    if (!unidade) unidade = await this.prisma.unidadeMedida.create({ data: { tenantId, sigla, descricao: sigla } });
+    // Gera código sequencial simples se não informado
+    const codigo = dto.codigo || `P${Date.now().toString().slice(-6)}`;
+    const exists = await this.prisma.produto.findFirst({ where: { tenantId, codigo } });
+    if (exists) throw new ConflictException('Já existe produto com este código.');
+
+    return this.prisma.produto.create({
+      data: {
+        tenantId,
+        codigo,
+        codigoBarras: dto.codigoBarras || null,
+        descricao: dto.descricao,
+        ncm: dto.ncm || '00000000',
+        cfop: dto.cfop || null,
+        categoria: dto.categoria || null,
+        grupo: dto.grupo || null,
+        marca: dto.marca || null,
+        classificacao: dto.classificacao || null,
+        tipoCaixaria: dto.tipoCaixaria || null,
+        pesoCaixaria: num(dto.pesoCaixaria),
+        pesoLiquido: num(dto.pesoLiquido),
+        precoVenda: num(dto.precoVenda) ?? 0,
+        unidadeMedidaId: unidade.id,
+      },
+      include: { unidadeMedida: { select: { sigla: true } } },
+    });
+  }
+
+  async remove(tenantId: string, id: string) {
+    const p = await this.prisma.produto.findFirst({ where: { id, tenantId } });
+    if (!p) throw new NotFoundException('Produto não encontrado.');
+    // Inativa em vez de excluir (preserva histórico de movimentações/NF-e)
+    return this.prisma.produto.update({ where: { id }, data: { ativo: false } });
   }
 
   async update(tenantId: string, id: string, dto: any) {
@@ -38,6 +93,9 @@ export class ProdutosService {
         categoria: dto.categoria ?? undefined,
         grupo: dto.grupo ?? undefined,
         marca: dto.marca ?? undefined,
+        classificacao: dto.classificacao ?? undefined,
+        tipoCaixaria: dto.tipoCaixaria ?? undefined,
+        pesoCaixaria: num(dto.pesoCaixaria),
         pesoLiquido: num(dto.pesoLiquido),
         pesoBruto: num(dto.pesoBruto),
         precoVenda: num(dto.precoVenda),

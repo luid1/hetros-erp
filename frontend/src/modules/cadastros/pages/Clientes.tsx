@@ -1,27 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Users, Plus, Search, X, Pencil, Trash2, Save, Building2, MapPin, Phone } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, Pencil, Trash2, Building2, MapPin, Phone, QrCode } from 'lucide-react';
 import api from '../../../services/api';
+import { CadastroShell, TopBar, FilterBar, TableCard, Th, StatusBadge, Modal, Secao, Campo, Loader, Vazio, inp, UFS, R$ } from '../ui';
 
-const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
-
-interface Endereco { rua?: string; numero?: string; bairro?: string; cidade?: string; uf?: string; cep?: string; }
-interface Contato { nome?: string; cargo?: string; email?: string; telefone?: string; }
 interface Cliente {
-  id: string;
-  tipo: string;
-  razaoSocial: string;
-  nomeFantasia: string | null;
-  cnpjCpf: string;
-  ie: string | null;
-  email: string | null;
-  telefone: string | null;
-  celular: string | null;
-  enderecoJson: Endereco | null;
-  contatoJson: Contato | null;
-  limiteCredito: string;
-  prazoMedio: number;
-  observacoes: string | null;
-  ativo: boolean;
+  id: string; tipo: string; razaoSocial: string; nomeFantasia: string | null; cnpjCpf: string;
+  ie: string | null; email: string | null; telefone: string | null; celular: string | null;
+  enderecoJson: any; contatoJson: any; limiteCredito: string; prazoMedio: number;
+  observacoes: string | null; ativo: boolean; exigeRastreabilidade?: boolean;
 }
 
 export default function Clientes() {
@@ -34,289 +20,152 @@ export default function Clientes() {
   const carregar = () => {
     setLoading(true);
     api.get('/clientes', { params: { search: search || undefined } })
-      .then(r => setClientes(r.data))
-      .catch(() => setClientes([]))
-      .finally(() => setLoading(false));
+      .then(r => setClientes(r.data)).catch(() => setClientes([])).finally(() => setLoading(false));
   };
+  useEffect(() => { const t = setTimeout(carregar, 250); return () => clearTimeout(t); }, [search]);
 
-  useEffect(() => {
-    const t = setTimeout(carregar, 250);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  const handleExcluir = async (c: Cliente) => {
+  const excluir = async (c: Cliente) => {
     if (!confirm(`Excluir o cliente "${c.nomeFantasia || c.razaoSocial}"?`)) return;
-    try {
-      await api.delete(`/clientes/${c.id}`);
-      carregar();
-    } catch (e: any) {
-      alert(e.response?.data?.message || 'Não foi possível excluir (cliente pode ter pedidos vinculados).');
-    }
+    try { await api.delete(`/clientes/${c.id}`); carregar(); }
+    catch (e: any) { alert(e.response?.data?.message || 'Não foi possível excluir (cliente pode ter pedidos vinculados).'); }
   };
-
-  const total = clientes.length;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2">
-            <Users className="h-5 w-5 text-sky-500" /> Clientes
-          </h1>
-          <p className="text-xs text-gray-400 mt-0.5">{total} cliente{total !== 1 ? 's' : ''} cadastrado{total !== 1 ? 's' : ''}</p>
-        </div>
-        <button onClick={() => setCriando(true)} className="btn-primary text-xs py-2">
-          <Plus className="h-3.5 w-3.5" /> Novo Cliente
-        </button>
-      </div>
+    <CadastroShell>
+      <TopBar icon={<Users className="h-5 w-5" />} titulo="Clientes" novoLabel="Novo Cadastro"
+        subtitulo={`${clientes.length} comprador(es) — supermercados, sacolões e varejões`}
+        onNovo={() => setCriando(true)} />
+      <FilterBar busca={search} onBusca={setSearch} placeholder="Buscar por razão social, fantasia ou CNPJ/CPF..." />
 
-      {/* Busca */}
-      <div className="bg-gray-50 border-b border-gray-200 px-5 py-2 flex items-center gap-3 shrink-0">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por razão social, fantasia ou CNPJ/CPF..."
-            className="w-full border border-gray-300 rounded pl-8 pr-2 py-1.5 text-xs bg-white focus:ring-2 focus:ring-blue-400" />
-        </div>
-        <button onClick={carregar} className="text-xs text-gray-500 hover:text-blue-600">↻ Atualizar</button>
-      </div>
-
-      {/* Tabela */}
-      <div className="flex-1 overflow-auto">
-        {loading ? (
-          <div className="flex justify-center py-16"><div className="animate-spin h-6 w-6 border-2 border-sky-500 border-t-transparent rounded-full" /></div>
-        ) : (
-          <table className="w-full text-xs border-collapse">
-            <thead className="bg-gray-100 sticky top-0 z-10">
-              <tr>
-                {['Cliente', 'CNPJ/CPF', 'Cidade/UF', 'Telefone', 'Limite', 'Prazo', 'Status', 'Ações'].map(h => (
-                  <th key={h} className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-gray-200 whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
+      <div className="flex-1 overflow-auto p-4">
+        {loading ? <Loader /> : clientes.length === 0 ? <Vazio icon={<Users className="h-10 w-10" />} texto="Nenhum cliente encontrado" /> : (
+          <TableCard>
+            <thead><tr>
+              {['Cliente', 'CNPJ/CPF', 'Cidade/UF', 'Limite', 'Prazo', 'Rastreio', 'Status', ''].map(h => <Th key={h}>{h}</Th>)}
+            </tr></thead>
             <tbody>
               {clientes.map(c => (
-                <tr key={c.id} className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors">
-                  <td className="px-3 py-2">
-                    <p className="font-semibold text-gray-900 truncate max-w-[240px]">{c.nomeFantasia || c.razaoSocial}</p>
-                    {c.nomeFantasia && <p className="text-gray-400 truncate max-w-[240px]">{c.razaoSocial}</p>}
+                <tr key={c.id} className="border-t border-slate-800 hover:bg-sky-500/5">
+                  <td className="px-3 py-2.5">
+                    <p className="font-semibold text-slate-100 truncate max-w-[240px]">{c.nomeFantasia || c.razaoSocial}</p>
+                    {c.nomeFantasia && <p className="text-slate-500 text-xs truncate max-w-[240px]">{c.razaoSocial}</p>}
                   </td>
-                  <td className="px-3 py-2 font-mono text-gray-600">{c.cnpjCpf}</td>
-                  <td className="px-3 py-2 text-gray-600">{c.enderecoJson?.cidade ? `${c.enderecoJson.cidade}/${c.enderecoJson.uf || ''}` : '—'}</td>
-                  <td className="px-3 py-2 text-gray-600">{c.celular || c.telefone || '—'}</td>
-                  <td className="px-3 py-2 text-right font-mono">{Number(c.limiteCredito).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                  <td className="px-3 py-2 text-center">{c.prazoMedio}d</td>
-                  <td className="px-3 py-2">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${c.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
-                      {c.ativo ? 'ATIVO' : 'INATIVO'}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-2.5 font-mono text-slate-400 text-xs">{c.cnpjCpf}</td>
+                  <td className="px-3 py-2.5 text-slate-300">{c.enderecoJson?.cidade ? `${c.enderecoJson.cidade}/${c.enderecoJson.uf || ''}` : '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-slate-300">{R$(c.limiteCredito)}</td>
+                  <td className="px-3 py-2.5 text-center text-slate-400">{c.prazoMedio}d</td>
+                  <td className="px-3 py-2.5 text-center">{c.exigeRastreabilidade ? <QrCode className="h-4 w-4 text-emerald-400 mx-auto" /> : <span className="text-slate-600">—</span>}</td>
+                  <td className="px-3 py-2.5"><StatusBadge ativo={c.ativo} inativoLabel="BLOQUEADO" /></td>
+                  <td className="px-3 py-2.5">
                     <div className="flex gap-1.5">
-                      <button onClick={() => setEditando(c)} className="text-[10px] bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded font-semibold hover:bg-blue-100 flex items-center gap-1">
-                        <Pencil className="h-3 w-3" /> Editar
-                      </button>
-                      <button onClick={() => handleExcluir(c)} className="text-[10px] text-red-600 hover:text-red-800 px-1">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <button onClick={() => setEditando(c)} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Pencil className="h-3 w-3" /> Editar</button>
+                      <button onClick={() => excluir(c)} className="text-slate-500 hover:text-rose-400 px-1"><Trash2 className="h-3.5 w-3.5" /></button>
                     </div>
                   </td>
                 </tr>
               ))}
-              {clientes.length === 0 && (
-                <tr><td colSpan={8} className="px-6 py-12 text-center text-gray-400">
-                  <Users className="h-8 w-8 mx-auto mb-2 text-gray-200" />
-                  <p className="text-sm font-medium">Nenhum cliente encontrado</p>
-                </td></tr>
-              )}
             </tbody>
-          </table>
+          </TableCard>
         )}
       </div>
 
       {(editando || criando) && (
-        <ModalCliente
-          cliente={editando}
-          onClose={() => { setEditando(null); setCriando(false); }}
-          onSalvo={() => { setEditando(null); setCriando(false); carregar(); }}
-        />
+        <ModalCliente cliente={editando} onClose={() => { setEditando(null); setCriando(false); }}
+          onSalvo={() => { setEditando(null); setCriando(false); carregar(); }} />
       )}
-    </div>
+    </CadastroShell>
   );
 }
 
-// ─── Modal Criar / Editar Cliente ─────
 function ModalCliente({ cliente, onClose, onSalvo }: { cliente: Cliente | null; onClose: () => void; onSalvo: () => void }) {
-  const ed = cliente?.enderecoJson || {};
-  const ct = cliente?.contatoJson || {};
-
-  const [tipo, setTipo]               = useState(cliente?.tipo || 'PJ');
-  const [razaoSocial, setRazao]       = useState(cliente?.razaoSocial || '');
-  const [nomeFantasia, setFantasia]   = useState(cliente?.nomeFantasia || '');
-  const [cnpjCpf, setCnpjCpf]         = useState(cliente?.cnpjCpf || '');
-  const [ie, setIe]                   = useState(cliente?.ie || '');
-  const [email, setEmail]             = useState(cliente?.email || '');
-  const [telefone, setTelefone]       = useState(cliente?.telefone || '');
-  const [celular, setCelular]         = useState(cliente?.celular || '');
-  const [limiteCredito, setLimite]    = useState(String(cliente?.limiteCredito ?? '0'));
-  const [prazoMedio, setPrazo]        = useState(String(cliente?.prazoMedio ?? '30'));
-  const [ativo, setAtivo]             = useState(cliente?.ativo ?? true);
-  const [observacoes, setObs]         = useState(cliente?.observacoes || '');
-  // Endereço
-  const [rua, setRua]       = useState(ed.rua || '');
-  const [numero, setNumero] = useState(ed.numero || '');
-  const [bairro, setBairro] = useState(ed.bairro || '');
-  const [cidade, setCidade] = useState(ed.cidade || '');
-  const [uf, setUf]         = useState(ed.uf || 'SP');
-  const [cep, setCep]       = useState(ed.cep || '');
-  // Contato
-  const [ctNome, setCtNome]   = useState(ct.nome || '');
-  const [ctCargo, setCtCargo] = useState(ct.cargo || '');
-  const [ctEmail, setCtEmail] = useState(ct.email || '');
-  const [ctTel, setCtTel]     = useState(ct.telefone || '');
-
+  const ed = cliente?.enderecoJson || {}; const ct = cliente?.contatoJson || {};
+  const [f, setF] = useState({
+    tipo: cliente?.tipo || 'PJ', razaoSocial: cliente?.razaoSocial || '', nomeFantasia: cliente?.nomeFantasia || '',
+    cnpjCpf: cliente?.cnpjCpf || '', ie: cliente?.ie || '', email: cliente?.email || '',
+    telefone: cliente?.telefone || '', celular: cliente?.celular || '',
+    limiteCredito: String(cliente?.limiteCredito ?? '0'), prazoMedio: String(cliente?.prazoMedio ?? '30'),
+    ativo: cliente?.ativo ?? true, exigeRastreabilidade: cliente?.exigeRastreabilidade ?? false, observacoes: cliente?.observacoes || '',
+    rua: ed.rua || '', numero: ed.numero || '', bairro: ed.bairro || '', cidade: ed.cidade || '', uf: ed.uf || 'SP', cep: ed.cep || '',
+    ctNome: ct.nome || '', ctCargo: ct.cargo || '', ctTel: ct.telefone || '',
+  });
+  const set = (k: string, v: any) => setF(p => ({ ...p, [k]: v }));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
 
-  const handleSalvar = async () => {
-    if (!razaoSocial.trim()) { setErro('Informe a razão social / nome.'); return; }
-    if (!cnpjCpf.trim()) { setErro('Informe o CNPJ/CPF.'); return; }
+  const salvar = async () => {
+    if (!f.razaoSocial.trim()) return setErro('Informe a razão social / nome.');
+    if (!f.cnpjCpf.trim()) return setErro('Informe o CNPJ/CPF.');
     setSalvando(true); setErro('');
-
     const payload = {
-      tipo,
-      razaoSocial: razaoSocial.trim(),
-      nomeFantasia: nomeFantasia.trim() || null,
-      cnpjCpf: cnpjCpf.trim(),
-      ie: ie.trim() || null,
-      email: email.trim() || null,
-      telefone: telefone.trim() || null,
-      celular: celular.trim() || null,
-      limiteCredito: parseFloat(limiteCredito) || 0,
-      prazoMedio: parseInt(prazoMedio) || 30,
-      ativo,
-      observacoes: observacoes.trim() || null,
-      enderecoJson: { rua, numero, bairro, cidade, uf, cep },
-      contatoJson: { nome: ctNome, cargo: ctCargo, email: ctEmail, telefone: ctTel },
+      tipo: f.tipo, razaoSocial: f.razaoSocial.trim(), nomeFantasia: f.nomeFantasia.trim() || null,
+      cnpjCpf: f.cnpjCpf.trim(), ie: f.ie.trim() || null, email: f.email.trim() || null,
+      telefone: f.telefone.trim() || null, celular: f.celular.trim() || null,
+      limiteCredito: parseFloat(f.limiteCredito) || 0, prazoMedio: parseInt(f.prazoMedio) || 30,
+      ativo: f.ativo, exigeRastreabilidade: f.exigeRastreabilidade, observacoes: f.observacoes.trim() || null,
+      enderecoJson: { rua: f.rua, numero: f.numero, bairro: f.bairro, cidade: f.cidade, uf: f.uf, cep: f.cep },
+      contatoJson: { nome: f.ctNome, cargo: f.ctCargo, telefone: f.ctTel },
     };
-
     try {
-      if (cliente) await api.put(`/clientes/${cliente.id}`, payload);
-      else await api.post('/clientes', payload);
+      if (cliente) await api.put(`/clientes/${cliente.id}`, payload); else await api.post('/clientes', payload);
       onSalvo();
-    } catch (e: any) {
-      setErro(e.response?.data?.message || 'Erro ao salvar cliente.');
-    } finally { setSalvando(false); }
+    } catch (e: any) { setErro(e.response?.data?.message || 'Erro ao salvar.'); }
+    finally { setSalvando(false); }
   };
 
-  const lbl = 'block text-[10px] font-bold text-gray-600 uppercase mb-1';
-  const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400';
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-xl shrink-0">
-          <h2 className="font-bold text-gray-900 text-sm flex items-center gap-2">
-            {cliente ? <><Pencil className="h-4 w-4 text-blue-600" /> Editar Cliente</> : <><Plus className="h-4 w-4 text-green-600" /> Novo Cliente</>}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X className="h-4 w-4" /></button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Identificação */}
-          <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400 uppercase"><Building2 className="h-3.5 w-3.5" /> Identificação</div>
-          <div className="grid grid-cols-4 gap-3">
-            <div>
-              <label className={lbl}>Tipo</label>
-              <select value={tipo} onChange={e => setTipo(e.target.value)} className={inp}>
-                <option value="PJ">PJ</option><option value="PF">PF</option>
-              </select>
-            </div>
-            <div className="col-span-3">
-              <label className={lbl}>{tipo === 'PJ' ? 'CNPJ' : 'CPF'} *</label>
-              <input value={cnpjCpf} onChange={e => setCnpjCpf(e.target.value)} className={inp} />
-            </div>
-          </div>
-          <div>
-            <label className={lbl}>{tipo === 'PJ' ? 'Razão Social' : 'Nome'} *</label>
-            <input value={razaoSocial} onChange={e => setRazao(e.target.value)} className={inp} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={lbl}>Nome Fantasia</label>
-              <input value={nomeFantasia} onChange={e => setFantasia(e.target.value)} className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Inscrição Estadual</label>
-              <input value={ie} onChange={e => setIe(e.target.value)} className={inp} />
-            </div>
-          </div>
-
-          {/* Contato */}
-          <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400 uppercase pt-1"><Phone className="h-3.5 w-3.5" /> Contato</div>
-          <div className="grid grid-cols-3 gap-3">
-            <div><label className={lbl}>Telefone</label><input value={telefone} onChange={e => setTelefone(e.target.value)} className={inp} /></div>
-            <div><label className={lbl}>Celular</label><input value={celular} onChange={e => setCelular(e.target.value)} className={inp} /></div>
-            <div><label className={lbl}>E-mail</label><input value={email} onChange={e => setEmail(e.target.value)} className={inp} /></div>
-          </div>
-          <div className="grid grid-cols-4 gap-3">
-            <div className="col-span-2"><label className={lbl}>Contato (nome)</label><input value={ctNome} onChange={e => setCtNome(e.target.value)} className={inp} /></div>
-            <div><label className={lbl}>Cargo</label><input value={ctCargo} onChange={e => setCtCargo(e.target.value)} className={inp} /></div>
-            <div><label className={lbl}>Tel. contato</label><input value={ctTel} onChange={e => setCtTel(e.target.value)} className={inp} /></div>
-          </div>
-
-          {/* Endereço */}
-          <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400 uppercase pt-1"><MapPin className="h-3.5 w-3.5" /> Endereço</div>
-          <div className="grid grid-cols-6 gap-3">
-            <div className="col-span-4"><label className={lbl}>Rua</label><input value={rua} onChange={e => setRua(e.target.value)} className={inp} /></div>
-            <div><label className={lbl}>Nº</label><input value={numero} onChange={e => setNumero(e.target.value)} className={inp} /></div>
-            <div><label className={lbl}>CEP</label><input value={cep} onChange={e => setCep(e.target.value)} className={inp} /></div>
-          </div>
-          <div className="grid grid-cols-6 gap-3">
-            <div className="col-span-3"><label className={lbl}>Bairro</label><input value={bairro} onChange={e => setBairro(e.target.value)} className={inp} /></div>
-            <div className="col-span-2"><label className={lbl}>Cidade</label><input value={cidade} onChange={e => setCidade(e.target.value)} className={inp} /></div>
-            <div>
-              <label className={lbl}>UF</label>
-              <select value={uf} onChange={e => setUf(e.target.value)} className={inp}>
-                {UFS.map(u => <option key={u} value={u}>{u}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Comercial */}
-          <div className="grid grid-cols-3 gap-3 pt-1">
-            <div>
-              <label className={lbl}>Limite de Crédito (R$)</label>
-              <input type="number" step="0.01" min="0" value={limiteCredito} onChange={e => setLimite(e.target.value)} className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Prazo Médio (dias)</label>
-              <input type="number" min="0" value={prazoMedio} onChange={e => setPrazo(e.target.value)} className={inp} />
-            </div>
-            <div>
-              <label className={lbl}>Situação</label>
-              <button onClick={() => setAtivo(!ativo)} type="button"
-                className={`w-full rounded-lg px-3 py-2 text-sm font-bold border ${ativo ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-300'}`}>
-                {ativo ? 'ATIVO' : 'INATIVO'}
-              </button>
-            </div>
-          </div>
-          <div>
-            <label className={lbl}>Observações</label>
-            <textarea value={observacoes} onChange={e => setObs(e.target.value)} rows={2} className={`${inp} resize-none`} />
-          </div>
-
-          {erro && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{erro}</p>}
-        </div>
-
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0">
-          <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
-          <button onClick={handleSalvar} disabled={salvando}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-1.5">
-            {salvando ? 'Salvando...' : <><Save className="h-4 w-4" /> {cliente ? 'Salvar Alterações' : 'Cadastrar'}</>}
-          </button>
-        </div>
+    <Modal titulo={cliente ? 'Editar Cliente' : 'Novo Cliente'} onClose={onClose} onSalvar={salvar} salvando={salvando}
+      salvarLabel={cliente ? 'Salvar Alterações' : 'Cadastrar'}>
+      <Secao icon={<Building2 className="h-3.5 w-3.5" />} titulo="Identificação" />
+      <div className="grid grid-cols-4 gap-3">
+        <Campo label="Tipo"><select value={f.tipo} onChange={e => set('tipo', e.target.value)} className={inp}><option value="PJ">PJ</option><option value="PF">PF</option></select></Campo>
+        <Campo label={`${f.tipo === 'PJ' ? 'CNPJ' : 'CPF'} *`} className="col-span-3"><input value={f.cnpjCpf} onChange={e => set('cnpjCpf', e.target.value)} className={inp} /></Campo>
       </div>
-    </div>
+      <Campo label={`${f.tipo === 'PJ' ? 'Razão Social' : 'Nome'} *`}><input value={f.razaoSocial} onChange={e => set('razaoSocial', e.target.value)} className={inp} /></Campo>
+      <div className="grid grid-cols-2 gap-3">
+        <Campo label="Nome Fantasia"><input value={f.nomeFantasia} onChange={e => set('nomeFantasia', e.target.value)} className={inp} /></Campo>
+        <Campo label="Inscrição Estadual"><input value={f.ie} onChange={e => set('ie', e.target.value)} className={inp} /></Campo>
+      </div>
+
+      <Secao icon={<Phone className="h-3.5 w-3.5" />} titulo="Contato" />
+      <div className="grid grid-cols-3 gap-3">
+        <Campo label="Telefone"><input value={f.telefone} onChange={e => set('telefone', e.target.value)} className={inp} /></Campo>
+        <Campo label="Celular"><input value={f.celular} onChange={e => set('celular', e.target.value)} className={inp} /></Campo>
+        <Campo label="E-mail"><input value={f.email} onChange={e => set('email', e.target.value)} className={inp} /></Campo>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <Campo label="Contato (nome)" className="col-span-1"><input value={f.ctNome} onChange={e => set('ctNome', e.target.value)} className={inp} /></Campo>
+        <Campo label="Cargo"><input value={f.ctCargo} onChange={e => set('ctCargo', e.target.value)} className={inp} /></Campo>
+        <Campo label="Tel. contato"><input value={f.ctTel} onChange={e => set('ctTel', e.target.value)} className={inp} /></Campo>
+      </div>
+
+      <Secao icon={<MapPin className="h-3.5 w-3.5" />} titulo="Endereço de entrega" />
+      <div className="grid grid-cols-6 gap-3">
+        <Campo label="Rua" className="col-span-4"><input value={f.rua} onChange={e => set('rua', e.target.value)} className={inp} /></Campo>
+        <Campo label="Nº"><input value={f.numero} onChange={e => set('numero', e.target.value)} className={inp} /></Campo>
+        <Campo label="CEP"><input value={f.cep} onChange={e => set('cep', e.target.value)} className={inp} /></Campo>
+      </div>
+      <div className="grid grid-cols-6 gap-3">
+        <Campo label="Bairro" className="col-span-3"><input value={f.bairro} onChange={e => set('bairro', e.target.value)} className={inp} /></Campo>
+        <Campo label="Cidade" className="col-span-2"><input value={f.cidade} onChange={e => set('cidade', e.target.value)} className={inp} /></Campo>
+        <Campo label="UF"><select value={f.uf} onChange={e => set('uf', e.target.value)} className={inp}>{UFS.map(u => <option key={u} value={u}>{u}</option>)}</select></Campo>
+      </div>
+
+      <Secao titulo="Comercial & FLV" />
+      <div className="grid grid-cols-3 gap-3">
+        <Campo label="Limite de Crédito (R$)"><input type="number" step="0.01" min="0" value={f.limiteCredito} onChange={e => set('limiteCredito', e.target.value)} className={inp} /></Campo>
+        <Campo label="Prazo de Pagamento (dias)"><input type="number" min="0" value={f.prazoMedio} onChange={e => set('prazoMedio', e.target.value)} className={inp} /></Campo>
+        <Campo label="Situação">
+          <button type="button" onClick={() => set('ativo', !f.ativo)} className={`w-full rounded-lg px-3 py-2 text-sm font-bold border ${f.ativo ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/15 text-rose-300 border-rose-500/40'}`}>{f.ativo ? 'ATIVO' : 'BLOQUEADO'}</button>
+        </Campo>
+      </div>
+      <label className="flex items-center gap-2.5 bg-slate-800/60 border border-slate-700 rounded-lg px-3 py-2.5 cursor-pointer">
+        <input type="checkbox" checked={f.exigeRastreabilidade} onChange={e => set('exigeRastreabilidade', e.target.checked)} className="accent-emerald-500 h-4 w-4" />
+        <QrCode className="h-4 w-4 text-emerald-400" />
+        <span className="text-sm text-slate-200">Exige <b>rastreabilidade</b> na entrega (etiqueta QR Code / cadastro em órgãos reguladores)</span>
+      </label>
+      <Campo label="Observações"><textarea value={f.observacoes} onChange={e => set('observacoes', e.target.value)} rows={2} className={`${inp} resize-none`} /></Campo>
+
+      {erro && <p className="text-xs text-rose-400 bg-rose-500/10 px-3 py-2 rounded-lg">{erro}</p>}
+    </Modal>
   );
 }

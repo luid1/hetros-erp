@@ -1,5 +1,5 @@
-﻿import { Controller, Get, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { TransportadorasService } from './transportadoras.service';
 import { CurrentTenant } from '../../common/decorators/context.decorator';
 
@@ -9,8 +9,29 @@ import { CurrentTenant } from '../../common/decorators/context.decorator';
 export class TransportadorasController {
   constructor(private service: TransportadorasService) {}
 
+  @Post()
+  create(@CurrentTenant() tenantId: string, @Body() dto: any) {
+    return this.service.create(tenantId, dto);
+  }
+
   @Get()
-  findAll(@CurrentTenant() tenantId: string) {
-    return this.service.findAll(tenantId);
+  findAll(@CurrentTenant() tenantId: string, @Query('search') search?: string, @Query('regiao') regiao?: string) {
+    return this.service.findAll(tenantId, search, regiao);
+  }
+
+  @Get(':id')
+  findOne(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    return this.service.findOne(tenantId, id);
+  }
+
+  @Put(':id')
+  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    return this.service.update(tenantId, id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Remove transportadora' })
+  remove(@CurrentTenant() tenantId: string, @Param('id') id: string) {
+    return this.service.remove(tenantId, id);
   }
 }

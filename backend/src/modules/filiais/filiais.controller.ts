@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Param, Body } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { FiliaisService } from './filiais.service';
 import { CurrentTenant } from '../../common/decorators/context.decorator';
@@ -12,6 +12,18 @@ export class FiliaisController {
   @Get()
   findAll(@CurrentTenant() tenantId: string) {
     return this.service.findAll(tenantId);
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Cadastra uma nova filial / box' })
+  create(@CurrentTenant() tenantId: string, @Body() dto: any) {
+    return this.service.create(tenantId, dto);
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Atualiza dados da filial / box' })
+  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    return this.service.update(tenantId, id, dto);
   }
 
   @Patch(':id/regime')

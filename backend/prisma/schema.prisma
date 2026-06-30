@@ -156,6 +156,11 @@ model Filial {
   // Fiscal
   regimeTributario String   @default("SIMPLES_NACIONAL") // SIMPLES_NACIONAL, LUCRO_PRESUMIDO, LUCRO_REAL
   crt             String    @default("1") // 1=Simples Nacional, 2=Simples excesso, 3=Regime Normal
+  // Operação / armazenagem (Box Ceasa)
+  responsavel     String?   // gerente / responsável pelo box
+  capacidadePaletes Int?    // capacidade total em paletes
+  ocupacaoPaletes Int       @default(0) // paletes ocupados (simulado p/ indicador)
+  camaraFria      Boolean   @default(false)
   ativo           Boolean   @default(true)
   createdAt       DateTime  @default(now())
 
@@ -269,6 +274,8 @@ model Cliente {
   ativo           Boolean   @default(true)
   sintegraOk      Boolean   @default(false)
   sintegraAt      DateTime?
+  // FLV — rastreabilidade exigida na entrega (etiqueta QR / órgãos reguladores)
+  exigeRastreabilidade Boolean @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -287,7 +294,7 @@ model Fornecedor {
   tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   razaoSocial     String
   nomeFantasia    String?
-  cnpj            String
+  cnpj            String    // CPF (produtor rural PF) ou CNPJ
   ie              String?
   email           String?
   telefone        String?
@@ -295,6 +302,12 @@ model Fornecedor {
   contatoJson     Json?
   prazoEntrega    Int       @default(1) // dias
   observacoes     String?
+  // FLV — produtor rural / parceria
+  inscricaoRural  String?   // Inscrição de Produtor Rural
+  localizacaoPropriedade String? // Propriedade / Sítio / município
+  tipoParceria    String    @default("COMPRA_DIRETA") // COMPRA_DIRETA, CONSIGNACAO
+  pix             String?   // chave Pix para acerto
+  dadosBancarios  Json?     // banco, agência, conta
   ativo           Boolean   @default(true)
   createdAt       DateTime  @default(now())
 
@@ -311,12 +324,17 @@ model Transportadora {
   tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   razaoSocial   String
   nomeFantasia  String?
-  cnpj          String
+  cnpj          String    // CPF ou CNPJ
   ie            String?
   antt          String?   // Registro ANTT
   email         String?
   telefone      String?
   enderecoJson  Json
+  // FLV / logística
+  placaPrincipal String?  // placa do veículo principal
+  tipoVeiculo   String?   // TRUCK, BITREM, FIORINO, VAN, KOMBI...
+  regiaoAtuacao String?   // região atendida
+  freteBaseKg   Decimal?  @db.Decimal(10, 4) // valor de frete por kg (simulado)
   ativo         Boolean   @default(true)
   createdAt     DateTime  @default(now())
 
@@ -359,10 +377,14 @@ model Produto {
   pesoBruto           Decimal?  @db.Decimal(10, 4)  // kg
   pesoLiquido         Decimal?  @db.Decimal(10, 4)  // kg
   volumeM3            Decimal?  @db.Decimal(10, 4)
-  categoria           String?
+  categoria           String?   // FLV: FRUTA, LEGUME, VERDURA
   grupo               String?
   subgrupo            String?
   marca               String?
+  // FLV — classificação e caixaria
+  classificacao       String?   // Tipo 1, Tipo 2, Graúdo, Médio, Extra...
+  tipoCaixaria        String?   // Caixa Madeira 20kg, Caixa Plástica H, Saca, Maço
+  pesoCaixaria        Decimal?  @db.Decimal(10, 3) // peso líquido médio por caixa (kg)
   // Fiscal
   aliquotaIcms        Decimal   @default(0) @db.Decimal(6, 4)
   aliquotaPis         Decimal   @default(0) @db.Decimal(6, 4)

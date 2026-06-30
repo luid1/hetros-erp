@@ -20,6 +20,45 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-30] — Módulo Cadastros (FLV) em dark mode: 5 telas + campos de nicho
+
+### O que mudou
+- Novo **kit de UI dark** (`modules/cadastros/ui.tsx`) — shell, topbar, filtros, tabela, modal,
+  badges, barra de ocupação — visual sofisticado alinhado à sidebar.
+- **Clientes** (real + dark): + campo **exige rastreabilidade** (etiqueta QR/órgãos) com ícone
+  na tabela. Mantém CRUD real (399 clientes).
+- **Fornecedores** (novo, real): produtor rural — Inscrição de Produtor Rural, Localização da
+  propriedade, **Tipo de Parceria** (Compra Direta / Consignação), Pix e dados bancários para
+  acerto. Filtro por tipo de parceria. CRUD completo no backend (antes era stub).
+- **Transportadoras** (novo, real): Placa principal, Tipo de veículo, Região de atuação, Frete
+  base por kg. Filtro por região. CRUD completo no backend.
+- **Produtos & NCM** (real + dark): + **Classificação/Calibre** (Tipo 1, Graúdo…), **Caixaria**
+  (Caixa Madeira 20kg, Plástica H…) e **peso líquido médio/caixa**. Tabela com ícone do produto
+  e **estoque em kg e caixas**. Agora com create/inativar (POST/DELETE).
+- **Filiais / Boxes** (novo, real): identificação do box, responsável, **capacidade de paletes**
+  + **barra de ocupação** colorida, **câmara fria**. CRUD (POST/PUT).
+- Seed de mock: 3 produtores, 3 transportadoras, capacidade/ocupação nos boxes.
+
+### Backend / schema
+- FLV: `Cliente.exigeRastreabilidade`; `Fornecedor.{inscricaoRural, localizacaoPropriedade,
+  tipoParceria, pix, dadosBancarios}`; `Transportadora.{placaPrincipal, tipoVeiculo,
+  regiaoAtuacao, freteBaseKg}`; `Produto.{classificacao, tipoCaixaria, pesoCaixaria}`;
+  `Filial.{responsavel, capacidadePaletes, ocupacaoPaletes, camaraFria}`.
+- CRUD implementado: **Fornecedores** e **Transportadoras** (eram stubs); **Produtos** ganhou
+  create/delete + lista de unidades + estoque no findAll; **Filiais** ganhou create/update.
+
+### Arquivos
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/{fornecedores,transportadoras,produtos,filiais}/*`
+- `frontend/src/modules/cadastros/ui.tsx` (novo)
+- `frontend/src/modules/cadastros/pages/{Clientes, Fornecedores (novo), Transportadoras (novo), Produtos, Filiais (novo)}.tsx`
+- `frontend/src/App.tsx`
+
+### Observação
+- As 5 telas de Cadastros usam **tema dark** (o resto do app segue claro por enquanto).
+
+---
+
 ## [2026-06-30] — Fix baixa no faturamento + telas fiscais (filtros, painel, CT-e/MDF-e, regime)
 
 ### Correção (importante)
