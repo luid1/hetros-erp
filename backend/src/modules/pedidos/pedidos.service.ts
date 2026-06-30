@@ -258,12 +258,45 @@ export class PedidosService {
       where: { id, tenantId },
       include: {
         cliente: true,
-        itens: { include: { produto: { select: { codigo: true, descricao: true, codigoBarras: true } } } },
+        itens: {
+          include: { produto: { select: { codigo: true, descricao: true, codigoBarras: true, pesoLiquido: true, pesoBruto: true } } },
+          orderBy: { id: 'asc' },
+        },
         filialOrigem: true,
       },
     });
     if (!pedido) throw new NotFoundException('Pedido não encontrado.');
     return pedido;
+  }
+
+  /** Separação/pesagem de um item: grava peso aferido, conferência e corte. */
+  async separarItem(
+    tenantId: string,
+    pedidoId: string,
+    itemId: string,
+    dto: { pesoAferido?: number; quantidadeSeparada?: number; separado?: boolean; cortado?: boolean },
+  ) {
+    const pedido = await this.prisma.pedido.findFirst({ where: { id: pedidoId, tenantId }, select: { id: true } });
+    if (!pedido) throw new NotFoundException('Pedido não encontrado.');
+    const item = await this.prisma.itemPedido.findFirst({ where: { id: itemId, pedidoId } });
+    if (!item) throw new NotFoundException('Item não encontrado neste pedido.');
+
+    const data: any = {};
+    if (dto.pesoAferido !== undefined) data.pesoAferido = dto.pesoAferido;
+    if (dto.quantidadeSeparada !== undefined) data.quantidadeSeparada = dto.quantidadeSeparada;
+    if (dto.separado !== undefined) data.separado = dto.separado;
+    if (dto.cortado !== undefined) data.cortado = dto.cortado;
+
+    await this.prisma.itemPedido.update({ where: { id: itemId }, data });
+
+    // Recalcula o peso total real do pedido (soma dos pesos aferidos dos itens não cortados)
+    const itens = await this.prisma.itemPedido.findMany({ where: { pedidoId }, select: { pesoAferido: true, cortado: true } });
+    const pesoTotal = itens
+      .filter((i) => !i.cortado)
+      .reduce((s, i) => s + Number(i.pesoAferido || 0), 0);
+    await this.prisma.pedido.update({ where: { id: pedidoId }, data: { pesoTotal } });
+
+    return this.findOne(tenantId, pedidoId);
   }
 
   async updateStatus(tenantId: string, id: string, status: string) {

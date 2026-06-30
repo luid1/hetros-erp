@@ -20,6 +20,47 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-30] — Separação com pesagem na balança (estilo NewOxxy)
+
+### O que mudou
+- Nova tela de **Separação / Pesagem** integrada à **Operacional · Separação**, inspirada na
+  tela dos separadores do NewOxxy, com cara moderna (full-screen, touch).
+  - Botão **"Iniciar Separação / Pesar"** no painel da Operacional abre a tela (e marca o
+    pedido como EM_SEPARACAO).
+  - **Balança ao vivo via WebSocket** (`ws://<host>:8765`, a ponte `balanca_ws.py`):
+    peso gigante, estável/instável, reconexão automática, indicador conectado/offline e
+    ajuste de host (caso o ERP rode em máquina diferente da balança).
+  - Por item: **Peso Vendido (kg de referência)** × **Peso Aferido (balança)** com
+    **divergência colorida** (verde acima / vermelho abaixo).
+    - Itens em **KG** usam a balança; itens em **UN/CX** são conferência (pesagem opcional).
+    - "Peso Vendido" de itens não-KG = qtd × peso unitário do produto (pesoLiquido/pesoBruto).
+  - Ações: **Capturar Peso**, **Confirmar Item**, **Cortar item** (sem estoque), navegação
+    (primeiro/anterior/próximo/último), atalhos de teclado (Enter confirma, espaço captura,
+    setas navegam), totais (vendido × aferido) e **Liberar p/ Faturamento** quando todos os
+    itens estão conferidos ou cortados.
+
+### Backend / schema
+- `ItemPedido`: novos campos `pesoAferido` (kg), `separado` (bool), `cortado` (bool).
+  Aplicado via `prisma db push`.
+- `pedidos.findOne`: passa a incluir `pesoLiquido`/`pesoBruto` do produto e ordena itens.
+- Novo endpoint `PATCH /pedidos/:id/itens/:itemId/separacao` — grava peso aferido / conferência
+  / corte e **recalcula o peso total real** do pedido (soma dos aferidos, exceto cortados).
+
+### Arquivos
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/pedidos/{pedidos.service.ts, pedidos.controller.ts}`
+- `frontend/src/hooks/useBalanca.ts` (novo)
+- `frontend/src/modules/logistica/pages/SeparacaoPesagem.tsx` (novo)
+- `frontend/src/modules/logistica/pages/Operacional.tsx`
+
+### Observação
+- A balança só mostra peso ao vivo se a ponte `balanca_ws.py` estiver rodando no PC do touch
+  (COM4 / PRIX TI200). Sem ela, a tela funciona em modo conferência (mostra "balança offline").
+- Produtos sem `pesoLiquido` cadastrado mostram peso esperado 0 — cadastrar o peso unitário
+  para a divergência ficar correta em itens UN/CX.
+
+---
+
 ## [2026-06-30] — Pedidos do dia, correção de fuso, frete fora do pedido e fix tela branca
 
 ### O que mudou

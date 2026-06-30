@@ -645,6 +645,9 @@ model ItemPedido {
   descricao       String
   quantidade      Decimal   @db.Decimal(12, 4)
   quantidadeSeparada Decimal @default(0) @db.Decimal(12, 4)
+  pesoAferido     Decimal?  @db.Decimal(12, 3) // kg lido na balança na separação
+  separado        Boolean   @default(false)    // item conferido/confirmado pelo separador
+  cortado         Boolean   @default(false)    // item cortado (sem estoque / não vai)
   unidade         String
   precoUnitario   Decimal   @db.Decimal(12, 4)
   desconto        Decimal   @default(0) @db.Decimal(12, 4) // valor resolvido em R$

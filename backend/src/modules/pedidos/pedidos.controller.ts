@@ -57,4 +57,15 @@ export class PedidosController {
   updateStatus(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body('status') status: string) {
     return this.service.updateStatus(tenantId, id, status);
   }
+
+  @Patch(':id/itens/:itemId/separacao')
+  @ApiOperation({ summary: 'Separação/pesagem de um item (peso aferido, conferência, corte)' })
+  separarItem(
+    @CurrentTenant() tenantId: string,
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: { pesoAferido?: number; quantidadeSeparada?: number; separado?: boolean; cortado?: boolean },
+  ) {
+    return this.service.separarItem(tenantId, id, itemId, dto);
+  }
 }

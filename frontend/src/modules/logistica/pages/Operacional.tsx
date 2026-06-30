@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { PackageCheck, RefreshCw, Play, Check, Printer, Truck } from 'lucide-react';
+import { PackageCheck, RefreshCw, Check, Printer, Truck, Scale } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
+import SeparacaoPesagem from './SeparacaoPesagem';
 
 const R$ = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -24,6 +25,7 @@ export default function Operacional() {
   const [selId, setSelId] = useState<string | null>(null);
   const [detalhe, setDetalhe] = useState<any>(null);
   const [acaoLoading, setAcaoLoading] = useState(false);
+  const [separandoId, setSeparandoId] = useState<string | null>(null);
 
   const carregar = useCallback(() => {
     if (!filialAtiva) return;
@@ -63,6 +65,13 @@ export default function Operacional() {
     } catch (e: any) {
       alert(e.response?.data?.message || 'Erro ao mudar status.');
     } finally { setAcaoLoading(false); }
+  };
+
+  const abrirSeparacao = async (ped: any) => {
+    if (ped.status === 'CONFIRMADO') {
+      try { await api.patch(`/pedidos/${ped.id}/status`, { status: 'EM_SEPARACAO' }); } catch { /* segue */ }
+    }
+    setSeparandoId(ped.id);
   };
 
   const imprimirEspelho = async (pedidoId: string) => {
@@ -207,16 +216,16 @@ export default function Operacional() {
                 <button onClick={() => imprimirEspelho(detalhe.id)} className="w-full flex items-center justify-center gap-1 bg-white border border-gray-300 hover:bg-gray-50 rounded px-2 py-1.5 text-xs font-semibold text-gray-700">
                   <Printer className="h-3.5 w-3.5" /> Imprimir Espelho
                 </button>
-                {detalhe.status === 'CONFIRMADO' && (
-                  <button onClick={() => mudarStatus('EM_SEPARACAO')} disabled={acaoLoading}
-                    className="w-full flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 text-white rounded px-2 py-2 text-xs font-bold disabled:opacity-40">
-                    <Play className="h-3.5 w-3.5" /> Iniciar Separação
+                {(detalhe.status === 'CONFIRMADO' || detalhe.status === 'EM_SEPARACAO') && (
+                  <button onClick={() => abrirSeparacao(detalhe)} disabled={acaoLoading}
+                    className="w-full flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded px-2 py-2.5 text-sm font-bold disabled:opacity-40">
+                    <Scale className="h-4 w-4" /> {detalhe.status === 'CONFIRMADO' ? 'Iniciar Separação / Pesar' : 'Continuar Separação / Pesar'}
                   </button>
                 )}
                 {detalhe.status === 'EM_SEPARACAO' && (
                   <button onClick={() => mudarStatus('SEPARADO')} disabled={acaoLoading}
                     className="w-full flex items-center justify-center gap-1 bg-green-600 hover:bg-green-700 text-white rounded px-2 py-2 text-xs font-bold disabled:opacity-40">
-                    <Check className="h-3.5 w-3.5" /> Liberar para Faturamento
+                    <Check className="h-3.5 w-3.5" /> Liberar para Faturamento (sem pesar)
                   </button>
                 )}
                 {detalhe.status === 'SEPARADO' && (
@@ -233,6 +242,14 @@ export default function Operacional() {
           )}
         </div>
       </div>
+
+      {separandoId && (
+        <SeparacaoPesagem
+          pedidoId={separandoId}
+          onClose={() => setSeparandoId(null)}
+          onFinalizado={() => { carregar(); if (selId) api.get(`/pedidos/${selId}`).then(r => setDetalhe(r.data)).catch(() => {}); }}
+        />
+      )}
     </div>
   );
 }
