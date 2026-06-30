@@ -21,6 +21,7 @@ import { DreModule } from './modules/dre/dre.module';
 import { AuditoriaModule } from './modules/auditoria/auditoria.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CargaModule } from './modules/carga/carga.module';
+import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -48,6 +49,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     AuditoriaModule,
     DashboardModule,
     CargaModule,
+    UsuariosModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

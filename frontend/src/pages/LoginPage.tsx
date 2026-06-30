@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, Lock, ChevronLeft, Zap, Clock } from 'lucide-react';
+import { rotaInicial } from '../config/telas';
 
 interface UsuarioCard {
   id: string;
@@ -114,7 +115,7 @@ export default function LoginPage() {
       localStorage.setItem('wms_user', JSON.stringify(authUser));
       localStorage.setItem('wms_filiais', JSON.stringify(filiais));
       if (filiais[0]) localStorage.setItem('wms_filial', JSON.stringify(filiais[0]));
-      window.location.href = '/dashboard';
+      window.location.href = rotaInicial(data.usuario.telas, data.usuario.role, data.usuario.telaInicial);
     } catch (err: any) {
       setError(err.message);
       setPassword('');

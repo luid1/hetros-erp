@@ -10,6 +10,7 @@ import PedidosVenda from './modules/logistica/pages/PedidosVenda';
 import Clientes from './modules/cadastros/pages/Clientes';
 import Operacional from './modules/logistica/pages/Operacional';
 import FreteMotoristas from './modules/logistica/pages/FreteMotoristas';
+import UsuariosAcessos from './modules/gerencial/pages/UsuariosAcessos';
 
 const Placeholder = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-64">
@@ -78,7 +79,7 @@ export default function App() {
 
             {/* Gerencial */}
             <Route path="gerencial/auditoria" element={<Placeholder title="Logs de Auditoria" />} />
-            <Route path="gerencial/usuarios" element={<Placeholder title="Usuários & Acessos" />} />
+            <Route path="gerencial/usuarios" element={<UsuariosAcessos />} />
             <Route path="gerencial/configuracoes" element={<Placeholder title="Configurações" />} />
           </Route>
         </Routes>

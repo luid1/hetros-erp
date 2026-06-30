@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useState, useMemo } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { podeVerTela, rotaInicial } from '../../config/telas';
 import {
   LayoutDashboard, Users, Package, Warehouse, FileText,
   DollarSign, Truck, ClipboardList, BarChart3, Settings,
@@ -83,6 +84,11 @@ export default function AppShell() {
   const navigate = useNavigate();
   const sw = collapsed ? 'w-14' : 'w-56';
 
+  // Filtra o menu pelas telas que o perfil do usuário pode ver
+  const navVisivel = useMemo(() => navigation
+    .map((g) => ({ ...g, items: g.items.filter((i) => podeVerTela(user?.telas, user?.role, i.to)) }))
+    .filter((g) => g.items.length > 0), [user?.telas, user?.role]);
+
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
       {mobileOpen && (
@@ -113,7 +119,7 @@ export default function AppShell() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto py-2 px-1.5 space-y-2">
-          {navigation.map((group) => (
+          {navVisivel.map((group) => (
             <div key={group.group}>
               {!collapsed && (
                 <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest px-1.5 mb-0.5">{group.group}</p>
@@ -204,11 +210,20 @@ export default function AppShell() {
           </div>
         </header>
         <main className="flex-1 overflow-y-auto bg-gray-50">
-          <Outlet />
+          <TelaGuard><Outlet /></TelaGuard>
         </main>
       </div>
     </div>
   );
+}
+
+// Bloqueia acesso por URL a telas fora do perfil do usuário
+function TelaGuard({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const location = useLocation();
+  const path = location.pathname;
+  if (podeVerTela(user?.telas, user?.role, path)) return <>{children}</>;
+  return <Navigate to={rotaInicial(user?.telas, user?.role, user?.telaInicial)} replace />;
 }
 
 function FilialSelector() {

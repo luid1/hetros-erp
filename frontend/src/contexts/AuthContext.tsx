@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface Filial { id: string; codigo: string; nome: string }
-interface AuthUser { id: string; nome: string; email: string; role: string; tenantId: string }
+interface AuthUser { id: string; nome: string; email: string; role: string; tenantId: string; telas?: string[]; telaInicial?: string | null }
 
 interface AuthCtx {
   user: AuthUser | null;

@@ -20,6 +20,39 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-06-30] — Área de Usuários & Acessos (perfis + controle de telas)
+
+### O que mudou
+- Nova tela **Usuários & Acessos** (`/gerencial/usuarios`) com duas abas:
+  - **Usuários**: criar / editar / inativar usuário (nome, e-mail, senha, perfil, filiais,
+    ativo) + trocar senha.
+  - **Perfis**: criar / editar perfis e **marcar quais telas cada perfil vê** (checkboxes
+    agrupados) + definir a **tela inicial** (onde o usuário cai ao logar). ADMIN = todas.
+- **Controle de acesso por tela**: o menu lateral e as rotas passam a respeitar as telas do
+  perfil. Quem não tem acesso a uma tela nem a vê no menu nem consegue abrir por URL
+  (redireciona pra tela inicial dele).
+- **Login inteligente**: usuário restrito cai **direto na sua tela** (ex.: Operador WMS abre
+  já na Separação, sem ver o resto). Ideal pro touch do galpão.
+- Perfis semeados: ADMIN (tudo), OPERADOR_WMS (só Separação), COMERCIAL (pedidos/clientes/
+  carga), FINANCEIRO (contas/DRE), FISCAL (NF-e/CT-e).
+
+### Backend / schema
+- `Role`: novos campos `telas String[]` (rotas permitidas; `["*"]` = todas) e `telaInicial`.
+- Novo módulo **`usuarios`**: CRUD de usuários (`/usuarios`) e de perfis (`/usuarios/roles`),
+  incluindo reset de senha e inativação.
+- `auth.login` / `login-por-id` passam a devolver `telas` e `telaInicial` do perfil.
+
+### Arquivos
+- `backend/prisma/schema.prisma`
+- `backend/src/modules/usuarios/*` (novo módulo), `backend/src/app.module.ts`
+- `backend/src/modules/auth/auth.service.ts`
+- `frontend/src/config/telas.ts` (novo — catálogo de telas)
+- `frontend/src/contexts/AuthContext.tsx`, `frontend/src/components/layout/AppShell.tsx`
+- `frontend/src/pages/LoginPage.tsx`, `frontend/src/App.tsx`
+- `frontend/src/modules/gerencial/pages/UsuariosAcessos.tsx` (novo)
+
+---
+
 ## [2026-06-30] — Separação com pesagem na balança (estilo NewOxxy)
 
 ### O que mudou

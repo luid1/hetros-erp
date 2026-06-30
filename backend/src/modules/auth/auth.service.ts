@@ -143,6 +143,8 @@ export class AuthService {
         nome: usuario.nome,
         email: usuario.email,
         role: usuario.role.nome,
+        telas: usuario.role.telas || [],
+        telaInicial: usuario.role.telaInicial || null,
         filiais: usuario.filiais.map((uf) => ({
           id: uf.filial.id,
           codigo: uf.filial.codigo,
@@ -192,6 +194,8 @@ export class AuthService {
         nome: usuario.nome,
         email: usuario.email,
         role: usuario.role.nome,
+        telas: usuario.role.telas || [],
+        telaInicial: usuario.role.telaInicial || null,
         filiais: usuario.filiais.map((uf) => ({
           id: uf.filial.id,
           codigo: uf.filial.codigo,

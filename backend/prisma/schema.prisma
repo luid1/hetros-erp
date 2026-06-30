@@ -180,6 +180,8 @@ model Role {
   tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   nome        String    // ADMIN, OPERADOR_WMS, COMERCIAL, FINANCEIRO, FISCAL, AUDITOR
   descricao   String?
+  telas       String[]  @default([])  // rotas/telas que o perfil pode ver (ex: "/logistica/operacional"); ["*"] = todas
+  telaInicial String?                  // rota inicial ao logar (ex: "/logistica/operacional")
   permissoes  RolePermissao[]
   usuarios    Usuario[]
 
