@@ -10,6 +10,8 @@ const R$ = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'cur
 // Senha para liberar descontos no pedido (trocar aqui conforme política da empresa)
 const SENHA_DESCONTO = 'hetros2026';
 const REGIOES = ['GUARULHOS', 'ZONA NORTE', 'ZONA SUL', 'ZONA OESTE', 'CENTRO', 'ARUJÁ', 'ZONA LESTE', 'ABC'];
+// Unidades de separação/venda — a Separação usa isso (KG pesa na balança; CX/UN conferem)
+const UNIDADES = ['KG', 'CX', 'UN'];
 const FORMAS_PAG = [
   { v: 'DINHEIRO', label: 'Dinheiro', parcelavel: false },
   { v: 'PIX', label: 'PIX', parcelavel: false },
@@ -577,7 +579,13 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
                             onChange={e => updItem(idx, { quantidade: parseFloat(e.target.value) || 0 })}
                             className={`w-16 border rounded px-1.5 py-1 text-right ${excede ? 'border-red-400 bg-red-50' : 'border-gray-300'}`} />
                         </td>
-                        <td className="px-2 py-1 text-gray-500">{it.unidade}</td>
+                        <td className="px-2 py-1">
+                          <select value={UNIDADES.includes(it.unidade) ? it.unidade : 'KG'}
+                            onChange={e => updItem(idx, { unidade: e.target.value })}
+                            className="border border-gray-300 rounded px-1 py-1 text-xs bg-white font-semibold text-gray-700">
+                            {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                        </td>
                         <td className="px-2 py-1">
                           {/* Preço definido pela área de custo — somente leitura */}
                           <span className="inline-block w-20 text-right font-mono text-gray-700">{R$(it.precoUnitario)}</span>
