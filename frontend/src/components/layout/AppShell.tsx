@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, Package, Warehouse, FileText,
   DollarSign, Truck, ClipboardList, BarChart3, Settings,
   ChevronLeft, ChevronRight, LogOut, Building2, AlertTriangle,
-  Receipt, ShieldCheck, Menu, X, MapPin, PackageCheck,
+  Receipt, ShieldCheck, Menu, X, MapPin, PackageCheck, ShoppingCart,
 } from 'lucide-react';
 
 interface NavItem { to: string; icon: React.ElementType; label: string; badge?: string; badgeColor?: string; highlight?: boolean }
@@ -34,6 +34,7 @@ const navigation: NavGroup[] = [
     items: [
       { to: '/wms/posicao',       icon: Warehouse,      label: 'Posição de Estoque' },
       { to: '/wms/pereciveis',    icon: AlertTriangle,  label: 'Perecíveis / FLV', badge: '!', badgeColor: 'bg-red-500' },
+      { to: '/wms/compras',       icon: ShoppingCart,   label: 'Ordens de Compra' },
       { to: '/wms/entradas',      icon: ClipboardList,  label: 'Entradas (XML NF-e)' },
       { to: '/wms/movimentacoes', icon: BarChart3,      label: 'Movimentações' },
       { to: '/wms/inventario',    icon: ClipboardList,  label: 'Inventário' },

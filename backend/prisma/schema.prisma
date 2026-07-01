@@ -106,6 +106,14 @@ enum TipoAjusteInventario {
   QUEBRA_OPERACIONAL
 }
 
+enum StatusOrdemCompra {
+  PENDENTE     // criada, aguardando aprovação/envio
+  APROVADA     // enviada ao fornecedor
+  PARCIAL      // recebida parcialmente
+  ENTREGUE     // recebida por completo (deu entrada no estoque)
+  CANCELADA
+}
+
 // ─────────────────────────────────────────
 // MÓDULO 0: TENANT & INFRAESTRUTURA
 // ─────────────────────────────────────────
@@ -313,6 +321,7 @@ model Fornecedor {
 
   entradas        EntradaMercadoria[]
   contasPagar     ContaPagar[]
+  ordensCompra    OrdemCompra[]
 
   @@unique([tenantId, cnpj])
   @@index([tenantId])
@@ -416,6 +425,7 @@ model Produto {
   itensNFe            ItemNFe[]
   movimentacoes       MovimentacaoEstoque[]
   itensInventario     ItemInventario[]
+  itensOrdemCompra    ItemOrdemCompra[]
 
   @@unique([tenantId, codigo])
   @@index([tenantId])
@@ -599,6 +609,53 @@ model ItemInventario {
   ajusteGerado        Boolean   @default(false)
 
   @@index([inventarioId])
+}
+
+// ─────────────────────────────────────────
+// MÓDULO: COMPRAS & SUPRIMENTOS
+// ─────────────────────────────────────────
+
+model OrdemCompra {
+  id                  String    @id @default(uuid())
+  tenantId            String
+  filialId            String?   // filial de destino do recebimento
+  fornecedorId        String
+  fornecedor          Fornecedor @relation(fields: [fornecedorId], references: [id])
+  numero              Int       // sequencial por tenant
+  status              StatusOrdemCompra @default(PENDENTE)
+  condicaoPagamento   String?   // A_VISTA, 30_DIAS, 30_60, etc.
+  dataEmissao         DateTime  @default(now())
+  dataEntregaPrevista DateTime?
+  dataEntregaReal     DateTime?
+  observacoes         String?
+  valorTotal          Decimal   @default(0) @db.Decimal(12, 2)
+  entradaId           String?   // entrada de mercadoria gerada no recebimento
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  itens               ItemOrdemCompra[]
+
+  @@unique([tenantId, numero])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([fornecedorId])
+}
+
+model ItemOrdemCompra {
+  id                  String    @id @default(uuid())
+  ordemId             String
+  ordem               OrdemCompra @relation(fields: [ordemId], references: [id], onDelete: Cascade)
+  produtoId           String?
+  produto             Produto?  @relation(fields: [produtoId], references: [id])
+  descricao           String
+  unidade             String    @default("KG")
+  quantidade          Decimal   @db.Decimal(12, 4)
+  quantidadeRecebida  Decimal   @default(0) @db.Decimal(12, 4)
+  precoUnitario       Decimal   @db.Decimal(12, 4)
+  subtotal            Decimal   @db.Decimal(12, 2)
+
+  @@index([ordemId])
+  @@index([produtoId])
 }
 
 // ─────────────────────────────────────────

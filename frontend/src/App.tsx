@@ -19,6 +19,7 @@ import Pereciveis from './modules/estoque/pages/Pereciveis';
 import Entradas from './modules/estoque/pages/Entradas';
 import Movimentacoes from './modules/estoque/pages/Movimentacoes';
 import Inventario from './modules/estoque/pages/Inventario';
+import Compras from './modules/estoque/pages/Compras';
 import Faturamento from './modules/fiscal/pages/Faturamento';
 import NotasEmitidas from './modules/fiscal/pages/NotasEmitidas';
 import MatrizFiscal from './modules/fiscal/pages/MatrizFiscal';
@@ -70,6 +71,7 @@ export default function App() {
             <Route path="wms/entradas" element={<Entradas />} />
             <Route path="wms/movimentacoes" element={<Movimentacoes />} />
             <Route path="wms/inventario" element={<Inventario />} />
+            <Route path="wms/compras" element={<Compras />} />
             <Route path="wms/analise-estoque" element={<AnaliseEstoqueFisico />} />
 
             {/* Logística */}

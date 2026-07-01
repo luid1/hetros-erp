@@ -6,6 +6,7 @@ import { CadastroShell, TopBar, FilterBar, TableCard, Th, Modal, Secao, Campo, L
 
 const dt = (v: any) => v ? new Date(v).toLocaleDateString('pt-BR') : '—';
 const UNIDADES = ['KG', 'UN', 'CX', 'MAÇO', 'SACA', 'DZ', 'LT'];
+const soDigitos = (v: string) => v.replace(/\D/g, '');
 const STATUS_COR: Record<string, string> = { CONFERIDA: 'bg-emerald-500/15 text-emerald-400', PENDENTE: 'bg-amber-500/15 text-amber-400', DIVERGENTE: 'bg-rose-500/15 text-rose-400', CANCELADA: 'bg-slate-600/40 text-slate-400' };
 
 type Item = { produtoId: string; descricao: string; ncm: string; quantidade: string; unidade: string; valorUnitario: string; loteNumero: string; dataValidade: string };
@@ -156,16 +157,19 @@ function ModalEntrada({ onClose, onSalvo, filialId }: { onClose: () => void; onS
       <Secao titulo="Dados da nota" />
       <div className="grid grid-cols-4 gap-3">
         <Campo label="Fornecedor *" className="col-span-2">
-          <select value={fornecedorId} onChange={e => setFornecedorId(e.target.value)} className={inp}>
+          <select value={fornecedorId} onChange={e => setFornecedorId(e.target.value)} className={`${inp} ${!fornecedorId ? 'border-rose-500/50' : ''}`}>
             <option value="">— selecione —</option>
             {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nomeFantasia || f.razaoSocial}</option>)}
           </select>
         </Campo>
-        <Campo label="Nº NF"><input value={numeroNf} onChange={e => setNumeroNf(e.target.value)} className={inp} /></Campo>
-        <Campo label="Série"><input value={serieNf} onChange={e => setSerieNf(e.target.value)} className={inp} /></Campo>
+        <Campo label="Nº NF"><input inputMode="numeric" value={numeroNf} onChange={e => setNumeroNf(soDigitos(e.target.value))} className={inp} placeholder="só números" /></Campo>
+        <Campo label="Série"><input inputMode="numeric" value={serieNf} onChange={e => setSerieNf(soDigitos(e.target.value))} className={inp} /></Campo>
       </div>
       <div className="grid grid-cols-4 gap-3">
-        <Campo label="Chave de acesso" className="col-span-3"><input value={chave} onChange={e => setChave(e.target.value)} className={`${inp} font-mono text-xs`} /></Campo>
+        <Campo label="Chave de acesso (opcional · 44 dígitos)" className="col-span-3">
+          <input inputMode="numeric" maxLength={44} value={chave} onChange={e => setChave(soDigitos(e.target.value))} className={`${inp} font-mono text-xs`} placeholder="só números — deixe em branco se não tiver a NF-e" />
+          {chave.length > 0 && <span className={`text-[10px] ${chave.length === 44 ? 'text-emerald-400' : 'text-amber-400'}`}>{chave.length}/44 dígitos</span>}
+        </Campo>
         <Campo label="Emissão"><input type="date" value={dataEmissao} onChange={e => setDataEmissao(e.target.value)} className={inp} /></Campo>
       </div>
 
@@ -180,21 +184,21 @@ function ModalEntrada({ onClose, onSalvo, filialId }: { onClose: () => void; onS
                 <div className="col-span-6 sm:col-span-5"><label className={lb}>Produto (vínculo)</label>
                   <select value={it.produtoId} onChange={e => escolherProduto(i, e.target.value)} className={fld}><option value="">— sem vínculo —</option>{produtos.map(p => <option key={p.id} value={p.id}>{p.descricao}</option>)}</select>
                 </div>
-                <div className="col-span-6 sm:col-span-6"><label className={lb}>Descrição</label><input value={it.descricao} onChange={e => setItem(i, 'descricao', e.target.value)} className={fld} placeholder="descrição do item" /></div>
+                <div className="col-span-6 sm:col-span-6"><label className={lb}>Descrição *</label><input value={it.descricao} onChange={e => setItem(i, 'descricao', e.target.value)} className={`${fld} ${!it.descricao.trim() ? 'border-rose-500/40' : ''}`} placeholder="nome do item" /></div>
                 <div className="col-span-12 sm:col-span-1 flex sm:justify-center sm:items-end">
                   {itens.length > 1 && <button onClick={() => delItem(i)} className="text-slate-500 hover:text-rose-400 flex items-center gap-1 text-[11px] pb-1.5"><Trash2 className="h-4 w-4" /><span className="sm:hidden">remover</span></button>}
                 </div>
               </div>
               <div className="grid grid-cols-12 gap-2 mt-2">
-                <div className="col-span-3 sm:col-span-2"><label className={lb}>NCM</label><input value={it.ncm} onChange={e => setItem(i, 'ncm', e.target.value)} className={`${fld} font-mono`} /></div>
-                <div className="col-span-3 sm:col-span-2"><label className={lb}>Qtd</label><input type="number" value={it.quantidade} onChange={e => setItem(i, 'quantidade', e.target.value)} className={`${fld} text-right`} /></div>
+                <div className="col-span-3 sm:col-span-2"><label className={lb}>NCM (8 díg.)</label><input inputMode="numeric" maxLength={8} value={it.ncm} onChange={e => setItem(i, 'ncm', soDigitos(e.target.value))} className={`${fld} font-mono`} placeholder="números" /></div>
+                <div className="col-span-3 sm:col-span-2"><label className={lb}>Qtd *</label><input type="number" inputMode="decimal" min="0" step="0.001" value={it.quantidade} onChange={e => setItem(i, 'quantidade', e.target.value)} className={`${fld} text-right ${!(Number(it.quantidade) > 0) ? 'border-rose-500/40' : ''}`} /></div>
                 <div className="col-span-3 sm:col-span-1"><label className={lb}>Un</label>
                   <select value={UNIDADES.includes((it.unidade || '').toUpperCase()) ? it.unidade.toUpperCase() : (it.unidade || 'KG')} onChange={e => setItem(i, 'unidade', e.target.value)} className={fld}>
                     {[...new Set([...(it.unidade && !UNIDADES.includes(it.unidade.toUpperCase()) ? [it.unidade] : []), ...UNIDADES])].map(u => <option key={u} value={u}>{u}</option>)}
                   </select>
                 </div>
-                <div className="col-span-4 sm:col-span-2"><label className={lb}>Vl Unit</label><input type="number" value={it.valorUnitario} onChange={e => setItem(i, 'valorUnitario', e.target.value)} className={`${fld} text-right`} /></div>
-                <div className="col-span-5 sm:col-span-2"><label className={lb}>Lote</label><input value={it.loteNumero} onChange={e => setItem(i, 'loteNumero', e.target.value)} className={fld} placeholder="opcional" /></div>
+                <div className="col-span-4 sm:col-span-2"><label className={lb}>Vl Unit (R$)</label><input type="number" inputMode="decimal" min="0" step="0.01" value={it.valorUnitario} onChange={e => setItem(i, 'valorUnitario', e.target.value)} className={`${fld} text-right`} placeholder="0,00" /></div>
+                <div className="col-span-5 sm:col-span-2"><label className={lb}>Lote</label><input value={it.loteNumero} onChange={e => setItem(i, 'loteNumero', e.target.value.toUpperCase())} className={fld} placeholder="letras/números" /></div>
                 <div className="col-span-7 sm:col-span-3"><label className={lb}>Validade</label><input type="date" value={it.dataValidade} onChange={e => setItem(i, 'dataValidade', e.target.value)} className={fld} /></div>
               </div>
               <div className="text-right text-[11px] text-slate-500 mt-1.5">Subtotal: <b className="text-slate-300">{R$((Number(it.quantidade) || 0) * (Number(it.valorUnitario) || 0))}</b></div>

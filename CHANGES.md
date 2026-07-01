@@ -20,6 +20,31 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-01] — Módulo Compras / Suprimentos: Ordem de Compra (OC) com recebimento no estoque
+
+### O que mudou
+- Novo fluxo de **Ordem de Compra** (`/wms/compras`, menu Estoque):
+  - Criar OC: fornecedor, condição de pagamento, entrega prevista e **N itens** (produto,
+    quantidade, preço unitário). **Subtotal por item e total da OC** calculados automaticamente.
+  - **Status**: Pendente → Aprovada → (Parcial) → Entregue / Cancelada.
+  - **Receber** (ou mudar status para ENTREGUE): **dá entrada no estoque** de cada item
+    (ENTRADA_COMPRA, com custo) e **gera o Contas a Pagar** pela condição de pagamento.
+  - CRUD completo (criar/editar/excluir) — edição/exclusão bloqueadas após entrega.
+  - Itens puxam NCM/descrição/unidade/preço do cadastro do produto (igual à Entrada).
+
+### Backend / schema
+- Models **`OrdemCompra`** 1:N **`ItemOrdemCompra`** + enum `StatusOrdemCompra`
+  (PENDENTE, APROVADA, PARCIAL, ENTREGUE, CANCELADA). Back-relations em Fornecedor e Produto.
+- Novo módulo **`compras`** (service + controller): CRUD, `mudarStatus`, `receber`
+  (integra EstoqueService + ContaPagar). Arquitetura: lógica no service, controller fino.
+
+### Arquivos
+- `backend/prisma/schema.prisma`, `backend/src/modules/compras/*` (novo), `backend/src/app.module.ts`
+- `frontend/src/modules/estoque/pages/Compras.tsx` (novo)
+- `frontend/src/App.tsx`, `frontend/src/components/layout/AppShell.tsx`
+
+---
+
 ## [2026-07-01] — FEFO automático: separação sugere o lote e a baixa consome por validade
 
 ### O que mudou
