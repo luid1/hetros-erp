@@ -1,40 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import {
-  Package, AlertTriangle, TrendingUp, Truck,
-  Receipt, DollarSign, Activity, ArrowUpRight, ArrowDownRight,
+  Package, AlertTriangle, TrendingUp, Truck, Receipt, DollarSign,
+  Activity, RefreshCw, BarChart3, PackageCheck,
 } from 'lucide-react';
 
 const R$ = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+const R$k = (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(Math.round(v));
 
-interface DashKPIs {
-  totalProdutos: number;
-  alertasValidade: number;
-  pedidosPendentes: number;
-  pedidosSeparacao: number;
-  nfesHoje: number;
-  valorFaturadoHoje: number;
-  contasReceberVencer: number;
-  valorReceberVencer: number;
-  movimentacoesHoje: number;
+interface Resumo {
+  kpis: {
+    itensEstoque: number; alertasValidade: number; pedidosPendentes: number; pedidosSeparacao: number;
+    pedidosSeparados: number; nfesHoje: number; faturadoHoje: number; contasReceberQtd: number;
+    contasReceberValor: number; movimentacoesHoje: number;
+  };
+  pedidosPorStatus: Record<string, number>;
+  serieFaturamento: { dia: string; label: string; valor: number }[];
+  fluxoDia: { entradas: number; faturados: number; romaneios: number; entregues: number };
 }
 
-function KPICard({ icon: Icon, label, value, sub, color, trend }: {
-  icon: any; label: string; value: string; sub?: string; color: string; trend?: 'up' | 'down';
-}) {
+function KPICard({ icon: Icon, label, value, sub, color }: { icon: any; label: string; value: string; sub?: string; color: string }) {
   return (
     <div className="card p-5">
-      <div className="flex items-start justify-between mb-3">
-        <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${color}`}>
-          <Icon className="h-4 w-4 text-white" />
-        </div>
-        {trend && (
-          <span className={`text-xs font-medium flex items-center gap-0.5 ${trend === 'up' ? 'text-emerald-600' : 'text-red-500'}`}>
-            {trend === 'up' ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-          </span>
-        )}
-      </div>
+      <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${color} mb-3`}><Icon className="h-4 w-4 text-white" /></div>
       <p className="text-2xl font-bold text-gray-900">{value}</p>
       <p className="text-xs font-medium text-gray-500 mt-0.5">{label}</p>
       {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
@@ -42,100 +31,118 @@ function KPICard({ icon: Icon, label, value, sub, color, trend }: {
   );
 }
 
+const STATUS_INFO: Record<string, { label: string; cor: string }> = {
+  CONFIRMADO: { label: 'Pendente', cor: 'bg-red-500' },
+  EM_SEPARACAO: { label: 'Separando', cor: 'bg-sky-500' },
+  SEPARADO: { label: 'Liberado', cor: 'bg-emerald-500' },
+  FATURADO: { label: 'Faturado', cor: 'bg-slate-500' },
+};
+
 export default function DashboardPage() {
   const { filialAtiva } = useAuth();
-  const [kpis, setKpis] = useState<DashKPIs | null>(null);
+  const [d, setD] = useState<Resumo | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!filialAtiva) return;
-    // Em produção: api.get(`/dashboard/kpis?filialId=${filialAtiva.id}`)
-    // Dados simulados para desenvolvimento
-    setKpis({
-      totalProdutos: 847,
-      alertasValidade: 12,
-      pedidosPendentes: 34,
-      pedidosSeparacao: 8,
-      nfesHoje: 23,
-      valorFaturadoHoje: 87450.00,
-      contasReceberVencer: 15,
-      valorReceberVencer: 43200.00,
-      movimentacoesHoje: 156,
-    });
-  }, [filialAtiva]);
+  const carregar = useCallback(() => {
+    setLoading(true);
+    api.get('/dashboard', { params: { filialId: filialAtiva?.id } })
+      .then(r => setD(r.data)).catch(() => setD(null)).finally(() => setLoading(false));
+  }, [filialAtiva?.id]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const k = d?.kpis;
+  const maxFat = Math.max(1, ...(d?.serieFaturamento || []).map(s => s.valor));
+  const maxStatus = Math.max(1, ...Object.values(d?.pedidosPorStatus || {}));
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">Painel Operacional</h1>
-        <p className="text-sm text-gray-400 mt-0.5">
-          {filialAtiva ? `${filialAtiva.codigo} — ${filialAtiva.nome}` : 'Selecione uma filial'} ·{' '}
-          {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Painel Operacional</h1>
+          <p className="text-sm text-gray-400 mt-0.5">
+            {filialAtiva ? `${filialAtiva.codigo} — ${filialAtiva.nome}` : 'Selecione uma filial'} ·{' '}
+            {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+          </p>
+        </div>
+        <button onClick={carregar} className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-200 text-sm">
+          <RefreshCw className={`h-4 w-4 text-sky-400 ${loading ? 'animate-spin' : ''}`} /> Atualizar
+        </button>
       </div>
 
-      {/* KPIs principais */}
+      {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard icon={Package} label="Itens em Estoque" value={String(kpis?.totalProdutos || 0)} color="bg-sky-500" />
-        <KPICard
-          icon={AlertTriangle}
-          label="Alertas de Validade"
-          value={String(kpis?.alertasValidade || 0)}
-          sub="perecíveis vencendo"
-          color={kpis?.alertasValidade ? 'bg-red-500' : 'bg-gray-400'}
-        />
-        <KPICard icon={Truck} label="Pedidos p/ Separar" value={String(kpis?.pedidosPendentes || 0)} color="bg-amber-500" />
-        <KPICard icon={Activity} label="Em Separação" value={String(kpis?.pedidosSeparacao || 0)} color="bg-violet-500" />
+        <KPICard icon={Package} label="Itens em Estoque" value={String(k?.itensEstoque ?? 0)} color="bg-sky-500" />
+        <KPICard icon={AlertTriangle} label="Alertas de Validade" value={String(k?.alertasValidade ?? 0)} sub="perecíveis vencendo" color={k?.alertasValidade ? 'bg-red-500' : 'bg-gray-500'} />
+        <KPICard icon={Truck} label="Pedidos p/ Separar" value={String(k?.pedidosPendentes ?? 0)} color="bg-amber-500" />
+        <KPICard icon={Activity} label="Em Separação" value={String(k?.pedidosSeparacao ?? 0)} color="bg-violet-500" />
+        <KPICard icon={Receipt} label="NF-e Emitidas Hoje" value={String(k?.nfesHoje ?? 0)} color="bg-teal-500" />
+        <KPICard icon={TrendingUp} label="Faturado Hoje" value={R$(k?.faturadoHoje ?? 0)} color="bg-emerald-500" />
+        <KPICard icon={DollarSign} label="A Receber (7 dias)" value={String(k?.contasReceberQtd ?? 0)} sub={R$(k?.contasReceberValor ?? 0)} color="bg-blue-500" />
+        <KPICard icon={Activity} label="Movimentações Hoje" value={String(k?.movimentacoesHoje ?? 0)} color="bg-indigo-500" />
       </div>
 
-      {/* KPIs financeiros / fiscal */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard icon={Receipt} label="NF-e Emitidas Hoje" value={String(kpis?.nfesHoje || 0)} color="bg-teal-500" />
-        <KPICard icon={TrendingUp} label="Faturado Hoje" value={R$(kpis?.valorFaturadoHoje || 0)} color="bg-emerald-500" />
-        <KPICard icon={DollarSign} label="A Receber (7 dias)" value={String(kpis?.contasReceberVencer || 0)} sub={R$(kpis?.valorReceberVencer || 0)} color="bg-blue-500" />
-        <KPICard icon={Activity} label="Movimentações Hoje" value={String(kpis?.movimentacoesHoje || 0)} color="bg-indigo-500" />
-      </div>
-
-      {/* Alertas críticos */}
-      {(kpis?.alertasValidade || 0) > 0 && (
-        <div className="card border-red-200 bg-red-50 p-5">
+      {/* Alerta de validade */}
+      {(k?.alertasValidade ?? 0) > 0 && (
+        <div className="card border-red-500/40 p-4" style={{ background: 'rgba(244,63,94,0.08)' }}>
           <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+            <AlertTriangle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-red-800">
-                {kpis?.alertasValidade} produto{kpis?.alertasValidade !== 1 ? 's' : ''} com validade vencendo em breve
-              </p>
-              <p className="text-sm text-red-600 mt-1">
-                Verifique a tela <strong>Perecíveis / FLV</strong> para detalhes e ação imediata.
-                Produtos FLV com menos de 5 dias de validade estão listados para descarte ou promoção.
-              </p>
+              <p className="font-semibold text-red-300">{k?.alertasValidade} produto(s) com validade vencendo em breve</p>
+              <p className="text-sm text-red-400/80 mt-1">Veja a tela <strong>Perecíveis / FLV</strong> para descarte ou promoção (FEFO).</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Fluxo do dia — timeline visual */}
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Faturamento 7 dias */}
+        <div className="card p-5 lg:col-span-2">
+          <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-emerald-500" /> Faturamento — últimos 7 dias</h3>
+          <div className="flex items-end gap-2 h-44 pt-4">
+            {(d?.serieFaturamento || []).map(s => (
+              <div key={s.dia} className="flex-1 flex flex-col items-center gap-1" title={R$(s.valor)}>
+                <span className="text-[10px] text-gray-400 font-mono">{s.valor > 0 ? R$k(s.valor) : ''}</span>
+                <div className="w-full bg-emerald-500 hover:bg-emerald-400 rounded-t transition-all" style={{ height: `${Math.max(3, (s.valor / maxFat) * 140)}px` }} />
+                <span className="text-[10px] text-gray-400">{s.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Pedidos por status */}
+        <div className="card p-5">
+          <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><PackageCheck className="h-4 w-4 text-sky-500" /> Pedidos por status</h3>
+          <div className="space-y-3">
+            {Object.entries(d?.pedidosPorStatus || {}).map(([s, n]) => (
+              <div key={s}>
+                <div className="flex justify-between text-xs text-gray-500 mb-1"><span>{STATUS_INFO[s]?.label || s}</span><span className="font-bold text-gray-700">{n}</span></div>
+                <div className="h-2.5 rounded-full bg-slate-700/50 overflow-hidden">
+                  <div className={`h-full ${STATUS_INFO[s]?.cor || 'bg-slate-500'} rounded-full transition-all`} style={{ width: `${(n / maxStatus) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Fluxo do dia */}
       <div className="card p-5">
-        <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Activity className="h-4 w-4 text-sky-500" /> Fluxo Operacional do Dia
-        </h3>
+        <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><Activity className="h-4 w-4 text-sky-500" /> Fluxo Operacional do Dia</h3>
         <div className="grid grid-cols-4 gap-0">
           {[
-            { label: 'Entradas\nrecebidas', value: '3 NF-e', color: 'bg-sky-500', step: 1 },
-            { label: 'Pedidos\nfaturados', value: `${kpis?.nfesHoje || 0} NF-e`, color: 'bg-emerald-500', step: 2 },
-            { label: 'Romaneios\nna rota', value: '5 veículos', color: 'bg-amber-500', step: 3 },
-            { label: 'Entregas\nconcluídas', value: '4 rotas', color: 'bg-violet-500', step: 4 },
+            { label: 'Entradas\nrecebidas', value: `${d?.fluxoDia.entradas ?? 0}`, color: 'bg-sky-500', step: 1 },
+            { label: 'Pedidos\nfaturados', value: `${d?.fluxoDia.faturados ?? 0} NF-e`, color: 'bg-emerald-500', step: 2 },
+            { label: 'Romaneios\nna rota', value: `${d?.fluxoDia.romaneios ?? 0} rota(s)`, color: 'bg-amber-500', step: 3 },
+            { label: 'Entregas\nconcluídas', value: `${d?.fluxoDia.entregues ?? 0}`, color: 'bg-violet-500', step: 4 },
           ].map((item, i, arr) => (
             <div key={i} className="flex items-center">
               <div className="flex flex-col items-center flex-1">
-                <div className={`h-10 w-10 rounded-full ${item.color} flex items-center justify-center text-white text-xs font-bold`}>
-                  {item.step}
-                </div>
+                <div className={`h-10 w-10 rounded-full ${item.color} flex items-center justify-center text-white text-xs font-bold`}>{item.step}</div>
                 <p className="text-xs font-medium text-gray-600 mt-2 text-center whitespace-pre-line">{item.label}</p>
                 <p className="text-sm font-bold text-gray-900 mt-0.5">{item.value}</p>
               </div>
-              {i < arr.length - 1 && (
-                <div className="h-0.5 w-full bg-gray-200 mx-1 mb-6" />
-              )}
+              {i < arr.length - 1 && <div className="h-0.5 w-full bg-slate-700 mx-1 mb-6" />}
             </div>
           ))}
         </div>
