@@ -175,6 +175,69 @@ export class EstoqueService {
   }
 
   /**
+   * FEFO — lotes de um produto na filial com saldo, ordenados por validade (vence primeiro).
+   * Inclui a "linha" sem lote (loteId null) por último.
+   */
+  async getFefoLotes(tenantId: string, filialId: string, produtoId: string) {
+    const saldos = await this.prisma.estoqueSaldo.findMany({
+      where: { tenantId, filialId, produtoId, quantidade: { gt: 0 } },
+      include: { lote: { select: { numero: true, dataValidade: true } } },
+    });
+    const hoje = new Date();
+    return saldos
+      .map((s) => ({
+        loteId: s.loteId,
+        loteNumero: s.lote?.numero || null,
+        dataValidade: s.lote?.dataValidade || null,
+        disponivel: Number(s.quantidade) - Number(s.quantidadeReservada || 0),
+        quantidade: Number(s.quantidade),
+        diasAteVencer: s.lote?.dataValidade ? Math.ceil((s.lote.dataValidade.getTime() - hoje.getTime()) / 86400000) : null,
+      }))
+      .sort((a, b) => {
+        // quem tem validade vem primeiro (mais próxima), depois os sem validade
+        if (a.dataValidade && b.dataValidade) return a.dataValidade.getTime() - b.dataValidade.getTime();
+        if (a.dataValidade) return -1;
+        if (b.dataValidade) return 1;
+        return 0;
+      });
+  }
+
+  /**
+   * Baixa uma quantidade seguindo FEFO: consome dos lotes que vencem primeiro.
+   * Se o físico não cobrir, a sobra sai do último lote (podendo ficar negativo).
+   */
+  async baixarFefo(tenantId: string, dto: {
+    filialId: string; produtoId: string; quantidade: number;
+    tipo?: TipoMovimentacao; nfeId?: string; pedidoId?: string; usuarioId: string; observacoes?: string;
+  }) {
+    const tipo = dto.tipo || TipoMovimentacao.SAIDA_VENDA;
+    const lotes = await this.getFefoLotes(tenantId, dto.filialId, dto.produtoId);
+    let restante = Number(dto.quantidade);
+    const alocacoes: { loteId: string | null; quantidade: number }[] = [];
+
+    for (const lote of lotes) {
+      if (restante <= 0) break;
+      const usar = Math.min(restante, Math.max(0, lote.disponivel));
+      if (usar > 0) { alocacoes.push({ loteId: lote.loteId, quantidade: usar }); restante -= usar; }
+    }
+    // Sobra sem cobertura: joga no último lote existente (ou sem lote) permitindo negativo
+    if (restante > 0.0001) {
+      const alvo = lotes[lotes.length - 1];
+      alocacoes.push({ loteId: alvo?.loteId ?? null, quantidade: restante });
+    }
+
+    for (const a of alocacoes) {
+      await this.movimentar(tenantId, {
+        filialId: dto.filialId, produtoId: dto.produtoId, tipo,
+        quantidade: a.quantidade, loteId: a.loteId ?? undefined,
+        nfeId: dto.nfeId, pedidoId: dto.pedidoId, usuarioId: dto.usuarioId,
+        permitirNegativo: true, observacoes: dto.observacoes,
+      });
+    }
+    return alocacoes;
+  }
+
+  /**
    * Transferência entre filiais — gera saída na origem e entrada no destino
    */
   async transferir(tenantId: string, dto: {

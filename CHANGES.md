@@ -20,6 +20,29 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-01] — FEFO automático: separação sugere o lote e a baixa consome por validade
+
+### O que mudou
+- **Baixa por FEFO** (First Expired, First Out): ao faturar, o sistema agora **consome o lote que
+  vence primeiro**, alocando a quantidade entre os lotes por ordem de validade (sobra sem
+  cobertura sai do último lote, podendo ficar negativo — regra "a comprar").
+- **Separação sugere o lote certo**: na tela de Separação/Pesagem, cada item mostra uma badge
+  **"📦 Pegar lote X · vence dd/mm (Nd)"**, colorida por urgência (vermelho vencido, laranja ≤2d,
+  azul no prazo). O separador pega o lote que o sistema aponta, evitando perda.
+
+### Backend
+- `EstoqueService.getFefoLotes()` — lotes do produto na filial com saldo, ordenados por validade.
+- `EstoqueService.baixarFefo()` — baixa alocando FEFO (uma movimentação por lote).
+- Novo endpoint `GET /estoque/:filialId/fefo/:produtoId` (sugestão para a separação).
+- `nfe.emitida` passou a usar `baixarFefo` no lugar do `movimentar` simples.
+
+### Arquivos
+- `backend/src/modules/estoque/{estoque.service.ts, estoque.controller.ts}`
+- `backend/src/modules/nfe/nfe.service.ts`
+- `frontend/src/modules/logistica/pages/SeparacaoPesagem.tsx`
+
+---
+
 ## [2026-07-01] — Módulo Estoque / WMS em dark mode: Perecíveis, Entradas, Movimentações, Inventário
 
 ### O que mudou

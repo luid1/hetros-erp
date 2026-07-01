@@ -230,15 +230,15 @@ export class NFeService {
       for (const item of payload.itens) {
         if (!item.produtoId) continue;
         try {
-          await this.estoque.movimentar(payload.tenantId, {
+          // FEFO: consome dos lotes que vencem primeiro
+          await this.estoque.baixarFefo(payload.tenantId, {
             filialId: payload.filialId,
             produtoId: item.produtoId,
             tipo: TipoMovimentacao.SAIDA_VENDA,
             quantidade: Number(item.quantidade),
             nfeId: payload.nfeId,
             usuarioId: payload.usuarioId,
-            permitirNegativo: true,
-            observacoes: `Baixa automática NF-e ${payload.nfeId.slice(0, 8)}`,
+            observacoes: `Baixa automática (FEFO) NF-e ${payload.nfeId.slice(0, 8)}`,
           });
         } catch (e: any) {
           this.logger.warn(`⚠️ Baixa de estoque falhou p/ produto ${item.produtoId}: ${e.message}`);

@@ -9,6 +9,7 @@ const kg = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFrac
 
 interface ItemSep {
   id: string;
+  produtoId?: string;
   descricao: string;
   quantidade: string;
   unidade: string;
@@ -17,6 +18,8 @@ interface ItemSep {
   cortado: boolean;
   produto?: { codigo?: string; pesoLiquido?: string | null; pesoBruto?: string | null };
 }
+
+type FefoLote = { loteId: string | null; loteNumero: string | null; dataValidade: string | null; disponivel: number; diasAteVencer: number | null };
 
 function pesoVendidoRef(it: ItemSep): number {
   const u = (it.unidade || '').toUpperCase();
@@ -36,13 +39,31 @@ export default function SeparacaoPainel({ pedidoId, onMudou }: {
   const [itens, setItens] = useState<ItemSep[]>([]);
   const [pesandoIdx, setPesandoIdx] = useState<number | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [fefo, setFefo] = useState<Record<string, FefoLote[]>>({});
 
   const carregar = useCallback(async () => {
     const { data } = await api.get(`/pedidos/${pedidoId}`);
     setPedido(data);
     setItens(data.itens || []);
+    // Sugestão FEFO por produto (lote que vence primeiro)
+    const filialId = data.filialOrigemId;
+    if (filialId) {
+      const ids: string[] = [...new Set((data.itens || []).map((i: any) => i.produtoId).filter(Boolean))] as string[];
+      const map: Record<string, FefoLote[]> = {};
+      await Promise.all(ids.map(async (pid) => {
+        try { const r = await api.get(`/estoque/${filialId}/fefo/${pid}`); map[pid] = r.data; } catch { /* noop */ }
+      }));
+      setFefo(map);
+    }
   }, [pedidoId]);
   useEffect(() => { carregar(); }, [carregar]);
+
+  // Primeiro lote com saldo disponível (sugestão de separação FEFO)
+  const loteSugerido = (produtoId?: string): FefoLote | null => {
+    if (!produtoId) return null;
+    const lotes = fefo[produtoId] || [];
+    return lotes.find(l => l.disponivel > 0 && l.loteNumero) || null;
+  };
 
   const conferidos = itens.filter(i => i.separado || i.cortado).length;
   const pct = itens.length ? Math.round((conferidos / itens.length) * 100) : 0;
@@ -123,6 +144,11 @@ export default function SeparacaoPainel({ pedidoId, onMudou }: {
               <div className="flex-1 min-w-0">
                 <p className={`text-4xl font-black truncate ${status === 'cortado' ? 'line-through text-slate-400' : 'text-slate-800'}`}>{it.descricao}</p>
                 <p className="text-2xl text-slate-400 mt-1">Pedido: {kg(Number(it.quantidade))} {it.unidade}{ref > 0 ? ` · esperado ${kg(ref)} kg` : ''}</p>
+                {(() => { const l = loteSugerido(it.produtoId); return l ? (
+                  <span className={`inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-lg text-lg font-bold ${l.diasAteVencer != null && l.diasAteVencer < 0 ? 'bg-red-100 text-red-700' : l.diasAteVencer != null && l.diasAteVencer <= 2 ? 'bg-orange-100 text-orange-700' : 'bg-sky-100 text-sky-700'}`}>
+                    📦 Pegar lote {l.loteNumero}{l.dataValidade ? ` · vence ${new Date(l.dataValidade).toLocaleDateString('pt-BR')}` : ''}{l.diasAteVencer != null ? ` (${l.diasAteVencer < 0 ? 'vencido' : l.diasAteVencer + 'd'})` : ''}
+                  </span>
+                ) : null; })()}
               </div>
               <div className="text-right shrink-0">
                 {status === 'ok' ? (

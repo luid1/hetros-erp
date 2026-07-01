@@ -44,6 +44,12 @@ export class EstoqueController {
     return this.service.getAlertasValidade(tenantId, filialId, dias ? Number(dias) : 5);
   }
 
+  @Get(':filialId/fefo/:produtoId')
+  @ApiOperation({ summary: 'Lotes do produto ordenados por validade (FEFO) — sugestão de separação' })
+  fefo(@CurrentTenant() tenantId: string, @Param('filialId') filialId: string, @Param('produtoId') produtoId: string) {
+    return this.service.getFefoLotes(tenantId, filialId, produtoId);
+  }
+
   @Get(':filialId/a-comprar')
   @ApiOperation({ summary: 'Produtos com estoque negativo ou abaixo do mínimo (a comprar/repor)' })
   aComprar(@CurrentTenant() tenantId: string, @Param('filialId') filialId: string) {
