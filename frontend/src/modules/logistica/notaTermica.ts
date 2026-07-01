@@ -111,11 +111,126 @@ export function imprimirNotaSeparacao(pedido: any) {
   </div>
 </body></html>`;
 
-  const w = window.open('', '_blank', 'width=380,height=700');
+  abrirImpressao(html);
+}
+
+// ─────────────────────────────────────────────────────────────
+// CUPOM FISCAL (estilo NFC-e) — bobina 80mm
+// Aceita um pedido (usa preços do pedido) e, opcionalmente, uma NF-e
+// (usa chave de acesso real). Modo teste → "SEM VALOR FISCAL".
+// ─────────────────────────────────────────────────────────────
+const R$ = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const FORMA: Record<string, string> = { DINHEIRO: 'Dinheiro', PIX: 'PIX', CARTAO_CREDITO: 'Cartão Crédito', CARTAO_DEBITO: 'Cartão Débito', BOLETO: 'Boleto', A_PRAZO: 'A Prazo', CHEQUE: 'Cheque' };
+
+// "QR code" ilustrativo (grade pseudo-aleatória a partir de uma semente)
+function fakeQr(seed: string) {
+  const n = 21; let h = 0; for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  const rnd = () => { h = (h * 1103515245 + 12345) & 0x7fffffff; return (h >>> 8) & 1; };
+  let cells = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    const finder = (r < 7 && c < 7) || (r < 7 && c >= n - 7) || (r >= n - 7 && c < 7);
+    const on = finder ? ((r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4) || r === n - 1 || r === n - 7 || c === n - 1 || c === n - 7) ? 1 : 0) : rnd();
+    if (on) cells += `<span style="grid-row:${r + 1};grid-column:${c + 1}"></span>`;
+  }
+  return `<div class="qr">${cells}</div>`;
+}
+
+export function imprimirCupomFiscal(pedido: any, nfe?: any) {
+  const cli = pedido.cliente || {};
+  const itens: any[] = (pedido.itens || []).filter((i: any) => !i.cortado);
+  const origin = window.location.origin;
+  const chave = (nfe?.chaveAcesso || '').replace(/\D/g, '');
+  const chaveFmt = chave ? chave.replace(/(.{4})/g, '$1 ').trim() : '';
+  const totalItens = itens.length;
+  const valorTotal = Number(pedido.valorTotal) || itens.reduce((s, i) => s + Number(i.valorTotal || 0), 0);
+
+  const linhas = itens.map((i, idx) => {
+    const unit = Number(i.precoUnitario ?? i.valorUnitario ?? 0);
+    const tot = Number(i.valorTotal ?? (Number(i.quantidade) * unit));
+    return `
+      <div class="ci">
+        <div class="ci1"><span class="ci-i">${String(idx + 1).padStart(3, '0')}</span> ${up(i.produto?.codigo || '')} ${up(i.descricao || i.produto?.descricao)}</div>
+        <div class="ci2"><span>${q(i.quantidade, i.unidade)} x ${R$(unit)}</span><span class="ci-t">${R$(tot)}</span></div>
+      </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cupom ${pedido.numero || ''}</title>
+<style>
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { size: 80mm auto; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #fff; }
+  .c80 { width: 74mm; margin: 0 auto; padding: 3mm 2mm; color: #000;
+    font-family: "Arial Narrow", Arial, sans-serif; font-size: 12px; line-height: 1.25; }
+  .center { text-align: center; }
+  .logo img { height: 11mm; max-width: 60mm; object-fit: contain; }
+  .emit { text-align: center; font-size: 10.5px; }
+  .emit .nome { font-weight: 800; font-size: 12px; }
+  .rule { border-top: 1px solid #000; margin: 4px 0; }
+  .dash { border-top: 1px dashed #000; margin: 4px 0; }
+  .tit { text-align: center; font-weight: 800; font-size: 11px; }
+  .colh { display: flex; justify-content: space-between; font-weight: 800; font-size: 10px; }
+  .ci { margin: 2px 0; }
+  .ci1 { font-size: 11.5px; }
+  .ci-i { font-weight: 700; }
+  .ci2 { display: flex; justify-content: space-between; font-size: 11px; padding-left: 22px; }
+  .ci-t { font-weight: 700; }
+  .tot { display: flex; justify-content: space-between; font-weight: 800; }
+  .totbig { font-size: 16px; }
+  .pg { display: flex; justify-content: space-between; font-size: 11.5px; }
+  .chave { font-family: "Courier New", monospace; font-size: 10px; word-break: break-all; text-align: center; }
+  .qr { display: grid; grid-template-columns: repeat(21, 3px); grid-template-rows: repeat(21, 3px); width: 63px; margin: 6px auto; }
+  .qr span { background: #000; width: 3px; height: 3px; }
+  .toolbar { text-align: center; margin: 10px 0; }
+  .btn { padding: 9px 18px; font-size: 13px; border: 1px solid #999; border-radius: 6px; background: #fff; cursor: pointer; }
+  @media print { .toolbar { display: none; } }
+</style></head><body>
+  <div class="toolbar"><button class="btn" onclick="window.print()">🖨️ Imprimir</button></div>
+  <div class="c80">
+    <div class="center logo"><img src="${origin}/logo-hetros.png" alt="HETROS" /></div>
+    <div class="emit">
+      <div class="nome">HETROS IMP. E EXP. LTDA</div>
+      <div>CNPJ 12.345.678/0001-95 · IE 111111111111</div>
+      <div>AV DR GASTÃO VIDIGAL, S/N - BOX 19 - CEASA</div>
+      <div>VILA LEOPOLDINA · SÃO PAULO/SP</div>
+    </div>
+    <div class="rule"></div>
+    <div class="tit">DANFE NFC-e — Documento Auxiliar da<br/>Nota Fiscal de Consumidor Eletrônica</div>
+    <div class="dash"></div>
+    <div class="colh"><span>ITEM CÓD DESCRIÇÃO</span><span>VL TOTAL</span></div>
+    <div class="colh"><span style="font-weight:400;font-size:9px">QTD x UNIT</span><span></span></div>
+    <div class="dash"></div>
+    ${linhas || '<div class="center">— sem itens —</div>'}
+    <div class="dash"></div>
+    <div class="tot"><span>Qtd. total de itens</span><span>${totalItens}</span></div>
+    <div class="tot totbig"><span>VALOR TOTAL R$</span><span>${R$(valorTotal)}</span></div>
+    <div class="pg"><span>Forma de pagamento</span><span>${FORMA[up(pedido.formaPagamento)] || pedido.formaPagamento || '-'}</span></div>
+    <div class="pg"><span>Valor pago</span><span>R$ ${R$(valorTotal)}</span></div>
+    <div class="dash"></div>
+    <div class="center" style="font-size:10.5px">
+      <b>CONSUMIDOR</b><br/>
+      ${up(cli.razaoSocial || cli.nomeFantasia || 'CONSUMIDOR NÃO IDENTIFICADO')}<br/>
+      ${cli.cnpjCpf ? 'CNPJ/CPF ' + cli.cnpjCpf : ''}
+    </div>
+    <div class="dash"></div>
+    <div class="center" style="font-size:10px">${nfe?.numero ? `NFC-e nº ${nfe.numero} · Série ${nfe.serie || '1'}` : `Pedido nº ${pedido.numero}`} · ${dtHora(nfe?.dataEmissao || new Date())}</div>
+    ${chave ? `
+      <div class="center" style="font-size:9px;margin-top:4px">Consulte pela Chave de Acesso em:<br/>www.nfce.fazenda.sp.gov.br</div>
+      <div class="chave">${chaveFmt}</div>
+      ${fakeQr(chave)}
+    ` : ''}
+    <div class="center" style="margin-top:6px;font-weight:800;font-size:11px">*** SEM VALOR FISCAL — MODO TESTE ***</div>
+    <div style="height:10mm"></div>
+  </div>
+</body></html>`;
+
+  abrirImpressao(html);
+}
+
+function abrirImpressao(html: string) {
+  const w = window.open('', '_blank', 'width=390,height=720');
   if (w) {
     w.document.write(html);
     w.document.close();
-    // espera a logo carregar antes de imprimir
     setTimeout(() => { try { w.focus(); w.print(); } catch { /* noop */ } }, 500);
   }
 }

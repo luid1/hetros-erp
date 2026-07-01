@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, RefreshCw, Printer, Scale, FileText, PackageCheck } from 'lucide-react';
+import { ClipboardList, RefreshCw, Printer, Scale, FileText, PackageCheck, Receipt } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
-import { imprimirNotaSeparacao } from '../notaTermica';
+import { imprimirNotaSeparacao, imprimirCupomFiscal } from '../notaTermica';
 
 const kg = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const dt = (v: any) => v ? new Date(v).toLocaleDateString('pt-BR') : '—';
@@ -52,8 +52,11 @@ export default function Lider() {
     setSelId(l.id); setDetalhe(null);
     try { const { data } = await api.get(`/pedidos/${l.id}`); setDetalhe(data); } catch { /* noop */ }
   };
-  const imprimirNota = async (l: any) => {
+  const imprimirBilhete = async (l: any) => {
     try { const { data } = await api.get(`/pedidos/${l.id}`); imprimirNotaSeparacao(data); } catch { /* noop */ }
+  };
+  const imprimirCupom = async (l: any) => {
+    try { const { data } = await api.get(`/pedidos/${l.id}`); imprimirCupomFiscal(data); } catch { /* noop */ }
   };
   const abrirSeparacao = (l: any) => navigate(`/logistica/operacional?pedido=${l.id}`);
 
@@ -112,7 +115,8 @@ export default function Lider() {
                       <td className="px-3 py-2"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${st(l.statusPedido).chip}`}>{st(l.statusPedido).label}</span></td>
                       <td className="px-3 py-2 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => imprimirNota(l)} className="flex items-center gap-1 text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-bold hover:bg-sky-500/20" title="Imprimir nota (80mm)"><Printer className="h-3 w-3" /> Nota</button>
+                          <button onClick={() => imprimirCupom(l)} className="flex items-center gap-1 text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-bold hover:bg-sky-500/20" title="Cupom fiscal (80mm)"><Receipt className="h-3 w-3" /> Nota</button>
+                          <button onClick={() => imprimirBilhete(l)} className="flex items-center gap-1 text-[11px] bg-slate-700/40 text-slate-200 border border-slate-600 px-2 py-1 rounded font-bold hover:bg-slate-700" title="Bilhete de separação (80mm)"><Printer className="h-3 w-3" /> Bilhete</button>
                           {l.statusPedido !== 'FATURADO' && <button onClick={() => abrirSeparacao(l)} className="flex items-center gap-1 text-[11px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-2 py-1 rounded font-bold hover:bg-emerald-500/20" title="Abrir separação/pesagem"><Scale className="h-3 w-3" /> Separar</button>}
                         </div>
                       </td>
@@ -174,7 +178,8 @@ export default function Lider() {
                 </table>
               </div>
               <div className="flex flex-col gap-2 pt-1">
-                <button onClick={() => imprimirNotaSeparacao(detalhe)} className="flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg px-4 py-2.5 text-sm font-bold"><Printer className="h-4 w-4" /> Imprimir Nota (80mm)</button>
+                <button onClick={() => imprimirCupomFiscal(detalhe)} className="flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg px-4 py-2.5 text-sm font-bold"><Receipt className="h-4 w-4" /> Imprimir Nota / Cupom (80mm)</button>
+                <button onClick={() => imprimirNotaSeparacao(detalhe)} className="flex items-center justify-center gap-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-200 rounded-lg px-4 py-2.5 text-sm font-bold"><Printer className="h-4 w-4" /> Bilhete de Separação (80mm)</button>
                 {detalhe.status !== 'FATURADO' && <button onClick={() => abrirSeparacao(detalhe)} className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-4 py-2.5 text-sm font-bold"><Scale className="h-4 w-4" /> Abrir Separação / Pesagem</button>}
                 <button onClick={() => navigate('/fiscal/emitir')} className="flex items-center justify-center gap-2 bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-200 rounded-lg px-4 py-2.5 text-sm font-bold"><FileText className="h-4 w-4" /> Ir para Faturamento</button>
               </div>

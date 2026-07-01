@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import api from '../../../services/api';
 import { useBalanca } from '../../../hooks/useBalanca';
-import { imprimirNotaSeparacao } from '../notaTermica';
+import { imprimirNotaSeparacao, imprimirCupomFiscal } from '../notaTermica';
 
 const kg = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
@@ -108,7 +108,11 @@ export default function SeparacaoPainel({ pedidoId, onMudou }: {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button onClick={() => pedido && imprimirNotaSeparacao(pedido)} disabled={!pedido}
-              className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-40 active:scale-95 transition-transform">
+              className="flex items-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg px-3 py-2 text-sm font-bold disabled:opacity-40 active:scale-95 transition-transform">
+              <Printer className="h-4 w-4" /> Bilhete
+            </button>
+            <button onClick={() => pedido && imprimirCupomFiscal(pedido)} disabled={!pedido}
+              className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg px-3 py-2 text-sm font-bold disabled:opacity-40 active:scale-95 transition-transform">
               <Printer className="h-4 w-4" /> Nota
             </button>
             {jaSeparado ? (
