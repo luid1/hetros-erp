@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PackageCheck, RefreshCw, PackageSearch, Printer } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
@@ -25,6 +26,10 @@ export default function Operacional() {
   const [loading, setLoading] = useState(false);
   const [filtro, setFiltro] = useState<StatusKey | 'TODOS'>('TODOS');
   const [selId, setSelId] = useState<string | null>(null);
+  const [params] = useSearchParams();
+
+  // Veio da tela do Líder com um pedido específico → já abre ele
+  useEffect(() => { const p = params.get('pedido'); if (p) setSelId(p); }, [params]);
 
   const carregar = useCallback(() => {
     if (!filialAtiva) return;
