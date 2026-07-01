@@ -15,6 +15,10 @@ import Produtos from './modules/cadastros/pages/Produtos';
 import Fornecedores from './modules/cadastros/pages/Fornecedores';
 import Transportadoras from './modules/cadastros/pages/Transportadoras';
 import Filiais from './modules/cadastros/pages/Filiais';
+import Pereciveis from './modules/estoque/pages/Pereciveis';
+import Entradas from './modules/estoque/pages/Entradas';
+import Movimentacoes from './modules/estoque/pages/Movimentacoes';
+import Inventario from './modules/estoque/pages/Inventario';
 import Faturamento from './modules/fiscal/pages/Faturamento';
 import NotasEmitidas from './modules/fiscal/pages/NotasEmitidas';
 import MatrizFiscal from './modules/fiscal/pages/MatrizFiscal';
@@ -62,10 +66,10 @@ export default function App() {
 
             {/* WMS */}
             <Route path="wms/posicao" element={<PosicaoEstoque />} />
-            <Route path="wms/pereciveis" element={<Placeholder title="Perecíveis / FLV" />} />
-            <Route path="wms/entradas" element={<Placeholder title="Entradas XML NF-e" />} />
-            <Route path="wms/movimentacoes" element={<Placeholder title="Movimentações" />} />
-            <Route path="wms/inventario" element={<Placeholder title="Inventário" />} />
+            <Route path="wms/pereciveis" element={<Pereciveis />} />
+            <Route path="wms/entradas" element={<Entradas />} />
+            <Route path="wms/movimentacoes" element={<Movimentacoes />} />
+            <Route path="wms/inventario" element={<Inventario />} />
             <Route path="wms/analise-estoque" element={<AnaliseEstoqueFisico />} />
 
             {/* Logística */}

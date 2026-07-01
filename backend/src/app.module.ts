@@ -12,6 +12,7 @@ import { ProdutosModule } from './modules/produtos/produtos.module';
 import { EstoqueModule } from './modules/estoque/estoque.module';
 import { MovimentacoesModule } from './modules/movimentacoes/movimentacoes.module';
 import { InventarioModule } from './modules/inventario/inventario.module';
+import { EntradasModule } from './modules/entradas/entradas.module';
 import { PedidosModule } from './modules/pedidos/pedidos.module';
 import { NFeModule } from './modules/nfe/nfe.module';
 import { FiscalModule } from './modules/fiscal/fiscal.module';
@@ -41,6 +42,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     EstoqueModule,
     MovimentacoesModule,
     InventarioModule,
+    EntradasModule,
     PedidosModule,
     NFeModule,
     FiscalModule,

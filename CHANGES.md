@@ -20,6 +20,42 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-01] — Módulo Estoque / WMS em dark mode: Perecíveis, Entradas, Movimentações, Inventário
+
+### O que mudou
+Detalhamento completo das 4 telas que eram placeholder no grupo **B · Estoque / WMS**
+(dark, reusando o kit de UI de Cadastros):
+
+- **Perecíveis / FLV** (`/wms/pereciveis`): controle **FEFO** por validade. Filtro de janela
+  (3/7/15/30 dias), KPIs (vencidos, vencendo ≤2d, lotes em alerta), dias restantes coloridos e
+  ações de baixa por **Perda/Avaria** (gera ajuste de estoque). Usa `GET /estoque/:filial/alertas-validade`.
+- **Entradas (XML NF-e)** (`/wms/entradas`): recebimento de mercadoria. **Importa o XML da NF-e
+  do fornecedor** (parse no navegador, preenche itens/NCM/qtd/valor + chave/nº), vínculo de
+  produtos por item, lote e validade, e opção de **gerar Contas a Pagar**. Dá **entrada no estoque**
+  (ENTRADA_COMPRA) com criação de **lote/validade** (rastreabilidade).
+- **Movimentações** (`/wms/movimentacoes`): extrato filtrável (tipo, período, produto) com KPIs
+  de entradas × saídas, saldo antes→depois, custo e usuário. Usa `GET /estoque/:filial/movimentacoes`.
+- **Inventário** (`/wms/inventario`): fluxo **abrir → contar → fechar**. Ao abrir, congela o saldo
+  do sistema; a contagem salva sozinha; ao fechar, **gera os ajustes** (+/−) automaticamente.
+
+### Backend
+- Novo módulo **`entradas`** (service + controller): registra entrada, cria lote/validade e
+  movimenta o estoque; opcional Contas a Pagar.
+- Módulo **`inventario`** implementado de verdade (era stub): abrir (snapshot), contar, fechar
+  (gera AJUSTE_POSITIVO/NEGATIVO via EstoqueService).
+- Seed de lotes com validade (vencido, hoje, 5d, 20d) para testar os perecíveis.
+
+### Arquivos
+- `backend/src/modules/entradas/*` (novo), `backend/src/modules/inventario/*`, `backend/src/app.module.ts`
+- `frontend/src/modules/estoque/pages/{Pereciveis, Entradas, Movimentacoes, Inventario}.tsx` (novos)
+- `frontend/src/App.tsx`
+
+### Observação
+- As telas novas de WMS usam **dark**; **Posição de Estoque** e **Análise Estoque Físico**
+  (as 2 que já existiam) seguem no tema claro — dá pra migrar depois pra uniformizar.
+
+---
+
 ## [2026-06-30] — Módulo Cadastros (FLV) em dark mode: 5 telas + campos de nicho
 
 ### O que mudou
