@@ -94,40 +94,53 @@ export default function SeparacaoPainel({ pedidoId, onMudou }: {
 
   const st = (it: ItemSep) => it.cortado ? 'cortado' : it.separado ? 'ok' : 'pendente';
 
+  const obs = [pedido?.observacoes, pedido?.observacoesNf].filter(Boolean).join(' · ');
+
   return (
     <div className="flex flex-col h-full bg-slate-50">
       {/* Cabeçalho do pedido */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 shrink-0">
-        <div className="flex items-center justify-between gap-4">
+      <div className="bg-white border-b border-slate-200 px-4 py-2.5 shrink-0">
+        <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-3xl font-black text-slate-800 leading-tight truncate">{pedido?.cliente?.nomeFantasia || pedido?.cliente?.razaoSocial || '—'}</p>
-            <p className="text-lg text-slate-400">Pedido nº {pedido?.numero} · {itens.length} itens</p>
+            <p className="text-lg font-bold text-slate-800 leading-tight truncate">{pedido?.cliente?.nomeFantasia || pedido?.cliente?.razaoSocial || '—'}</p>
+            <p className="text-xs text-slate-400">Pedido nº {pedido?.numero} · {itens.length} itens</p>
           </div>
           {jaSeparado ? (
             <button onClick={reabrir} disabled={salvando}
-              className="flex items-center gap-2 bg-white border-2 border-slate-300 text-slate-600 rounded-2xl px-6 py-4 text-lg font-bold disabled:opacity-40 active:scale-95 transition-transform shrink-0">
-              <Undo2 className="h-5 w-5" /> Reabrir
+              className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-600 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-40 active:scale-95 transition-transform shrink-0">
+              <Undo2 className="h-4 w-4" /> Reabrir
             </button>
           ) : (
             <button onClick={liberar} disabled={salvando || !tudoPronto}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl px-7 py-4 text-xl font-black disabled:opacity-30 active:scale-95 transition-transform shrink-0">
-              <Truck className="h-6 w-6" /> Finalizar
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-5 py-2 text-sm font-bold disabled:opacity-30 active:scale-95 transition-transform shrink-0">
+              <Truck className="h-4 w-4" /> Finalizar
             </button>
           )}
         </div>
-        <div className="mt-3">
-          <div className="flex justify-between text-lg text-slate-500 mb-1">
+        <div className="mt-2">
+          <div className="flex justify-between text-xs text-slate-500 mb-1">
             <span>{conferidos} de {itens.length} itens confirmados</span>
             <span className="font-bold">{pct}%</span>
           </div>
-          <div className="h-4 bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
             <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
           </div>
         </div>
       </div>
 
+      {/* Observações do pedido — destaque para o separador */}
+      {obs && (
+        <div className="bg-amber-100 border-b-2 border-amber-400 px-4 py-2.5 shrink-0 flex items-start gap-2">
+          <span className="text-lg leading-none mt-0.5">📌</span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-wide text-amber-700">Observações do pedido</p>
+            <p className="text-base font-bold text-amber-900 leading-snug">{obs}</p>
+          </div>
+        </div>
+      )}
+
       {/* Lista de itens */}
-      <div className="flex-1 overflow-auto p-4 space-y-3">
+      <div className="flex-1 overflow-auto p-3 space-y-2">
         {itens.map((it, idx) => {
           const status = st(it);
           const ref = pesoVendidoRef(it);
@@ -135,38 +148,38 @@ export default function SeparacaoPainel({ pedidoId, onMudou }: {
           const div = af - ref;
           return (
             <button key={it.id} onClick={() => setPesandoIdx(idx)}
-              className={`w-full flex items-center gap-5 bg-white rounded-2xl px-6 py-6 text-left shadow-sm border-2 active:scale-[0.99] transition-transform
+              className={`w-full flex items-center gap-3 bg-white rounded-xl px-4 py-3 text-left shadow-sm border-2 active:scale-[0.99] transition-transform
                 ${status === 'ok' ? 'border-emerald-300' : status === 'cortado' ? 'border-amber-300 opacity-70' : 'border-transparent hover:border-slate-300'}`}>
-              <div className={`h-20 w-20 rounded-full flex items-center justify-center text-3xl font-black shrink-0
+              <div className={`h-11 w-11 rounded-full flex items-center justify-center text-lg font-black shrink-0
                 ${status === 'cortado' ? 'bg-amber-500 text-white' : status === 'ok' ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
                 {status === 'cortado' ? '✕' : status === 'ok' ? '✓' : idx + 1}
               </div>
               <div className="flex-1 min-w-0">
-                <p className={`text-4xl font-black truncate ${status === 'cortado' ? 'line-through text-slate-400' : 'text-slate-800'}`}>{it.descricao}</p>
-                <p className="text-2xl text-slate-400 mt-1">Pedido: {kg(Number(it.quantidade))} {it.unidade}{ref > 0 ? ` · esperado ${kg(ref)} kg` : ''}</p>
+                <p className={`text-lg font-bold truncate ${status === 'cortado' ? 'line-through text-slate-400' : 'text-slate-800'}`}>{it.descricao}</p>
+                <p className="text-sm text-slate-400">Pedido: {kg(Number(it.quantidade))} {it.unidade}{ref > 0 ? ` · esperado ${kg(ref)} kg` : ''}</p>
                 {(() => { const l = loteSugerido(it.produtoId); return l ? (
-                  <span className={`inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-lg text-lg font-bold ${l.diasAteVencer != null && l.diasAteVencer < 0 ? 'bg-red-100 text-red-700' : l.diasAteVencer != null && l.diasAteVencer <= 2 ? 'bg-orange-100 text-orange-700' : 'bg-sky-100 text-sky-700'}`}>
-                    📦 Pegar lote {l.loteNumero}{l.dataValidade ? ` · vence ${new Date(l.dataValidade).toLocaleDateString('pt-BR')}` : ''}{l.diasAteVencer != null ? ` (${l.diasAteVencer < 0 ? 'vencido' : l.diasAteVencer + 'd'})` : ''}
+                  <span className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded text-xs font-bold ${l.diasAteVencer != null && l.diasAteVencer < 0 ? 'bg-red-100 text-red-700' : l.diasAteVencer != null && l.diasAteVencer <= 2 ? 'bg-orange-100 text-orange-700' : 'bg-sky-100 text-sky-700'}`}>
+                    📦 Lote {l.loteNumero}{l.dataValidade ? ` · vence ${new Date(l.dataValidade).toLocaleDateString('pt-BR')}` : ''}{l.diasAteVencer != null ? ` (${l.diasAteVencer < 0 ? 'vencido' : l.diasAteVencer + 'd'})` : ''}
                   </span>
                 ) : null; })()}
               </div>
               <div className="text-right shrink-0">
                 {status === 'ok' ? (
                   <>
-                    <p className={`text-5xl font-black tabular-nums ${div > 0.005 ? 'text-emerald-600' : div < -0.005 ? 'text-red-500' : 'text-slate-800'}`}>{kg(af)}</p>
-                    <p className="text-base text-slate-400">kg aferido</p>
+                    <p className={`text-2xl font-black tabular-nums ${div > 0.005 ? 'text-emerald-600' : div < -0.005 ? 'text-red-500' : 'text-slate-800'}`}>{kg(af)}</p>
+                    <p className="text-xs text-slate-400">kg aferido</p>
                   </>
                 ) : status === 'cortado' ? (
-                  <p className="text-2xl font-bold text-amber-500">CORTADO</p>
+                  <p className="text-lg font-bold text-amber-500">CORTADO</p>
                 ) : (
-                  <p className="text-2xl text-slate-300">—</p>
+                  <p className="text-lg text-slate-300">—</p>
                 )}
               </div>
-              <ChevronRight className="h-9 w-9 text-slate-300 shrink-0" />
+              <ChevronRight className="h-6 w-6 text-slate-300 shrink-0" />
             </button>
           );
         })}
-        {itens.length === 0 && <p className="text-center text-slate-400 text-xl pt-10">Pedido sem itens.</p>}
+        {itens.length === 0 && <p className="text-center text-slate-400 text-base pt-10">Pedido sem itens.</p>}
       </div>
 
       {/* Modal de pesagem do item */}
@@ -219,8 +232,8 @@ function ModalPesoItem({ item, ref0, salvando, onConfirmar, onCortar, onClose }:
             <X className="h-5 w-5" />
           </button>
           <div className="min-w-0">
-            <p className="text-2xl font-black text-slate-800 truncate">{item.descricao}</p>
-            <p className="text-base text-slate-400">Pedido: {kg(Number(item.quantidade))} {item.unidade}{ref0 > 0 ? ` · esperado ${kg(ref0)} kg` : ''}</p>
+            <p className="text-lg font-bold text-slate-800 truncate">{item.descricao}</p>
+            <p className="text-sm text-slate-400">Pedido: {kg(Number(item.quantidade))} {item.unidade}{ref0 > 0 ? ` · esperado ${kg(ref0)} kg` : ''}</p>
           </div>
         </div>
 
@@ -248,13 +261,13 @@ function ModalPesoItem({ item, ref0, salvando, onConfirmar, onCortar, onClose }:
           {manual ? (
             <div className="text-center py-4">
               <input autoFocus type="number" inputMode="decimal" value={manualVal} onChange={e => setManualVal(e.target.value)}
-                placeholder="0,000" className="w-full text-center text-7xl font-black tabular-nums text-slate-800 border-b-4 border-emerald-400 outline-none py-2" />
-              <p className="text-xl text-slate-400 mt-1">kg (digite o peso)</p>
+                placeholder="0,000" className="w-full text-center text-5xl font-black tabular-nums text-slate-800 border-b-4 border-emerald-400 outline-none py-2" />
+              <p className="text-base text-slate-400 mt-1">kg (digite o peso)</p>
             </div>
           ) : (
             <div className="text-center py-2">
-              <div className="text-8xl font-black tabular-nums text-slate-800 leading-none">
-                {kg(peso)}<span className="text-3xl text-slate-400 ml-2">kg</span>
+              <div className="text-6xl font-black tabular-nums text-slate-800 leading-none">
+                {kg(peso)}<span className="text-2xl text-slate-400 ml-2">kg</span>
               </div>
               <p className={`text-base font-bold mt-1 ${conectado ? (estavel ? 'text-emerald-600' : 'text-amber-500') : 'text-slate-400'}`}>
                 {conectado ? (estavel ? '● peso estável' : '○ medindo…') : 'sem balança — use o Modo Manual'}
@@ -277,14 +290,14 @@ function ModalPesoItem({ item, ref0, salvando, onConfirmar, onCortar, onClose }:
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-3 mt-5">
+          <div className="grid grid-cols-3 gap-2.5 mt-4">
             <button onClick={onCortar} disabled={salvando}
-              className={`flex items-center justify-center gap-2 rounded-2xl py-5 text-lg font-bold ${item.cortado ? 'bg-amber-500 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}>
-              <Scissors className="h-5 w-5" /> {item.cortado ? 'Cortado' : 'Cortar'}
+              className={`flex items-center justify-center gap-2 rounded-xl py-3 text-base font-bold ${item.cortado ? 'bg-amber-500 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}>
+              <Scissors className="h-4 w-4" /> {item.cortado ? 'Cortado' : 'Cortar'}
             </button>
             <button onClick={() => onConfirmar(pesoFoco)} disabled={salvando || (!manual && !conectado && precisaPesar(item))}
-              className="col-span-2 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl py-5 text-2xl font-black disabled:opacity-40 active:scale-95 transition-transform">
-              <Check className="h-7 w-7" /> Confirmar
+              className="col-span-2 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl py-3 text-lg font-black disabled:opacity-40 active:scale-95 transition-transform">
+              <Check className="h-5 w-5" /> Confirmar
             </button>
           </div>
         </div>

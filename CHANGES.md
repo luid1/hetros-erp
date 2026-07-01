@@ -20,6 +20,25 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-01] — Tema dark global + Separação enxuta com observações destacadas
+
+### O que mudou
+- **Tema dark global**: bloco de CSS em `index.css` uniformiza as telas que ainda eram claras
+  (Dashboard, Faturamento, NF-e Emitidas, Pedidos, Controle de Carga, Posição, Análise, etc.)
+  para o azul-escuro/branco, remapeando `bg-white/bg-gray-*`, textos e bordas. As telas já dark
+  não são afetadas; a DANFE continua branca (abre em janela própria p/ impressão).
+- **Separação / Pesagem**:
+  - **Observações do pedido** agora aparecem num **destaque amarelo** no topo (📌), pra o
+    separador não perder recado (PESAR, NOIVA, etc.).
+  - **Reduzidos os tamanhos** (fontes, avatares, botões, modal de pesagem) — a tela estava
+    grande demais; agora cabe mais item por vez sem perder legibilidade no touch.
+
+### Arquivos
+- `frontend/src/index.css`
+- `frontend/src/modules/logistica/pages/SeparacaoPesagem.tsx`
+
+---
+
 ## [2026-07-01] — Receber Ordem de Compra passa pela tela de Entrada (NF/lote/validade)
 
 ### O que mudou
