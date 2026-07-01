@@ -103,6 +103,22 @@ export class EntradasService {
       });
     }
 
+    // Vinculada a uma Ordem de Compra? Marca a OC como entregue (sem re-movimentar estoque).
+    if (dto.ordemCompraId) {
+      try {
+        const oc = await this.prisma.ordemCompra.findFirst({ where: { id: dto.ordemCompraId, tenantId }, include: { itens: true } });
+        if (oc && oc.status !== 'ENTREGUE' && oc.status !== 'CANCELADA') {
+          await this.prisma.ordemCompra.update({
+            where: { id: oc.id },
+            data: { status: 'ENTREGUE', dataEntregaReal: new Date(), entradaId: entrada.id },
+          });
+          for (const it of oc.itens) {
+            await this.prisma.itemOrdemCompra.update({ where: { id: it.id }, data: { quantidadeRecebida: it.quantidade } });
+          }
+        }
+      } catch { /* não bloqueia a entrada se a OC falhar */ }
+    }
+
     // Contas a pagar (opcional)
     if (dto.gerarContaPagar) {
       await this.prisma.contaPagar.create({

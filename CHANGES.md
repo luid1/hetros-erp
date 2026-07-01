@@ -20,6 +20,22 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-01] — Receber Ordem de Compra passa pela tela de Entrada (NF/lote/validade)
+
+### O que mudou
+- Na **Ordem de Compra**, o botão **Receber** agora **leva para a tela de Entradas** com a OC
+  já pré-preenchida (fornecedor + itens com produto/qtd/preço), em vez de dar entrada "às cegas".
+  Lá o usuário confere e completa **NF, chave, lote e validade** e clica em **Dar entrada**.
+- Ao salvar a entrada vinda de uma OC, a **OC é marcada como Entregue** (com `entradaId` e
+  `quantidadeRecebida`), e a entrada faz a baixa no estoque + Contas a Pagar normalmente
+  (sem duplicar).
+
+### Arquivos
+- `frontend/src/modules/estoque/pages/{Compras.tsx, Entradas.tsx}`
+- `backend/src/modules/entradas/entradas.service.ts` (aceita `ordemCompraId` e conclui a OC)
+
+---
+
 ## [2026-07-01] — Fim dos alert/confirm/prompt do navegador + inventário lista todos os produtos
 
 ### O que mudou

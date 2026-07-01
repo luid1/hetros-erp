@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { PackagePlus, RefreshCw, Upload, Trash2, FileCode, Plus } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
@@ -14,6 +15,9 @@ const itemVazio = (): Item => ({ produtoId: '', descricao: '', ncm: '', quantida
 
 export default function Entradas() {
   const { filialAtiva } = useAuth();
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const ocId = params.get('oc') || undefined; // veio de "Receber" numa Ordem de Compra
   const [lista, setLista] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState('');
@@ -25,6 +29,10 @@ export default function Entradas() {
       .then(r => setLista(r.data)).catch(() => setLista([])).finally(() => setLoading(false));
   }, [busca]);
   useEffect(() => { const t = setTimeout(carregar, 250); return () => clearTimeout(t); }, [carregar]);
+
+  // Se veio de uma OC, abre o modal de entrada já pré-preenchido
+  useEffect(() => { if (ocId) setModal(true); }, [ocId]);
+  const fecharModal = () => { setModal(false); if (ocId) { params.delete('oc'); setParams(params, { replace: true }); } };
 
   return (
     <CadastroShell>
@@ -54,12 +62,12 @@ export default function Entradas() {
         )}
       </div>
 
-      {modal && <ModalEntrada onClose={() => setModal(false)} onSalvo={() => { setModal(false); carregar(); }} filialId={filialAtiva?.id} />}
+      {modal && <ModalEntrada ocId={ocId} onClose={fecharModal} onSalvo={() => { fecharModal(); carregar(); navigate('/wms/entradas'); }} filialId={filialAtiva?.id} />}
     </CadastroShell>
   );
 }
 
-function ModalEntrada({ onClose, onSalvo, filialId }: { onClose: () => void; onSalvo: () => void; filialId?: string }) {
+function ModalEntrada({ onClose, onSalvo, filialId, ocId }: { onClose: () => void; onSalvo: () => void; filialId?: string; ocId?: string }) {
   const [fornecedores, setFornecedores] = useState<any[]>([]);
   const [produtos, setProdutos] = useState<any[]>([]);
   const [fornecedorId, setFornecedorId] = useState('');
@@ -73,11 +81,33 @@ function ModalEntrada({ onClose, onSalvo, filialId }: { onClose: () => void; onS
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [aviso, setAviso] = useState('');
+  const [ordemCompraId, setOrdemCompraId] = useState<string | undefined>(undefined);
+  const [ocNumero, setOcNumero] = useState<number | null>(null);
 
   useEffect(() => {
     api.get('/fornecedores').then(r => setFornecedores(r.data)).catch(() => {});
-    api.get('/produtos').then(r => setProdutos(r.data)).catch(() => {});
-  }, []);
+    api.get('/produtos').then(async (r) => {
+      setProdutos(r.data);
+      // Pré-preenche a partir de uma Ordem de Compra (fluxo "Receber")
+      if (ocId) {
+        try {
+          const { data: oc } = await api.get(`/compras/${ocId}`);
+          setFornecedorId(oc.fornecedorId);
+          setOrdemCompraId(oc.id);
+          setOcNumero(oc.numero);
+          setItens(oc.itens.map((it: any) => {
+            const prod = r.data.find((p: any) => p.id === it.produtoId);
+            return {
+              produtoId: it.produtoId || '', descricao: it.descricao, ncm: prod?.ncm || '',
+              quantidade: String(it.quantidade), unidade: it.unidade || 'KG',
+              valorUnitario: String(it.precoUnitario), loteNumero: '', dataValidade: '',
+            } as Item;
+          }));
+          setAviso(`Recebendo a OC #${oc.numero}. Confira/complete NF, lote e validade e clique em "Dar entrada".`);
+        } catch { /* noop */ }
+      }
+    }).catch(() => {});
+  }, [ocId]);
 
   const setItem = (i: number, k: keyof Item, v: string) => setItens(p => p.map((it, idx) => idx === i ? { ...it, [k]: v } : it));
   // Ao vincular um produto, puxa NCM / descrição / unidade do cadastro
@@ -127,7 +157,8 @@ function ModalEntrada({ onClose, onSalvo, filialId }: { onClose: () => void; onS
     if (itensValidos.length === 0) return setErro('Informe ao menos um item com quantidade.');
     setSalvando(true); setErro('');
     const payload = {
-      fornecedorId, filialId, numeroNf: numeroNf || null, serieNf, chaveNfeEntrada: chave || null,
+      fornecedorId, filialId, ordemCompraId: ordemCompraId || null,
+      numeroNf: numeroNf || null, serieNf, chaveNfeEntrada: chave || null,
       dataEmissao: dataEmissao || null, gerarContaPagar: gerarCP, dataVencimento: dataVenc || null,
       itens: itensValidos.map(i => ({
         produtoId: i.produtoId || null, descricao: i.descricao.trim(), ncm: i.ncm || null,
@@ -144,7 +175,7 @@ function ModalEntrada({ onClose, onSalvo, filialId }: { onClose: () => void; onS
   const totalNota = itens.reduce((s, i) => s + (Number(i.quantidade) || 0) * (Number(i.valorUnitario) || 0), 0);
 
   return (
-    <Modal titulo="Nova Entrada de Mercadoria" onClose={onClose} onSalvar={salvar} salvando={salvando} salvarLabel="Dar entrada" wide>
+    <Modal titulo={ocNumero ? `Receber OC #${ocNumero} — Entrada de Mercadoria` : 'Nova Entrada de Mercadoria'} onClose={onClose} onSalvar={salvar} salvando={salvando} salvarLabel="Dar entrada" wide>
       {/* Upload XML */}
       <label className="flex items-center gap-3 bg-slate-800/60 border border-dashed border-slate-600 rounded-lg px-4 py-3 cursor-pointer hover:border-sky-500">
         <Upload className="h-5 w-5 text-sky-400" />

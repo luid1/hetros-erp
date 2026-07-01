@@ -1,5 +1,6 @@
 import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ShoppingCart, RefreshCw, Trash2, Plus, Check, PackageCheck, Ban, Pencil } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
@@ -18,6 +19,7 @@ const CONatoLabel: Record<string, string> = { A_VISTA: 'À vista', '7_DIAS': '7 
 
 export default function Compras() {
   const { filialAtiva } = useAuth();
+  const navigate = useNavigate();
   const [lista, setLista] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState('');
@@ -71,7 +73,7 @@ export default function Compras() {
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     <div className="flex items-center gap-1">
                       {oc.status === 'PENDENTE' && <button onClick={() => acao(oc, 'APROVADA')} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Check className="h-3 w-3" /> Aprovar</button>}
-                      {(oc.status === 'PENDENTE' || oc.status === 'APROVADA' || oc.status === 'PARCIAL') && <button onClick={() => acao(oc, 'ENTREGUE', `Receber a OC #${oc.numero}? Isso dá entrada no estoque e gera contas a pagar.`)} className="text-[11px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-2 py-1 rounded font-semibold hover:bg-emerald-500/20 flex items-center gap-1"><PackageCheck className="h-3 w-3" /> Receber</button>}
+                      {(oc.status === 'PENDENTE' || oc.status === 'APROVADA' || oc.status === 'PARCIAL') && <button onClick={() => navigate(`/wms/entradas?oc=${oc.id}`)} className="text-[11px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-2 py-1 rounded font-semibold hover:bg-emerald-500/20 flex items-center gap-1" title="Receber via Entrada de mercadoria"><PackageCheck className="h-3 w-3" /> Receber</button>}
                       {(oc.status === 'PENDENTE' || oc.status === 'APROVADA') && <button onClick={() => abrirEditar(oc)} className="text-slate-400 hover:text-sky-300 p-1" title="Editar"><Pencil className="h-3.5 w-3.5" /></button>}
                       {oc.status !== 'ENTREGUE' && oc.status !== 'CANCELADA' && <button onClick={() => acao(oc, 'CANCELADA', `Cancelar a OC #${oc.numero}?`)} className="text-slate-400 hover:text-rose-400 p-1" title="Cancelar"><Ban className="h-3.5 w-3.5" /></button>}
                       {oc.status === 'PENDENTE' && <button onClick={() => excluir(oc)} className="text-slate-400 hover:text-rose-400 p-1" title="Excluir"><Trash2 className="h-3.5 w-3.5" /></button>}
