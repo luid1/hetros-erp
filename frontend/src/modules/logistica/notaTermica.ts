@@ -1,91 +1,112 @@
-// Nota / bilhete de separação em bobina térmica 80mm (ex.: Benetech MP-4200 TH).
-// Abre uma janela já com @page 80mm e dispara a impressão.
+// Bilhete Separador em bobina térmica 80mm (ex.: Benetech MP-4200 TH).
+// Layout no padrão do NewOxxy: cabeçalho + itens agrupados por família,
+// com colunas Qtde Separação / Qtde Vendida e caixinha de conferência.
 
-const kg = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const q = (qtd: any, un: any) => `${(Number(qtd) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 })} ${un || ''}`.trim();
 const dt = (v: any) => v ? new Date(v).toLocaleDateString('pt-BR') : '';
-const hm = () => new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const dtHora = (v: any) => v ? new Date(v).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+const up = (s: any) => String(s || '').toUpperCase();
+
+const FAMILIA: Record<string, string> = { FRUTA: 'FRUTA', LEGUME: 'LEGUME', VERDURA: 'VERDURA' };
 
 export function imprimirNotaSeparacao(pedido: any) {
   const cli = pedido.cliente || {};
-  const itens: any[] = pedido.itens || [];
-  const obs = [pedido.observacoes, pedido.observacoesNf].filter(Boolean).join(' · ');
-  const totalItens = itens.length;
-  const pesoTotal = itens.reduce((s, i) => {
-    const u = (i.unidade || '').toUpperCase();
-    const pesoUnit = Number(i.produto?.pesoLiquido || i.produto?.pesoBruto || 0);
-    const p = u.startsWith('KG') ? Number(i.pesoAferido || i.quantidade) : Number(i.pesoAferido || (Number(i.quantidade) * pesoUnit));
-    return s + (Number(p) || 0);
-  }, 0);
+  const end: any = cli.enderecoJson || {};
+  const itens: any[] = (pedido.itens || []).filter((i: any) => !i.cortado);
 
-  const linhasItens = itens.map((i, idx) => {
-    const u = (i.unidade || '').toUpperCase();
-    const pesoUnit = Number(i.produto?.pesoLiquido || i.produto?.pesoBruto || 0);
-    const peso = u.startsWith('KG') ? Number(i.pesoAferido || i.quantidade) : Number(i.pesoAferido || (Number(i.quantidade) * pesoUnit));
-    const cod = i.produto?.codigo || '';
-    return `
-      <div class="it">
-        <div class="it-l1"><span class="q">${idx + 1}.</span> <b>${i.descricao || i.produto?.descricao || ''}</b></div>
-        <div class="it-l2">${cod ? 'Cód ' + cod + ' · ' : ''}${kg(i.quantidade)} ${i.unidade || ''}${peso > 0 ? ' · ' + kg(peso) + ' kg' : ''}${i.cortado ? ' · <b>CORTADO</b>' : ''}</div>
-      </div>`;
-  }).join('');
+  // Agrupa por família (categoria do produto)
+  const grupos = new Map<string, any[]>();
+  for (const i of itens) {
+    const fam = FAMILIA[up(i.produto?.categoria)] || up(i.produto?.grupo) || 'GERAL';
+    if (!grupos.has(fam)) grupos.set(fam, []);
+    grupos.get(fam)!.push(i);
+  }
 
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Nota ${pedido.numero || ''}</title>
+  const numero = pedido.numero ?? '';
+  const nomeCli = up(cli.nomeFantasia || cli.razaoSocial || 'CLIENTE');
+  const enderecoTxt = up([end.rua, end.numero].filter(Boolean).join(', ') + (end.bairro ? ' - ' + end.bairro : ''));
+
+  const gruposHtml = Array.from(grupos.entries()).map(([fam, its]) => `
+    <div class="fam">${fam}</div>
+    <div class="c sub">${nomeCli}</div>
+    <div class="sub">PEDIDO(s): ${numero}</div>
+    <div class="sub">BNO: ${numero}</div>
+    <div class="plus">++++++++++++++++++++++++++++++++++++</div>
+    ${its.map((i) => `
+      <div class="itrow">
+        <span class="prod">${up(i.descricao || i.produto?.descricao)}</span>
+        <span class="chk">▢</span>
+        <span class="qc">${q(i.quantidade, i.unidade)}</span>
+        <span class="qc">${q(i.quantidade, i.unidade)}</span>
+      </div>`).join('')}
+  `).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bilhete ${numero}</title>
 <style>
   * { box-sizing: border-box; }
   @page { size: 80mm auto; margin: 0; }
   html, body { margin: 0; padding: 0; background: #fff; }
-  .nota { width: 72mm; margin: 0 auto; padding: 4mm 2mm; color: #000;
-    font-family: "Courier New", monospace; font-size: 12px; line-height: 1.35; }
-  .center { text-align: center; }
+  .b80 { width: 74mm; margin: 0 auto; padding: 3mm 1.5mm; color: #000;
+    font-family: "Courier New", monospace; font-size: 12px; line-height: 1.3; }
+  .c { text-align: center; }
   .b { font-weight: bold; }
-  .big { font-size: 15px; font-weight: bold; }
-  .hr { border-top: 1px dashed #000; margin: 6px 0; }
-  .row { display: flex; justify-content: space-between; gap: 6px; }
-  .obs { border: 2px solid #000; padding: 4px 6px; margin: 6px 0; font-weight: bold; font-size: 13px; }
-  .it { margin: 3px 0; }
-  .it-l1 { font-size: 13px; }
-  .it-l2 { font-size: 11px; padding-left: 12px; }
-  .q { font-weight: bold; }
-  .tot { font-size: 14px; font-weight: bold; }
+  .logo { text-align: center; font-weight: bold; font-size: 16px; letter-spacing: 1px; }
+  .titulo { text-align: center; font-weight: bold; font-size: 13px; margin-top: 2px; }
+  .cli { text-align: center; font-weight: bold; font-size: 12px; }
+  .bilhete { text-align: center; font-weight: bold; margin: 4px 0; }
+  .hr { border-top: 1px solid #000; margin: 4px 0; }
+  .kv { font-size: 11px; white-space: pre; }
+  .colh { display: flex; font-weight: bold; font-size: 11px; margin-top: 2px; }
+  .colh .p { flex: 1; }
+  .colh .qc { width: 62px; text-align: center; }
+  .fam { text-align: center; font-weight: bold; font-size: 13px; margin-top: 6px; }
+  .sub { text-align: left; font-size: 10.5px; }
+  .sub.c { text-align: center; }
+  .plus { font-size: 9px; overflow: hidden; white-space: nowrap; letter-spacing: -1px; }
+  .itrow { display: flex; align-items: center; gap: 3px; font-size: 12px; margin: 2px 0; }
+  .itrow .prod { flex: 1; font-weight: bold; }
+  .itrow .chk { width: 16px; text-align: center; font-size: 14px; }
+  .itrow .qc { width: 54px; text-align: right; }
   .foot { margin-top: 8px; font-size: 11px; }
   .toolbar { text-align: center; margin: 8px 0; }
   .btn { padding: 8px 14px; font-size: 13px; border: 1px solid #999; border-radius: 6px; background: #fff; cursor: pointer; }
   @media print { .toolbar { display: none; } }
 </style></head><body>
   <div class="toolbar"><button class="btn" onclick="window.print()">🖨️ Imprimir</button></div>
-  <div class="nota">
-    <div class="center b big">HETROS</div>
-    <div class="center" style="font-size:10px">IMP. E EXP. LTDA · CEASA</div>
+  <div class="b80">
+    <div class="logo">🍃 HETROS</div>
+    <div class="titulo">BILHETE SEPARADOR</div>
+    <div class="cli">${nomeCli}</div>
+    <div class="bilhete">BILHETE Nº ${numero}${pedido.periodo ? '   ' + up(pedido.periodo) : ''}</div>
     <div class="hr"></div>
-    <div class="center b">NOTA DE SEPARAÇÃO</div>
-    <div class="row"><span>Pedido</span><span class="b">nº ${pedido.numero ?? ''}</span></div>
-    <div class="row"><span>Entrega</span><span>${dt(pedido.dataEntrega)}</span></div>
-    ${pedido.periodo ? `<div class="row"><span>Período</span><span>${pedido.periodo}</span></div>` : ''}
-    ${pedido.regiao ? `<div class="row"><span>Região</span><span>${pedido.regiao}</span></div>` : ''}
+    <div class="kv">Impressão.: ${dtHora(new Date())}</div>
+    <div class="kv">Depto.....: 1-OPERACIONAL</div>
+    <div class="kv">Pedido(s).: ${numero}</div>
+    <div class="kv">Vendedor..: ${up(pedido.usuario?.nome) || '-'}</div>
+    <div class="kv">Endereço..: ${enderecoTxt || '-'}</div>
+    <div class="kv">Cidade....: ${up(end.cidade) || '-'}</div>
+    <div class="kv">Referência: ${up(pedido.observacoes) || '-'}</div>
+    <div class="kv">Separador.: ______________________</div>
+    <div class="kv">Dt Entrega: ${dt(pedido.dataEntrega)}</div>
     <div class="hr"></div>
-    <div class="b">${cli.nomeFantasia || cli.razaoSocial || 'Cliente'}</div>
-    ${cli.cnpjCpf ? `<div style="font-size:11px">${cli.cnpjCpf}</div>` : ''}
-    ${obs ? `<div class="obs">📌 ${obs}</div>` : ''}
+    <div class="colh"><span class="p">PRODUTO</span><span class="qc">QTDE.</span><span class="qc">QTDE.</span></div>
+    <div class="colh"><span class="p"></span><span class="qc">SEPARAÇÃO</span><span class="qc">VENDIDA</span></div>
     <div class="hr"></div>
-    ${linhasItens || '<div class="center">— sem itens —</div>'}
-    <div class="hr"></div>
-    <div class="row tot"><span>ITENS: ${totalItens}</span><span>${kg(pesoTotal)} kg</span></div>
+    ${gruposHtml || '<div class="c">— sem itens —</div>'}
     <div class="hr"></div>
     <div class="foot">
-      <div>Separador: ____________________</div>
-      <div>Conferente: ___________________</div>
-      <div style="margin-top:4px">Impresso ${dt(new Date())} ${hm()}</div>
+      <div>Total de itens: ${itens.length}</div>
+      <div style="margin-top:4px">Conferente: ____________________</div>
     </div>
-    <div class="center" style="margin-top:6px;font-size:10px">*** SEM VALOR FISCAL ***</div>
+    <div class="c" style="margin-top:6px;font-size:10px">*** SEM VALOR FISCAL ***</div>
     <div style="height:10mm"></div>
   </div>
 </body></html>`;
 
-  const w = window.open('', '_blank', 'width=380,height=640');
+  const w = window.open('', '_blank', 'width=380,height=680');
   if (w) {
     w.document.write(html);
     w.document.close();
-    // dispara a impressão automaticamente (o operador só confirma na impressora térmica)
     setTimeout(() => { try { w.focus(); w.print(); } catch { /* noop */ } }, 350);
   }
 }
