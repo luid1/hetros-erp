@@ -261,8 +261,9 @@ export class PedidosService {
       where: { id, tenantId },
       include: {
         cliente: true,
+        usuario: { select: { nome: true } },
         itens: {
-          include: { produto: { select: { codigo: true, descricao: true, codigoBarras: true, pesoLiquido: true, pesoBruto: true } } },
+          include: { produto: { select: { codigo: true, descricao: true, codigoBarras: true, pesoLiquido: true, pesoBruto: true, categoria: true, grupo: true } } },
           orderBy: { id: 'asc' },
         },
         filialOrigem: true,
