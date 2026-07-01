@@ -198,6 +198,7 @@ model Role {
   descricao   String?
   telas       String[]  @default([])  // rotas/telas que o perfil pode ver (ex: "/logistica/operacional"); ["*"] = todas
   telaInicial String?                  // rota inicial ao logar (ex: "/logistica/operacional")
+  acoes       Json?                    // { "<rota>": ["CRIAR","EDITAR","EXCLUIR"] } — ações permitidas por tela
   permissoes  RolePermissao[]
   usuarios    Usuario[]
 

@@ -2,6 +2,7 @@ import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect } from 'react';
 import { Users, Pencil, Trash2, Building2, MapPin, Phone, QrCode } from 'lucide-react';
 import api from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import { CadastroShell, TopBar, FilterBar, TableCard, Th, StatusBadge, Modal, Secao, Campo, Loader, Vazio, inp, UFS, R$ } from '../ui';
 
 interface Cliente {
@@ -12,6 +13,7 @@ interface Cliente {
 }
 
 export default function Clientes() {
+  const { pode } = useAuth();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -59,8 +61,8 @@ export default function Clientes() {
                   <td className="px-3 py-2.5"><StatusBadge ativo={c.ativo} inativoLabel="BLOQUEADO" /></td>
                   <td className="px-3 py-2.5">
                     <div className="flex gap-1.5">
-                      <button onClick={() => setEditando(c)} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Pencil className="h-3 w-3" /> Editar</button>
-                      <button onClick={() => excluir(c)} className="text-slate-500 hover:text-rose-400 px-1"><Trash2 className="h-3.5 w-3.5" /></button>
+                      {pode('/cadastros/clientes', 'EDITAR') && <button onClick={() => setEditando(c)} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Pencil className="h-3 w-3" /> Editar</button>}
+                      {pode('/cadastros/clientes', 'EXCLUIR') && <button onClick={() => excluir(c)} className="text-slate-500 hover:text-rose-400 px-1"><Trash2 className="h-3.5 w-3.5" /></button>}
                     </div>
                   </td>
                 </tr>

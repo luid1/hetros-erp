@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { podeAcao, AcaoTela } from '../config/telas';
 
 interface Filial { id: string; codigo: string; nome: string }
-interface AuthUser { id: string; nome: string; email: string; role: string; tenantId: string; telas?: string[]; telaInicial?: string | null }
+interface AuthUser { id: string; nome: string; email: string; role: string; tenantId: string; telas?: string[]; telaInicial?: string | null; acoes?: Record<string, string[]> }
 
 interface AuthCtx {
   user: AuthUser | null;
@@ -11,6 +12,7 @@ interface AuthCtx {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
+  pode: (rota: string, acao: AcaoTela) => boolean;
 }
 
 const Ctx = createContext<AuthCtx>(null!);
@@ -66,8 +68,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('wms_filial', JSON.stringify(f));
   };
 
+  // Pode executar uma ação (CRIAR/EDITAR/EXCLUIR) na rota informada?
+  const pode = (rota: string, acao: AcaoTela) => podeAcao(user?.role, user?.acoes, rota, acao);
+
   return (
-    <Ctx.Provider value={{ user, filiais, filialAtiva, setFilialAtiva, login, logout, isLoading }}>
+    <Ctx.Provider value={{ user, filiais, filialAtiva, setFilialAtiva, login, logout, isLoading, pode }}>
       {children}
     </Ctx.Provider>
   );

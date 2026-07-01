@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Warehouse, Pencil, Snowflake, Building2, User } from 'lucide-react';
 import api from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import { CadastroShell, TopBar, FilterBar, TableCard, Th, StatusBadge, OcupacaoBar, Modal, Secao, Campo, Loader, Vazio, inp, UFS } from '../ui';
 
 const TIPOS = ['BOX_CEASA', 'MATRIZ', 'FILIAL', 'DEPOSITO'];
 const TIPO_LABEL: Record<string, string> = { BOX_CEASA: 'Box Ceasa', MATRIZ: 'Matriz', FILIAL: 'Filial', DEPOSITO: 'Depósito' };
 
 export default function Filiais() {
+  const { pode } = useAuth();
   const [lista, setLista] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -46,7 +48,7 @@ export default function Filiais() {
                     <td className="px-3 py-2.5">{cap > 0 ? <OcupacaoBar pct={pct} /> : <span className="text-slate-600 text-xs">não definida</span>}</td>
                     <td className="px-3 py-2.5"><StatusBadge ativo={f.ativo} /></td>
                     <td className="px-3 py-2.5">
-                      <button onClick={() => setEditando(f)} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Pencil className="h-3 w-3" /> Editar</button>
+                      {pode('/cadastros/filiais', 'EDITAR') && <button onClick={() => setEditando(f)} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Pencil className="h-3 w-3" /> Editar</button>}
                     </td>
                   </tr>
                 );

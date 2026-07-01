@@ -6,7 +6,7 @@ import {
 import api from '../../../services/api';
 import { TELAS_POR_GRUPO, TELAS } from '../../../config/telas';
 
-interface Role { id: string; nome: string; descricao?: string | null; telas: string[]; telaInicial?: string | null; _count: { usuarios: number } }
+interface Role { id: string; nome: string; descricao?: string | null; telas: string[]; telaInicial?: string | null; acoes?: Record<string, string[]>; _count: { usuarios: number } }
 interface Filial { id: string; codigo: string; nome: string }
 interface Usuario {
   id: string; nome: string; email: string; cpf?: string | null; ativo: boolean; ultimoAcesso?: string | null;
@@ -218,19 +218,34 @@ function ModalPerfil({ alvo, onClose, onSalvo }: { alvo: Role | 'novo'; onClose:
   const [descricao, setDescricao] = useState(r?.descricao || '');
   const [telas, setTelas] = useState<string[]>(r && !r.telas.includes('*') ? r.telas : []);
   const [telaInicial, setTelaInicial] = useState(r?.telaInicial || '');
+  const [acoes, setAcoes] = useState<Record<string, string[]>>((r?.acoes as any) || {});
   const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
 
-  const toggleTela = (key: string) => setTelas(p => p.includes(key) ? p.filter(x => x !== key) : [...p, key]);
+  const TODAS_ACOES = ['CRIAR', 'EDITAR', 'EXCLUIR'];
+  const toggleTela = (key: string) => setTelas(p => {
+    if (p.includes(key)) { setAcoes(a => { const n = { ...a }; delete n[key]; return n; }); return p.filter(x => x !== key); }
+    setAcoes(a => ({ ...a, [key]: TODAS_ACOES })); return [...p, key];
+  });
   const toggleGrupo = (keys: string[]) => {
     const todosMarcados = keys.every(k => telas.includes(k));
     setTelas(p => todosMarcados ? p.filter(k => !keys.includes(k)) : Array.from(new Set([...p, ...keys])));
+    setAcoes(a => { const n = { ...a }; if (todosMarcados) keys.forEach(k => delete n[k]); else keys.forEach(k => { if (!n[k]) n[k] = TODAS_ACOES; }); return n; });
   };
+  const acoesDe = (key: string) => acoes[key] ?? TODAS_ACOES;
+  const toggleAcao = (key: string, acao: string) => setAcoes(a => {
+    const atual = a[key] ?? TODAS_ACOES;
+    const nova = atual.includes(acao) ? atual.filter(x => x !== acao) : [...atual, acao];
+    return { ...a, [key]: nova };
+  });
 
   const salvar = async () => {
     setErro(''); setSalvando(true);
     try {
-      const payload = { nome, descricao, telas: ehAdmin ? ['*'] : telas, telaInicial: telaInicial || null };
+      // só guarda ações das telas selecionadas
+      const acoesFiltradas: Record<string, string[]> = {};
+      telas.forEach(k => { acoesFiltradas[k] = acoes[k] ?? TODAS_ACOES; });
+      const payload = { nome, descricao, telas: ehAdmin ? ['*'] : telas, telaInicial: telaInicial || null, acoes: ehAdmin ? {} : acoesFiltradas };
       if (novo) await api.post('/usuarios/roles', payload);
       else await api.put(`/usuarios/roles/${r!.id}`, payload);
       onSalvo();
@@ -269,7 +284,8 @@ function ModalPerfil({ alvo, onClose, onSalvo }: { alvo: Role | 'novo'; onClose:
                 </select>
               </div>
               <div>
-                <label className={lbl}>Telas que este perfil pode ver</label>
+                <label className={lbl}>Telas que este perfil vê — e o que pode fazer</label>
+                <p className="text-[10px] text-gray-400 mb-1">Marque a tela para o perfil vê-la. Ao lado, ligue/desligue <b>C</b>riar, <b>E</b>ditar e e<b>X</b>cluir. Botões sem permissão somem pro usuário.</p>
                 <div className="space-y-3 border border-gray-200 rounded-lg p-3 max-h-[40vh] overflow-auto">
                   {Object.entries(TELAS_POR_GRUPO).map(([grupo, items]) => {
                     const keys = items.map(i => i.key);
@@ -280,13 +296,29 @@ function ModalPerfil({ alvo, onClose, onSalvo }: { alvo: Role | 'novo'; onClose:
                           <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide">{grupo}</p>
                           <button onClick={() => toggleGrupo(keys)} type="button" className="text-[10px] text-sky-600 hover:underline">{todos ? 'desmarcar' : 'marcar todas'}</button>
                         </div>
-                        <div className="grid grid-cols-2 gap-1">
-                          {items.map(t => (
-                            <label key={t.key} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">
-                              <input type="checkbox" checked={telas.includes(t.key)} onChange={() => toggleTela(t.key)} className="accent-sky-600 h-3.5 w-3.5" />
-                              {t.label}
-                            </label>
-                          ))}
+                        <div className="space-y-0.5">
+                          {items.map(t => {
+                            const sel = telas.includes(t.key);
+                            return (
+                              <div key={t.key} className="flex items-center justify-between gap-2 rounded px-1 py-0.5 hover:bg-gray-50">
+                                <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer flex-1 min-w-0">
+                                  <input type="checkbox" checked={sel} onChange={() => toggleTela(t.key)} className="accent-sky-600 h-3.5 w-3.5 shrink-0" />
+                                  <span className="truncate">{t.label}</span>
+                                </label>
+                                {sel && (
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {[['CRIAR', 'C'], ['EDITAR', 'E'], ['EXCLUIR', 'X']].map(([acao, ab]) => {
+                                      const on = acoesDe(t.key).includes(acao);
+                                      return (
+                                        <button key={acao} type="button" onClick={() => toggleAcao(t.key, acao)} title={acao}
+                                          className={`h-5 w-5 rounded text-[10px] font-bold border ${on ? 'bg-sky-600 text-white border-sky-600' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>{ab}</button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );

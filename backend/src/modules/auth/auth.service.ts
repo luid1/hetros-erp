@@ -145,6 +145,7 @@ export class AuthService {
         role: usuario.role.nome,
         telas: usuario.role.telas || [],
         telaInicial: usuario.role.telaInicial || null,
+        acoes: usuario.role.acoes || {},
         filiais: usuario.filiais.map((uf) => ({
           id: uf.filial.id,
           codigo: uf.filial.codigo,
@@ -196,6 +197,7 @@ export class AuthService {
         role: usuario.role.nome,
         telas: usuario.role.telas || [],
         telaInicial: usuario.role.telaInicial || null,
+        acoes: usuario.role.acoes || {},
         filiais: usuario.filiais.map((uf) => ({
           id: uf.filial.id,
           codigo: uf.filial.codigo,

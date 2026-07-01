@@ -1,5 +1,7 @@
 import { ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Plus, Search, X, Save } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 /**
  * Kit de UI dark para o módulo de Cadastros (FLV / Ceasa).
@@ -21,6 +23,9 @@ export function CadastroShell({ children }: { children: ReactNode }) {
 // Barra superior com título + botão "Novo Cadastro"
 export function TopBar({ icon, titulo, subtitulo, onNovo, novoLabel = 'Novo Cadastro', extra }:
   { icon: ReactNode; titulo: string; subtitulo?: string; onNovo?: () => void; novoLabel?: string; extra?: ReactNode }) {
+  const { pode } = useAuth();
+  const rota = useLocation().pathname;
+  const podeCriar = pode ? pode(rota, 'CRIAR') : true;
   return (
     <div className="border-b border-slate-800 px-5 py-3 flex items-center justify-between shrink-0 bg-[#0e1729]">
       <div className="flex items-center gap-3">
@@ -32,7 +37,7 @@ export function TopBar({ icon, titulo, subtitulo, onNovo, novoLabel = 'Novo Cada
       </div>
       <div className="flex items-center gap-2">
         {extra}
-        {onNovo && (
+        {onNovo && podeCriar && (
           <button onClick={onNovo} className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-sky-900/30">
             <Plus className="h-4 w-4" /> {novoLabel}
           </button>

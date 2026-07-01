@@ -20,6 +20,38 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-01] — Permissões por perfil: telas que vê + ações (criar/editar/excluir)
+
+### O que mudou
+- Na tela **Usuários & Acessos → Perfis**, além de marcar **quais telas** o perfil vê, agora dá
+  pra ligar/desligar por tela o que ele pode fazer: **C**riar, **E**ditar, e**X**cluir (chips ao
+  lado de cada tela). Padrão = tudo permitido; o admin desmarca o que quiser bloquear.
+- **Botões somem** para quem não tem permissão: o botão **"Novo"** (via TopBar, vale pra todas
+  as telas do kit) e **Editar/Excluir** nas 5 telas de Cadastros. ADMIN sempre vê tudo.
+
+### Backend / schema
+- `Role.acoes Json?` — mapa `{ "<rota>": ["CRIAR","EDITAR","EXCLUIR"] }`.
+- `usuarios` (roles) salva/retorna `acoes`; `auth.login` e `login-por-id` devolvem `acoes`.
+
+### Frontend
+- `config/telas.ts`: helper `podeAcao(...)` + catálogo de ações.
+- `AuthContext`: expõe `pode(rota, acao)`.
+- `cadastros/ui.tsx` (TopBar) e as 5 telas de Cadastros aplicam o gating.
+- `gerencial/pages/UsuariosAcessos.tsx`: editor de ações por tela.
+
+### Observação
+- Enforcement de **botão** aplicado às Cadastros + "Novo" global; dá pra estender o
+  Editar/Excluir às demais telas quando quiser. (O bloqueio no backend por ação fica como
+  próximo passo, se necessário.)
+
+### Arquivos
+- `backend/prisma/schema.prisma`, `backend/src/modules/{usuarios/usuarios.service.ts, auth/auth.service.ts}`
+- `frontend/src/config/telas.ts`, `frontend/src/contexts/AuthContext.tsx`, `frontend/src/modules/cadastros/ui.tsx`
+- `frontend/src/modules/cadastros/pages/{Clientes,Fornecedores,Transportadoras,Produtos,Filiais}.tsx`
+- `frontend/src/modules/gerencial/pages/UsuariosAcessos.tsx`
+
+---
+
 ## [2026-07-01] — Tema dark global + Separação enxuta com observações destacadas
 
 ### O que mudou

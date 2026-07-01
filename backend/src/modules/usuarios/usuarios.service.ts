@@ -83,23 +83,23 @@ export class UsuariosService {
   async listRoles(tenantId: string) {
     const roles = await this.prisma.role.findMany({
       where: { tenantId },
-      select: { id: true, nome: true, descricao: true, telas: true, telaInicial: true, _count: { select: { usuarios: true } } },
+      select: { id: true, nome: true, descricao: true, telas: true, telaInicial: true, acoes: true, _count: { select: { usuarios: true } } },
       orderBy: { nome: 'asc' },
     });
     return roles;
   }
 
-  async createRole(tenantId: string, dto: { nome: string; descricao?: string; telas?: string[]; telaInicial?: string }) {
+  async createRole(tenantId: string, dto: { nome: string; descricao?: string; telas?: string[]; telaInicial?: string; acoes?: any }) {
     if (!dto.nome) throw new BadRequestException('Nome do perfil é obrigatório.');
     const existe = await this.prisma.role.findFirst({ where: { tenantId, nome: dto.nome } });
     if (existe) throw new ConflictException('Já existe um perfil com este nome.');
     const role = await this.prisma.role.create({
-      data: { tenantId, nome: dto.nome, descricao: dto.descricao || null, telas: dto.telas || [], telaInicial: dto.telaInicial || null },
+      data: { tenantId, nome: dto.nome, descricao: dto.descricao || null, telas: dto.telas || [], telaInicial: dto.telaInicial || null, acoes: dto.acoes ?? undefined },
     });
     return { id: role.id };
   }
 
-  async updateRole(tenantId: string, id: string, dto: { nome?: string; descricao?: string; telas?: string[]; telaInicial?: string }) {
+  async updateRole(tenantId: string, id: string, dto: { nome?: string; descricao?: string; telas?: string[]; telaInicial?: string; acoes?: any }) {
     const role = await this.prisma.role.findFirst({ where: { id, tenantId } });
     if (!role) throw new NotFoundException('Perfil não encontrado.');
     if (dto.nome && dto.nome !== role.nome) {
@@ -108,7 +108,7 @@ export class UsuariosService {
     }
     await this.prisma.role.update({
       where: { id },
-      data: { nome: dto.nome, descricao: dto.descricao, telas: dto.telas, telaInicial: dto.telaInicial },
+      data: { nome: dto.nome, descricao: dto.descricao, telas: dto.telas, telaInicial: dto.telaInicial, acoes: dto.acoes ?? undefined },
     });
     return { ok: true };
   }

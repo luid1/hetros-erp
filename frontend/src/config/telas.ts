@@ -54,6 +54,32 @@ export function podeVerTela(telas: string[] | undefined, role: string | undefine
   return telas.includes('*') || telas.includes(key);
 }
 
+export type AcaoTela = 'CRIAR' | 'EDITAR' | 'EXCLUIR';
+export const ACOES: { key: AcaoTela; label: string }[] = [
+  { key: 'CRIAR', label: 'Criar' },
+  { key: 'EDITAR', label: 'Editar' },
+  { key: 'EXCLUIR', label: 'Excluir' },
+];
+
+/**
+ * Pode executar uma ação (criar/editar/excluir) numa tela?
+ * ADMIN sempre pode. Se o perfil não tem `acoes` configurado, ou a tela não foi
+ * restringida individualmente, libera (padrão). Só bloqueia quando o admin
+ * desmarca explicitamente a ação daquela tela.
+ */
+export function podeAcao(
+  role: string | undefined,
+  acoes: Record<string, string[]> | undefined,
+  key: string,
+  acao: AcaoTela,
+): boolean {
+  if (role === 'ADMIN') return true;
+  if (!acoes) return true;
+  const lista = acoes[key];
+  if (lista === undefined) return true;
+  return lista.includes(acao);
+}
+
 /** Resolve a rota inicial do usuário (telaInicial, 1ª tela permitida, ou /dashboard). */
 export function rotaInicial(telas: string[] | undefined, role: string | undefined, telaInicial: string | null | undefined): string {
   if (role === 'ADMIN' || telas?.includes('*')) return telaInicial || '/dashboard';

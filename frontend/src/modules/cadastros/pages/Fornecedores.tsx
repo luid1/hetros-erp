@@ -2,6 +2,7 @@ import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect } from 'react';
 import { Sprout, Pencil, Trash2, Building2, MapPin, Landmark, Handshake } from 'lucide-react';
 import api from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import { CadastroShell, TopBar, FilterBar, Chips, TableCard, Th, StatusBadge, Modal, Secao, Campo, Loader, Vazio, inp, UFS } from '../ui';
 
 const PARCERIA: Record<string, { label: string; cor: string }> = {
@@ -10,6 +11,7 @@ const PARCERIA: Record<string, { label: string; cor: string }> = {
 };
 
 export default function Fornecedores() {
+  const { pode } = useAuth();
   const [lista, setLista] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -57,8 +59,8 @@ export default function Fornecedores() {
                   <td className="px-3 py-2.5 font-mono text-slate-400 text-xs truncate max-w-[120px]">{f.pix || '—'}</td>
                   <td className="px-3 py-2.5"><StatusBadge ativo={f.ativo} /></td>
                   <td className="px-3 py-2.5"><div className="flex gap-1.5">
-                    <button onClick={() => setEditando(f)} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Pencil className="h-3 w-3" /> Editar</button>
-                    <button onClick={() => excluir(f)} className="text-slate-500 hover:text-rose-400 px-1"><Trash2 className="h-3.5 w-3.5" /></button>
+                    {pode('/cadastros/fornecedores', 'EDITAR') && <button onClick={() => setEditando(f)} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Pencil className="h-3 w-3" /> Editar</button>}
+                    {pode('/cadastros/fornecedores', 'EXCLUIR') && <button onClick={() => excluir(f)} className="text-slate-500 hover:text-rose-400 px-1"><Trash2 className="h-3.5 w-3.5" /></button>}
                   </div></td>
                 </tr>
               ))}
