@@ -5,6 +5,7 @@ import api from '../../../services/api';
 import { CadastroShell, TopBar, FilterBar, TableCard, Th, Modal, Secao, Campo, Loader, Vazio, inp, R$ } from '../../cadastros/ui';
 
 const dt = (v: any) => v ? new Date(v).toLocaleDateString('pt-BR') : '—';
+const UNIDADES = ['KG', 'UN', 'CX', 'MAÇO', 'SACA', 'DZ', 'LT'];
 const STATUS_COR: Record<string, string> = { CONFERIDA: 'bg-emerald-500/15 text-emerald-400', PENDENTE: 'bg-amber-500/15 text-amber-400', DIVERGENTE: 'bg-rose-500/15 text-rose-400', CANCELADA: 'bg-slate-600/40 text-slate-400' };
 
 type Item = { produtoId: string; descricao: string; ncm: string; quantidade: string; unidade: string; valorUnitario: string; loteNumero: string; dataValidade: string };
@@ -78,6 +79,17 @@ function ModalEntrada({ onClose, onSalvo, filialId }: { onClose: () => void; onS
   }, []);
 
   const setItem = (i: number, k: keyof Item, v: string) => setItens(p => p.map((it, idx) => idx === i ? { ...it, [k]: v } : it));
+  // Ao vincular um produto, puxa NCM / descrição / unidade do cadastro
+  const escolherProduto = (i: number, produtoId: string) => {
+    const prod = produtos.find(p => p.id === produtoId);
+    setItens(p => p.map((it, idx) => idx !== i ? it : {
+      ...it, produtoId,
+      descricao: prod ? prod.descricao : it.descricao,
+      ncm: prod?.ncm ? prod.ncm : it.ncm,
+      unidade: prod?.unidadeMedida?.sigla || it.unidade,
+      valorUnitario: it.valorUnitario || (prod?.precoCompra ? String(prod.precoCompra) : it.valorUnitario),
+    }));
+  };
   const addItem = () => setItens(p => [...p, itemVazio()]);
   const delItem = (i: number) => setItens(p => p.filter((_, idx) => idx !== i));
 
@@ -158,27 +170,37 @@ function ModalEntrada({ onClose, onSalvo, filialId }: { onClose: () => void; onS
       </div>
 
       <Secao titulo="Itens" />
-      <div className="border border-slate-700 rounded-lg overflow-hidden">
-        <table className="w-full text-xs">
-          <thead className="bg-slate-800/60 text-slate-400"><tr>
-            {['Produto (vínculo)', 'Descrição', 'NCM', 'Qtd', 'Un', 'Vl Unit', 'Lote', 'Validade', ''].map(h => <th key={h} className="px-2 py-1.5 text-left font-semibold">{h}</th>)}
-          </tr></thead>
-          <tbody>
-            {itens.map((it, i) => (
-              <tr key={i} className="border-t border-slate-800">
-                <td className="px-1.5 py-1"><select value={it.produtoId} onChange={e => setItem(i, 'produtoId', e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 w-32"><option value="">— sem vínculo —</option>{produtos.map(p => <option key={p.id} value={p.id}>{p.descricao}</option>)}</select></td>
-                <td className="px-1.5 py-1"><input value={it.descricao} onChange={e => setItem(i, 'descricao', e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 w-36" /></td>
-                <td className="px-1.5 py-1"><input value={it.ncm} onChange={e => setItem(i, 'ncm', e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 w-20 font-mono" /></td>
-                <td className="px-1.5 py-1"><input type="number" value={it.quantidade} onChange={e => setItem(i, 'quantidade', e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 w-16 text-right" /></td>
-                <td className="px-1.5 py-1"><input value={it.unidade} onChange={e => setItem(i, 'unidade', e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 w-12" /></td>
-                <td className="px-1.5 py-1"><input type="number" value={it.valorUnitario} onChange={e => setItem(i, 'valorUnitario', e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 w-20 text-right" /></td>
-                <td className="px-1.5 py-1"><input value={it.loteNumero} onChange={e => setItem(i, 'loteNumero', e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1.5 py-1 text-xs text-slate-100 w-20" /></td>
-                <td className="px-1.5 py-1"><input type="date" value={it.dataValidade} onChange={e => setItem(i, 'dataValidade', e.target.value)} className="bg-slate-800 border border-slate-600 rounded px-1 py-1 text-xs text-slate-100 w-32" /></td>
-                <td className="px-1.5 py-1">{itens.length > 1 && <button onClick={() => delItem(i)} className="text-slate-500 hover:text-rose-400"><Trash2 className="h-3.5 w-3.5" /></button>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="space-y-2">
+        {itens.map((it, i) => {
+          const fld = 'w-full bg-slate-800 border border-slate-600 rounded px-2 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-sky-500';
+          const lb = 'block text-[9px] font-bold text-slate-500 uppercase mb-0.5';
+          return (
+            <div key={i} className="border border-slate-700 rounded-lg p-3 bg-slate-800/30">
+              <div className="grid grid-cols-12 gap-2">
+                <div className="col-span-6 sm:col-span-5"><label className={lb}>Produto (vínculo)</label>
+                  <select value={it.produtoId} onChange={e => escolherProduto(i, e.target.value)} className={fld}><option value="">— sem vínculo —</option>{produtos.map(p => <option key={p.id} value={p.id}>{p.descricao}</option>)}</select>
+                </div>
+                <div className="col-span-6 sm:col-span-6"><label className={lb}>Descrição</label><input value={it.descricao} onChange={e => setItem(i, 'descricao', e.target.value)} className={fld} placeholder="descrição do item" /></div>
+                <div className="col-span-12 sm:col-span-1 flex sm:justify-center sm:items-end">
+                  {itens.length > 1 && <button onClick={() => delItem(i)} className="text-slate-500 hover:text-rose-400 flex items-center gap-1 text-[11px] pb-1.5"><Trash2 className="h-4 w-4" /><span className="sm:hidden">remover</span></button>}
+                </div>
+              </div>
+              <div className="grid grid-cols-12 gap-2 mt-2">
+                <div className="col-span-3 sm:col-span-2"><label className={lb}>NCM</label><input value={it.ncm} onChange={e => setItem(i, 'ncm', e.target.value)} className={`${fld} font-mono`} /></div>
+                <div className="col-span-3 sm:col-span-2"><label className={lb}>Qtd</label><input type="number" value={it.quantidade} onChange={e => setItem(i, 'quantidade', e.target.value)} className={`${fld} text-right`} /></div>
+                <div className="col-span-3 sm:col-span-1"><label className={lb}>Un</label>
+                  <select value={UNIDADES.includes((it.unidade || '').toUpperCase()) ? it.unidade.toUpperCase() : (it.unidade || 'KG')} onChange={e => setItem(i, 'unidade', e.target.value)} className={fld}>
+                    {[...new Set([...(it.unidade && !UNIDADES.includes(it.unidade.toUpperCase()) ? [it.unidade] : []), ...UNIDADES])].map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-4 sm:col-span-2"><label className={lb}>Vl Unit</label><input type="number" value={it.valorUnitario} onChange={e => setItem(i, 'valorUnitario', e.target.value)} className={`${fld} text-right`} /></div>
+                <div className="col-span-5 sm:col-span-2"><label className={lb}>Lote</label><input value={it.loteNumero} onChange={e => setItem(i, 'loteNumero', e.target.value)} className={fld} placeholder="opcional" /></div>
+                <div className="col-span-7 sm:col-span-3"><label className={lb}>Validade</label><input type="date" value={it.dataValidade} onChange={e => setItem(i, 'dataValidade', e.target.value)} className={fld} /></div>
+              </div>
+              <div className="text-right text-[11px] text-slate-500 mt-1.5">Subtotal: <b className="text-slate-300">{R$((Number(it.quantidade) || 0) * (Number(it.valorUnitario) || 0))}</b></div>
+            </div>
+          );
+        })}
       </div>
       <div className="flex items-center justify-between">
         <button onClick={addItem} className="flex items-center gap-1 text-xs text-sky-300 hover:text-sky-200 font-semibold"><Plus className="h-3.5 w-3.5" /> Adicionar item</button>
