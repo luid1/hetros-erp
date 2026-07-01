@@ -13,6 +13,7 @@ export function imprimirNotaSeparacao(pedido: any) {
   const cli = pedido.cliente || {};
   const end: any = cli.enderecoJson || {};
   const itens: any[] = (pedido.itens || []).filter((i: any) => !i.cortado);
+  const origin = window.location.origin;
 
   // Agrupa por família (categoria do produto)
   const grupos = new Map<string, any[]>();
@@ -26,16 +27,17 @@ export function imprimirNotaSeparacao(pedido: any) {
   const nomeCli = up(cli.nomeFantasia || cli.razaoSocial || 'CLIENTE');
   const enderecoTxt = up([end.rua, end.numero].filter(Boolean).join(', ') + (end.bairro ? ' - ' + end.bairro : ''));
 
+  const kv = (k: string, v: string) => `<div class="kv"><span class="k">${k}</span><span class="v">${v || '-'}</span></div>`;
+
   const gruposHtml = Array.from(grupos.entries()).map(([fam, its]) => `
     <div class="fam">${fam}</div>
-    <div class="c sub">${nomeCli}</div>
-    <div class="sub">PEDIDO(s): ${numero}</div>
-    <div class="sub">BNO: ${numero}</div>
-    <div class="plus">++++++++++++++++++++++++++++++++++++</div>
+    <div class="subc">${nomeCli}</div>
+    <div class="sub">PEDIDO(s): ${numero} &nbsp; BNO: ${numero}</div>
+    <div class="dash"></div>
     ${its.map((i) => `
       <div class="itrow">
         <span class="prod">${up(i.descricao || i.produto?.descricao)}</span>
-        <span class="chk">▢</span>
+        <span class="chk"></span>
         <span class="qc">${q(i.quantidade, i.unidade)}</span>
         <span class="qc">${q(i.quantidade, i.unidade)}</span>
       </div>`).join('')}
@@ -43,70 +45,77 @@ export function imprimirNotaSeparacao(pedido: any) {
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bilhete ${numero}</title>
 <style>
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   @page { size: 80mm auto; margin: 0; }
   html, body { margin: 0; padding: 0; background: #fff; }
-  .b80 { width: 74mm; margin: 0 auto; padding: 3mm 1.5mm; color: #000;
-    font-family: "Courier New", monospace; font-size: 12px; line-height: 1.3; }
-  .c { text-align: center; }
-  .b { font-weight: bold; }
-  .logo { text-align: center; font-weight: bold; font-size: 16px; letter-spacing: 1px; }
-  .titulo { text-align: center; font-weight: bold; font-size: 13px; margin-top: 2px; }
-  .cli { text-align: center; font-weight: bold; font-size: 12px; }
-  .bilhete { text-align: center; font-weight: bold; margin: 4px 0; }
-  .hr { border-top: 1px solid #000; margin: 4px 0; }
-  .kv { font-size: 11px; white-space: pre; }
-  .colh { display: flex; font-weight: bold; font-size: 11px; margin-top: 2px; }
-  .colh .p { flex: 1; }
-  .colh .qc { width: 62px; text-align: center; }
-  .fam { text-align: center; font-weight: bold; font-size: 13px; margin-top: 6px; }
-  .sub { text-align: left; font-size: 10.5px; }
-  .sub.c { text-align: center; }
-  .plus { font-size: 9px; overflow: hidden; white-space: nowrap; letter-spacing: -1px; }
-  .itrow { display: flex; align-items: center; gap: 3px; font-size: 12px; margin: 2px 0; }
-  .itrow .prod { flex: 1; font-weight: bold; }
-  .itrow .chk { width: 16px; text-align: center; font-size: 14px; }
-  .itrow .qc { width: 54px; text-align: right; }
+  .b80 { width: 74mm; margin: 0 auto; padding: 3mm 2mm; color: #000;
+    font-family: "Arial Narrow", Arial, sans-serif; font-size: 12px; line-height: 1.28; }
+  .logo { text-align: center; margin-bottom: 3px; }
+  .logo img { height: 12mm; max-width: 62mm; object-fit: contain; }
+  .titulo { text-align: center; font-weight: 800; font-size: 15px; letter-spacing: 1px; }
+  .cli { text-align: center; font-weight: 700; font-size: 12px; }
+  .bilhete { text-align: center; font-weight: 800; font-size: 13px; margin: 3px 0; padding: 2px 0; border-top: 1px solid #000; border-bottom: 1px solid #000; }
+  .rule { border-top: 1px solid #000; margin: 5px 0; }
+  .kv { display: flex; font-size: 11px; }
+  .kv .k { width: 68px; font-weight: 700; }
+  .kv .k::after { content: ":"; }
+  .kv .v { flex: 1; word-break: break-word; }
+  .colh { display: flex; align-items: flex-end; font-weight: 800; }
+  .colh .p { flex: 1; font-size: 11px; }
+  .colh .qc { width: 56px; text-align: center; }
+  .colh .qc .l1 { font-size: 11px; } .colh .qc .l2 { font-size: 8.5px; display: block; }
+  .fam { text-align: center; font-weight: 800; font-size: 13px; margin-top: 7px; letter-spacing: 2px; }
+  .subc { text-align: center; font-size: 10px; }
+  .sub { text-align: center; font-size: 10px; }
+  .dash { border-top: 1px dashed #000; margin: 3px 0; }
+  .itrow { display: flex; align-items: center; gap: 4px; font-size: 12.5px; margin: 3px 0; }
+  .itrow .prod { flex: 1; font-weight: 700; }
+  .itrow .chk { width: 14px; height: 14px; border: 1.5px solid #000; display: inline-block; }
+  .itrow .qc { width: 56px; text-align: right; }
   .foot { margin-top: 8px; font-size: 11px; }
-  .toolbar { text-align: center; margin: 8px 0; }
-  .btn { padding: 8px 14px; font-size: 13px; border: 1px solid #999; border-radius: 6px; background: #fff; cursor: pointer; }
-  @media print { .toolbar { display: none; } }
+  .assin { margin-top: 6px; }
+  .toolbar { text-align: center; margin: 10px 0; }
+  .btn { padding: 9px 18px; font-size: 13px; border: 1px solid #999; border-radius: 6px; background: #fff; cursor: pointer; }
+  @media print { .toolbar { display: none; } body { -webkit-print-color-adjust: exact; } }
 </style></head><body>
   <div class="toolbar"><button class="btn" onclick="window.print()">🖨️ Imprimir</button></div>
   <div class="b80">
-    <div class="logo">🍃 HETROS</div>
+    <div class="logo"><img src="${origin}/logo-hetros.png" alt="HETROS" /></div>
     <div class="titulo">BILHETE SEPARADOR</div>
     <div class="cli">${nomeCli}</div>
-    <div class="bilhete">BILHETE Nº ${numero}${pedido.periodo ? '   ' + up(pedido.periodo) : ''}</div>
-    <div class="hr"></div>
-    <div class="kv">Impressão.: ${dtHora(new Date())}</div>
-    <div class="kv">Depto.....: 1-OPERACIONAL</div>
-    <div class="kv">Pedido(s).: ${numero}</div>
-    <div class="kv">Vendedor..: ${up(pedido.usuario?.nome) || '-'}</div>
-    <div class="kv">Endereço..: ${enderecoTxt || '-'}</div>
-    <div class="kv">Cidade....: ${up(end.cidade) || '-'}</div>
-    <div class="kv">Referência: ${up(pedido.observacoes) || '-'}</div>
-    <div class="kv">Separador.: ______________________</div>
-    <div class="kv">Dt Entrega: ${dt(pedido.dataEntrega)}</div>
-    <div class="hr"></div>
-    <div class="colh"><span class="p">PRODUTO</span><span class="qc">QTDE.</span><span class="qc">QTDE.</span></div>
-    <div class="colh"><span class="p"></span><span class="qc">SEPARAÇÃO</span><span class="qc">VENDIDA</span></div>
-    <div class="hr"></div>
-    ${gruposHtml || '<div class="c">— sem itens —</div>'}
-    <div class="hr"></div>
-    <div class="foot">
-      <div>Total de itens: ${itens.length}</div>
-      <div style="margin-top:4px">Conferente: ____________________</div>
+    <div class="bilhete">BILHETE Nº ${numero}${pedido.periodo ? ' &nbsp;·&nbsp; ' + up(pedido.periodo) : ''}</div>
+    ${kv('Impressão', dtHora(new Date()))}
+    ${kv('Depto', '1-OPERACIONAL')}
+    ${kv('Pedido(s)', String(numero))}
+    ${kv('Vendedor', up(pedido.usuario?.nome))}
+    ${kv('Endereço', enderecoTxt)}
+    ${kv('Cidade', up(end.cidade))}
+    ${kv('Referência', up(pedido.observacoes))}
+    ${kv('Separador', '______________________')}
+    ${kv('Dt Entrega', dt(pedido.dataEntrega))}
+    <div class="rule"></div>
+    <div class="colh">
+      <span class="p">PRODUTO</span>
+      <span class="qc"><span class="l1">QTDE.</span><span class="l2">SEPARAÇÃO</span></span>
+      <span class="qc"><span class="l1">QTDE.</span><span class="l2">VENDIDA</span></span>
     </div>
-    <div class="c" style="margin-top:6px;font-size:10px">*** SEM VALOR FISCAL ***</div>
+    <div class="rule"></div>
+    ${gruposHtml || '<div style="text-align:center">— sem itens —</div>'}
+    <div class="rule"></div>
+    <div class="foot">
+      <div><b>Total de itens:</b> ${itens.length}</div>
+      <div class="assin">Conferente: ______________________</div>
+    </div>
+    <div style="text-align:center;margin-top:8px;font-size:10px">*** SEM VALOR FISCAL ***</div>
     <div style="height:10mm"></div>
   </div>
 </body></html>`;
 
-  const w = window.open('', '_blank', 'width=380,height=680');
+  const w = window.open('', '_blank', 'width=380,height=700');
   if (w) {
     w.document.write(html);
     w.document.close();
-    setTimeout(() => { try { w.focus(); w.print(); } catch { /* noop */ } }, 350);
+    // espera a logo carregar antes de imprimir
+    setTimeout(() => { try { w.focus(); w.print(); } catch { /* noop */ } }, 500);
   }
 }
