@@ -21,8 +21,8 @@
 
 /* ============================================================
    TEMA DARK GLOBAL — uniformiza as telas antigas (claras) para
-   o azul-escuro/branco. As telas já dark usam bg-slate-*/#hex,
-   então não são afetadas. A DANFE abre em janela própria (fica branca p/ impressão).
+   o azul-escuro/branco. As telas ja dark usam classes slate/hex proprias,
+   entao nao sao afetadas. A DANFE abre em janela propria (fica branca p/ impressao).
    ============================================================ */
 :root { color-scheme: dark; }
 body { background-color: #0b1220 !important; color: #e2e8f0 !important; }
@@ -34,7 +34,7 @@ body { background-color: #0b1220 !important; color: #e2e8f0 !important; }
 .bg-gray-200 { background-color: #1e293b !important; }
 
 /* Hovers claros → escuros */
-.hover\:bg-gray-50:hover, .hover\:bg-slate-50:hover, .hover\:bg-gray-50\/50:hover, .hover\:bg-blue-50\/50:hover, .hover\:bg-sky-50\/40:hover { background-color: #16233b !important; }
+.hover\:bg-gray-50:hover, .hover\:bg-slate-50:hover { background-color: #16233b !important; }
 .hover\:bg-gray-100:hover, .hover\:bg-slate-100:hover { background-color: #1e293b !important; }
 
 /* Textos */
