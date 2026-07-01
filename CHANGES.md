@@ -20,6 +20,28 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-01] — Operacional: nota térmica (bilhete de separação 80mm) + cartões melhorados
+
+### O que mudou
+- **Nota de Separação térmica (80mm)**: novo módulo `notaTermica.ts` que imprime a "notinha"
+  no formato de bobina (ex.: **Benetech MP-4200 TH**) — cabeçalho HETROS/CEASA, pedido, cliente,
+  **observação em destaque**, itens (descrição, qtd, un, peso), total de itens e peso, linhas de
+  separador/conferente. Abre já chamando a impressão (o operador escolhe a impressora térmica).
+- Botão **Nota** na **Operacional** (por pedido na fila) e no **painel de Separação** (ao lado de
+  Finalizar).
+- Cartões da fila da Operacional mostram mais dados (peso, data de entrega, período), aproximando
+  do layout do sistema antigo (NewOxxy).
+
+### Arquivos
+- `frontend/src/modules/logistica/notaTermica.ts` (novo)
+- `frontend/src/modules/logistica/pages/{Operacional.tsx, SeparacaoPesagem.tsx}`
+
+### Observação
+- A impressão abre o diálogo do navegador; para sair direto na MP-4200 TH, defina-a como
+  impressora padrão (ou selecione no diálogo). Papel 80mm; layout já vem com `@page size: 80mm`.
+
+---
+
 ## [2026-07-01] — Permissões por perfil: telas que vê + ações (criar/editar/excluir)
 
 ### O que mudou

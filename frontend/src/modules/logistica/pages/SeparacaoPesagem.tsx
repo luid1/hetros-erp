@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  X, Check, Scissors, ChevronRight, Wifi, WifiOff, Truck, Keyboard, Undo2,
+  X, Check, Scissors, ChevronRight, Wifi, WifiOff, Truck, Keyboard, Undo2, Printer,
 } from 'lucide-react';
 import api from '../../../services/api';
 import { useBalanca } from '../../../hooks/useBalanca';
+import { imprimirNotaSeparacao } from '../notaTermica';
 
 const kg = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
@@ -105,17 +106,23 @@ export default function SeparacaoPainel({ pedidoId, onMudou }: {
             <p className="text-lg font-bold text-slate-800 leading-tight truncate">{pedido?.cliente?.nomeFantasia || pedido?.cliente?.razaoSocial || '—'}</p>
             <p className="text-xs text-slate-400">Pedido nº {pedido?.numero} · {itens.length} itens</p>
           </div>
-          {jaSeparado ? (
-            <button onClick={reabrir} disabled={salvando}
-              className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-600 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-40 active:scale-95 transition-transform shrink-0">
-              <Undo2 className="h-4 w-4" /> Reabrir
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={() => pedido && imprimirNotaSeparacao(pedido)} disabled={!pedido}
+              className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-40 active:scale-95 transition-transform">
+              <Printer className="h-4 w-4" /> Nota
             </button>
-          ) : (
-            <button onClick={liberar} disabled={salvando || !tudoPronto}
-              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-5 py-2 text-sm font-bold disabled:opacity-30 active:scale-95 transition-transform shrink-0">
-              <Truck className="h-4 w-4" /> Finalizar
-            </button>
-          )}
+            {jaSeparado ? (
+              <button onClick={reabrir} disabled={salvando}
+                className="flex items-center gap-1.5 bg-white border border-slate-300 text-slate-600 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-40 active:scale-95 transition-transform">
+                <Undo2 className="h-4 w-4" /> Reabrir
+              </button>
+            ) : (
+              <button onClick={liberar} disabled={salvando || !tudoPronto}
+                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg px-5 py-2 text-sm font-bold disabled:opacity-30 active:scale-95 transition-transform">
+                <Truck className="h-4 w-4" /> Finalizar
+              </button>
+            )}
+          </div>
         </div>
         <div className="mt-2">
           <div className="flex justify-between text-xs text-slate-500 mb-1">

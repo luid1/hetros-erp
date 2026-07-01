@@ -1,8 +1,12 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { PackageCheck, RefreshCw, PackageSearch } from 'lucide-react';
+import { PackageCheck, RefreshCw, PackageSearch, Printer } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import SeparacaoPainel from './SeparacaoPesagem';
+import { imprimirNotaSeparacao } from '../notaTermica';
+
+const kg3 = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+const dtBR = (v: any) => v ? new Date(v).toLocaleDateString('pt-BR') : '';
 
 const STATUS = {
   CONFIRMADO:   { label: 'Pendente',                cor: 'bg-red-500',    chip: 'bg-red-100 text-red-700 border-red-300' },
@@ -47,6 +51,12 @@ export default function Operacional() {
     if (l.statusPedido === 'CONFIRMADO') {
       try { await api.patch(`/pedidos/${l.id}/status`, { status: 'EM_SEPARACAO' }); carregar(); } catch { /* segue */ }
     }
+  };
+
+  // Imprime a notinha térmica (80mm) do pedido — busca os itens antes
+  const imprimirNota = async (e: React.MouseEvent, l: any) => {
+    e.stopPropagation();
+    try { const { data } = await api.get(`/pedidos/${l.id}`); imprimirNotaSeparacao(data); } catch { /* noop */ }
   };
 
   return (
@@ -103,8 +113,18 @@ export default function Operacional() {
                     <p className="text-xl font-black text-slate-800 leading-tight truncate">{l.nomeFantasia}</p>
                     <span className={`shrink-0 px-2 py-1 rounded-full text-[11px] font-bold border ${st(l.statusPedido).chip}`}>{st(l.statusPedido).label}</span>
                   </div>
-                  <div className="mt-2 text-base text-slate-500">
-                    Pedido nº {l.idVenda || l.numero} · {l.qtdItens} itens
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-slate-500">
+                    <span>Pedido nº <b className="text-slate-700">{l.idVenda || l.numero}</b></span>
+                    <span>{l.qtdItens} itens</span>
+                    {l.peso > 0 && <span>{kg3(l.peso)} kg</span>}
+                    {l.data && <span>entrega {dtBR(l.data)}</span>}
+                    {l.periodo && <span>{l.periodo}</span>}
+                  </div>
+                  <div className="mt-2 flex justify-end">
+                    <span onClick={(e) => imprimirNota(e, l)} role="button"
+                      className="inline-flex items-center gap-1 text-xs font-bold text-sky-700 bg-sky-100 hover:bg-sky-200 border border-sky-300 rounded-lg px-2.5 py-1">
+                      <Printer className="h-3.5 w-3.5" /> Nota
+                    </span>
                   </div>
                 </button>
               );
