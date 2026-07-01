@@ -1,3 +1,4 @@
+import { toast, confirmDialog, promptDialog } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback } from 'react';
 import { FileText, RefreshCw, Printer, Ban, Mail, Undo2, X, ListChecks, Search } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -57,29 +58,29 @@ export default function NotasEmitidas() {
     imprimirDanfe(data);
   };
   const cancelar = async (id: string) => {
-    const motivo = prompt('Motivo do cancelamento (mín. 15 caracteres):');
+    const motivo = await promptDialog('Motivo do cancelamento (mín. 15 caracteres):');
     if (!motivo) return;
     try { await api.patch(`/nfe/${id}/cancelar`, { motivo }); setDetalhe(null); carregar(); }
-    catch (e: any) { alert(e.response?.data?.message || 'Erro ao cancelar.'); }
+    catch (e: any) { toast(e.response?.data?.message || 'Erro ao cancelar.'); }
   };
   const enviarCce = async (id: string) => {
-    const correcao = prompt('Texto da correção (15 a 1000 caracteres):');
+    const correcao = await promptDialog('Texto da correção (15 a 1000 caracteres):');
     if (!correcao) return;
-    try { await api.post(`/nfe/${id}/carta-correcao`, { correcao }); await abrirDetalhe(id); carregar(); alert('CC-e registrada (modo teste).'); }
-    catch (e: any) { alert(e.response?.data?.message || 'Erro na CC-e.'); }
+    try { await api.post(`/nfe/${id}/carta-correcao`, { correcao }); await abrirDetalhe(id); carregar(); toast('CC-e registrada (modo teste).'); }
+    catch (e: any) { toast(e.response?.data?.message || 'Erro na CC-e.'); }
   };
   const devolver = async (id: string) => {
-    if (!confirm('Gerar e emitir Nota Fiscal de Devolução (total) desta NF-e? A mercadoria volta ao estoque e os títulos são anulados.')) return;
+    if (!await confirmDialog('Gerar e emitir Nota Fiscal de Devolução (total) desta NF-e? A mercadoria volta ao estoque e os títulos são anulados.')) return;
     setBusy(true);
     try {
       const { data: dev } = await api.post(`/nfe/${id}/devolucao`);
       await api.post(`/nfe/${dev.id}/devolucao/emitir`);
       setDetalhe(null); carregar();
-      alert('NF-e de devolução emitida (modo teste).');
-    } catch (e: any) { alert(e.response?.data?.message || 'Erro na devolução.'); }
+      toast('NF-e de devolução emitida (modo teste).');
+    } catch (e: any) { toast(e.response?.data?.message || 'Erro na devolução.'); }
     finally { setBusy(false); }
   };
-  const enviarEmail = (n: any) => alert(`Modo teste: enviaria XML + DANFE para ${n.cliente?.email || 'o e-mail do cliente'}.`);
+  const enviarEmail = (n: any) => toast(`Modo teste: enviaria XML + DANFE para ${n.cliente?.email || 'o e-mail do cliente'}.`);
 
   return (
     <div className="flex flex-col h-full bg-gray-50">

@@ -1,3 +1,4 @@
+import { toast, confirmDialog, promptDialog } from '../../../components/ui/feedback';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ClipboardList, Plus, Search, X, Check, Trash2, Pencil,
@@ -99,17 +100,17 @@ export default function PedidosVenda() {
       const avisos = r.data?.avisosEstoque || [];
       if (avisos.length > 0) {
         const linhas = avisos.map((a: any) => `• ${a.descricao}: faltam ${a.faltam} (estoque ficou negativo)`).join('\n');
-        alert(`✅ Pedido APROVADO.\n\n⚠️ ATENÇÃO — estoque negativo, PRECISA COMPRAR:\n${linhas}`);
+        toast(`✅ Pedido APROVADO.\n\n⚠️ ATENÇÃO — estoque negativo, PRECISA COMPRAR:\n${linhas}`);
       }
       carregarPedidos();
       carregarAComprar();
     } catch (e: any) {
-      alert(e.response?.data?.message || 'Não foi possível aprovar o pedido.');
+      toast(e.response?.data?.message || 'Não foi possível aprovar o pedido.');
     }
   };
 
   const handleCancelar = async (id: string) => {
-    if (!confirm('Cancelar este pedido?')) return;
+    if (!await confirmDialog('Cancelar este pedido?')) return;
     await api.patch(`/pedidos/${id}/cancelar`);
     carregarPedidos();
   };
@@ -327,12 +328,12 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
 
   // Desconto bloqueado — só libera com senha
   const [descontoLiberado, setDescontoLiberado] = useState(false);
-  const liberarDesconto = () => {
+  const liberarDesconto = async () => {
     if (descontoLiberado) { setDescontoLiberado(false); return; }
-    const s = window.prompt('Senha para liberar descontos:');
+    const s = await promptDialog('Senha para liberar descontos:');
     if (s === null) return;
     if (s === SENHA_DESCONTO) setDescontoLiberado(true);
-    else window.alert('Senha incorreta. Descontos continuam bloqueados.');
+    else toast('Senha incorreta. Descontos continuam bloqueados.', 'error');
   };
 
   const [salvando, setSalvando] = useState(false);
@@ -458,7 +459,7 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
         ? await api.put(`/pedidos/${pedidoId}`, payload)
         : await api.post('/pedidos', payload);
       if (r.data?.bloqueioCredito) {
-        alert(`⚠️ Pedido salvo, mas BLOQUEADO por crédito:\n${r.data.motivoBloqueio}\nNão poderá ser aprovado até regularizar.`);
+        toast(`⚠️ Pedido salvo, mas BLOQUEADO por crédito:\n${r.data.motivoBloqueio}\nNão poderá ser aprovado até regularizar.`);
       }
       onSalvo();
     } catch (e: any) {

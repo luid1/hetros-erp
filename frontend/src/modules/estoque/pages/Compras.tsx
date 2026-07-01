@@ -1,3 +1,4 @@
+import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback } from 'react';
 import { ShoppingCart, RefreshCw, Trash2, Plus, Check, PackageCheck, Ban, Pencil } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -32,14 +33,14 @@ export default function Compras() {
   useEffect(() => { const t = setTimeout(carregar, 250); return () => clearTimeout(t); }, [carregar]);
 
   const acao = async (oc: any, novo: string, msg?: string) => {
-    if (msg && !confirm(msg)) return;
+    if (msg && !await confirmDialog(msg)) return;
     try { await api.patch(`/compras/${oc.id}/status`, { status: novo }); carregar(); }
-    catch (e: any) { alert(e.response?.data?.message || 'Erro.'); }
+    catch (e: any) { toast(e.response?.data?.message || 'Erro.'); }
   };
   const excluir = async (oc: any) => {
-    if (!confirm(`Excluir a OC #${oc.numero}?`)) return;
+    if (!await confirmDialog(`Excluir a OC #${oc.numero}?`)) return;
     try { await api.delete(`/compras/${oc.id}`); carregar(); }
-    catch (e: any) { alert(e.response?.data?.message || 'Erro ao excluir.'); }
+    catch (e: any) { toast(e.response?.data?.message || 'Erro ao excluir.'); }
   };
   const abrirEditar = async (oc: any) => { const { data } = await api.get(`/compras/${oc.id}`); setEditar(data); };
 

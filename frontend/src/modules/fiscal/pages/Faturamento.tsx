@@ -1,3 +1,4 @@
+import { toast } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback } from 'react';
 import { Receipt, RefreshCw, FileText, Printer, Check, AlertTriangle, Loader2, ShieldCheck, X, XCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -76,7 +77,7 @@ export default function Faturamento() {
     if (processando) return;
     setProcessando(true); setResultado(null);
     try { const nfe = await faturarUm(pedidoId); carregar(); imprimirDanfe(nfe); }
-    catch (e: any) { alert(e.response?.data?.message || 'Erro ao faturar.'); }
+    catch (e: any) { toast(e.response?.data?.message || 'Erro ao faturar.'); }
     finally { setProcessando(false); }
   };
 

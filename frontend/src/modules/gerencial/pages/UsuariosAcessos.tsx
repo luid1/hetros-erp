@@ -1,3 +1,4 @@
+import { toast, confirmDialog, promptDialog } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Users, ShieldCheck, Plus, Pencil, Power, KeyRound, X, Check, Trash2, Building2, Monitor,
@@ -147,14 +148,14 @@ function ModalUsuario({ alvo, roles, filiais, onClose, onSalvo }: {
   };
 
   const resetSenha = async () => {
-    const nova = prompt('Nova senha para ' + u!.nome + ':');
+    const nova = await promptDialog('Nova senha para ' + u!.nome + ':');
     if (!nova) return;
-    try { await api.patch(`/usuarios/${u!.id}/senha`, { senha: nova }); alert('Senha alterada.'); }
-    catch (e: any) { alert(e.response?.data?.message || 'Erro.'); }
+    try { await api.patch(`/usuarios/${u!.id}/senha`, { senha: nova }); toast('Senha alterada.'); }
+    catch (e: any) { toast(e.response?.data?.message || 'Erro.'); }
   };
   const inativar = async () => {
-    if (!confirm('Inativar ' + u!.nome + '? Ele não conseguirá mais logar.')) return;
-    try { await api.delete(`/usuarios/${u!.id}`); onSalvo(); } catch (e: any) { alert(e.response?.data?.message || 'Erro.'); }
+    if (!await confirmDialog('Inativar ' + u!.nome + '? Ele não conseguirá mais logar.')) return;
+    try { await api.delete(`/usuarios/${u!.id}`); onSalvo(); } catch (e: any) { toast(e.response?.data?.message || 'Erro.'); }
   };
 
   return (
@@ -237,8 +238,8 @@ function ModalPerfil({ alvo, onClose, onSalvo }: { alvo: Role | 'novo'; onClose:
     finally { setSalvando(false); }
   };
   const excluir = async () => {
-    if (!confirm('Excluir o perfil ' + r!.nome + '?')) return;
-    try { await api.delete(`/usuarios/roles/${r!.id}`); onSalvo(); } catch (e: any) { alert(e.response?.data?.message || 'Erro.'); }
+    if (!await confirmDialog('Excluir o perfil ' + r!.nome + '?')) return;
+    try { await api.delete(`/usuarios/roles/${r!.id}`); onSalvo(); } catch (e: any) { toast(e.response?.data?.message || 'Erro.'); }
   };
 
   return (

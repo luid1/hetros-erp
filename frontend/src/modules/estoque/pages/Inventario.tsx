@@ -1,3 +1,4 @@
+import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback } from 'react';
 import { ClipboardList, RefreshCw, ArrowLeft, Lock, Save, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -105,10 +106,10 @@ function Contagem({ id, onVoltar }: { id: string; onVoltar: () => void }) {
     try { await api.patch(`/inventario/item/${itemId}/contar`, { quantidadeContada: Number(v) }); carregar(); } catch {/*noop*/}
   };
   const fechar = async () => {
-    if (!confirm('Fechar o inventário e gerar os ajustes de estoque das diferenças?')) return;
+    if (!await confirmDialog('Fechar o inventário e gerar os ajustes de estoque das diferenças?')) return;
     setFechando(true);
-    try { const { data } = await api.post(`/inventario/${id}/fechar`); alert(`Inventário fechado. ${data.ajustesGerados} ajuste(s) gerado(s).`); onVoltar(); }
-    catch (e: any) { alert(e.response?.data?.message || 'Erro ao fechar.'); setFechando(false); }
+    try { const { data } = await api.post(`/inventario/${id}/fechar`); toast(`Inventário fechado. ${data.ajustesGerados} ajuste(s) gerado(s).`); onVoltar(); }
+    catch (e: any) { toast(e.response?.data?.message || 'Erro ao fechar.'); setFechando(false); }
   };
 
   const fechado = inv?.status === 'FECHADO';

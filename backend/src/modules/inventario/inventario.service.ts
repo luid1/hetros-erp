@@ -38,12 +38,19 @@ export class InventarioService {
   async abrir(tenantId: string, usuarioId: string, dto: { filialId: string; descricao?: string; categoria?: string }) {
     if (!dto.filialId) throw new BadRequestException('Selecione a filial.');
 
-    const saldos = await this.prisma.estoqueSaldo.findMany({
-      where: { tenantId, filialId: dto.filialId, ...(dto.categoria && { produto: { categoria: dto.categoria } }) },
-      include: { produto: { select: { id: true } } },
+    // Todos os produtos ativos (opcionalmente por categoria) — inventário conta tudo,
+    // inclusive itens com saldo zero (pra achar estoque físico não registrado).
+    const produtos = await this.prisma.produto.findMany({
+      where: { tenantId, ativo: true, ...(dto.categoria && { categoria: dto.categoria }) },
+      select: { id: true },
     });
+    if (produtos.length === 0) throw new BadRequestException('Nenhum produto ativo para inventariar.');
 
-    // agrupa por produto (soma lotes/localizações)
+    // Saldo do sistema por produto (soma lotes/localizações da filial)
+    const saldos = await this.prisma.estoqueSaldo.findMany({
+      where: { tenantId, filialId: dto.filialId, produtoId: { in: produtos.map((p) => p.id) } },
+      select: { produtoId: true, quantidade: true },
+    });
     const porProduto = new Map<string, number>();
     for (const s of saldos) porProduto.set(s.produtoId, (porProduto.get(s.produtoId) || 0) + Number(s.quantidade));
 
@@ -53,8 +60,8 @@ export class InventarioService {
         descricao: dto.descricao || `Inventário ${new Date().toLocaleDateString('pt-BR')}`,
         status: 'EM_CONTAGEM',
         itens: {
-          create: Array.from(porProduto.entries()).map(([produtoId, qtd]) => ({
-            produtoId, quantidadeSistema: qtd, quantidadeContada: null, diferenca: null,
+          create: produtos.map((p) => ({
+            produtoId: p.id, quantidadeSistema: porProduto.get(p.id) || 0, quantidadeContada: null, diferenca: null,
           })),
         },
       },

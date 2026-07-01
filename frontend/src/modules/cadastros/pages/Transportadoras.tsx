@@ -1,3 +1,4 @@
+import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect } from 'react';
 import { Truck, Pencil, Trash2, Building2, MapPin } from 'lucide-react';
 import api from '../../../services/api';
@@ -22,9 +23,9 @@ export default function Transportadoras() {
   useEffect(() => { const t = setTimeout(carregar, 250); return () => clearTimeout(t); }, [search, regiao]);
 
   const excluir = async (t: any) => {
-    if (!confirm(`Excluir a transportadora "${t.razaoSocial}"?`)) return;
+    if (!await confirmDialog(`Excluir a transportadora "${t.razaoSocial}"?`)) return;
     try { await api.delete(`/transportadoras/${t.id}`); carregar(); }
-    catch (e: any) { alert(e.response?.data?.message || 'Não foi possível excluir.'); }
+    catch (e: any) { toast(e.response?.data?.message || 'Não foi possível excluir.'); }
   };
 
   return (

@@ -20,6 +20,26 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-01] — Fim dos alert/confirm/prompt do navegador + inventário lista todos os produtos
+
+### O que mudou
+- **Adeus caixinhas feias do navegador**: criado um sistema interno de feedback
+  (`components/ui/feedback.tsx`) com **toast** (notificação que some), **confirmDialog** e
+  **promptDialog** (modais dark), montado via `<FeedbackHost />` no AppShell. Substituídos os
+  **49 usos** de `alert/confirm/prompt` em 15 telas.
+- **Inventário** agora **lista todos os produtos ativos** (mesmo com saldo 0) ao abrir, em vez de
+  só os que tinham saldo — a tela nunca fica vazia e permite achar estoque físico não registrado.
+  Removidos os inventários de teste que ficaram vazios.
+- Corrigido: o `abrir` do inventário rodava, mas o processo do backend às vezes ficava defasado
+  (tsc-watch recompila sem reiniciar o Nest) — reinício limpo aplicado.
+
+### Arquivos
+- `frontend/src/components/ui/feedback.tsx` (novo), `frontend/src/components/layout/AppShell.tsx`
+- 15 telas em `frontend/src/modules/**/pages/*` (troca dos diálogos nativos)
+- `backend/src/modules/inventario/inventario.service.ts`
+
+---
+
 ## [2026-07-01] — Módulo Compras / Suprimentos: Ordem de Compra (OC) com recebimento no estoque
 
 ### O que mudou

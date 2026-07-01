@@ -1,3 +1,4 @@
+import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect } from 'react';
 import { Users, Pencil, Trash2, Building2, MapPin, Phone, QrCode } from 'lucide-react';
 import api from '../../../services/api';
@@ -25,9 +26,9 @@ export default function Clientes() {
   useEffect(() => { const t = setTimeout(carregar, 250); return () => clearTimeout(t); }, [search]);
 
   const excluir = async (c: Cliente) => {
-    if (!confirm(`Excluir o cliente "${c.nomeFantasia || c.razaoSocial}"?`)) return;
+    if (!await confirmDialog(`Excluir o cliente "${c.nomeFantasia || c.razaoSocial}"?`)) return;
     try { await api.delete(`/clientes/${c.id}`); carregar(); }
-    catch (e: any) { alert(e.response?.data?.message || 'Não foi possível excluir (cliente pode ter pedidos vinculados).'); }
+    catch (e: any) { toast(e.response?.data?.message || 'Não foi possível excluir (cliente pode ter pedidos vinculados).'); }
   };
 
   return (

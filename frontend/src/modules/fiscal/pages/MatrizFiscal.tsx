@@ -1,3 +1,4 @@
+import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback } from 'react';
 import { Scale, Plus, RefreshCw, Trash2, X, Sparkles, Pencil, Building2, Save } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -65,7 +66,7 @@ export default function MatrizFiscal() {
       await api.patch(`/filiais/${filial.id}/regime`, {
         regimeTributario: filial.regimeTributario, crt: filial.crt, cnpj: filial.cnpj, ie: filial.ie,
       });
-    } catch (e: any) { alert(e.response?.data?.message || 'Erro ao salvar.'); }
+    } catch (e: any) { toast(e.response?.data?.message || 'Erro ao salvar.'); }
     finally { setSalvandoFilial(false); }
   };
 
@@ -76,15 +77,15 @@ export default function MatrizFiscal() {
       if (edit.id) await api.put(`/fiscal/regras/${edit.id}`, body);
       else await api.post('/fiscal/regras', body);
       setEdit(null); carregar();
-    } catch (e: any) { alert(e.response?.data?.message || 'Erro ao salvar.'); }
+    } catch (e: any) { toast(e.response?.data?.message || 'Erro ao salvar.'); }
   };
   const remover = async (id: string) => {
-    if (!confirm('Remover esta regra fiscal?')) return;
+    if (!await confirmDialog('Remover esta regra fiscal?')) return;
     await api.delete(`/fiscal/regras/${id}`); carregar();
   };
   const semear = async () => {
     const { data } = await api.post('/fiscal/regras/seed');
-    if (data.jaExistiam) alert('A matriz já tem regras — nada foi criado.');
+    if (data.jaExistiam) toast('A matriz já tem regras — nada foi criado.');
     carregar();
   };
 

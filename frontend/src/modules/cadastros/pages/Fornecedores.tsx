@@ -1,3 +1,4 @@
+import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect } from 'react';
 import { Sprout, Pencil, Trash2, Building2, MapPin, Landmark, Handshake } from 'lucide-react';
 import api from '../../../services/api';
@@ -24,9 +25,9 @@ export default function Fornecedores() {
   useEffect(() => { const t = setTimeout(carregar, 250); return () => clearTimeout(t); }, [search, tipo]);
 
   const excluir = async (f: any) => {
-    if (!confirm(`Excluir o fornecedor "${f.razaoSocial}"?`)) return;
+    if (!await confirmDialog(`Excluir o fornecedor "${f.razaoSocial}"?`)) return;
     try { await api.delete(`/fornecedores/${f.id}`); carregar(); }
-    catch (e: any) { alert(e.response?.data?.message || 'Não foi possível excluir.'); }
+    catch (e: any) { toast(e.response?.data?.message || 'Não foi possível excluir.'); }
   };
 
   return (

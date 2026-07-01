@@ -1,3 +1,4 @@
+import { toast } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, RefreshCw, Truck, Receipt, Percent, Route } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -49,7 +50,7 @@ export default function FreteMotoristas() {
     try {
       await api.patch(`/carga/romaneio/${id}/frete`, { valorFrete: parseFloat(editValores[id]) || 0 });
       carregar();
-    } catch { alert('Erro ao salvar o frete.'); }
+    } catch { toast('Erro ao salvar o frete.'); }
     finally { setSalvandoId(null); }
   };
 

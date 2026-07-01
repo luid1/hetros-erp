@@ -1,3 +1,4 @@
+import { toast } from '../../../components/ui/feedback';
 import { useState, useEffect } from 'react';
 import { Truck, Plus, X, FileText, CheckCircle2, Ban } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -46,9 +47,9 @@ export default function CteMdfe() {
   };
 
   const salvar = () => {
-    if (!placa.trim()) return alert('Informe a placa do veículo.');
+    if (!placa.trim()) return toast('Informe a placa do veículo.');
     const nfesSel = notas.filter(n => selNfes.has(n.id)).map(n => ({ numero: n.numero, valor: Number(n.valorNfe || 0) }));
-    if (aba === 'MDFE' && nfesSel.length === 0) return alert('Vincule ao menos uma NF-e ao manifesto.');
+    if (aba === 'MDFE' && nfesSel.length === 0) return toast('Vincule ao menos uma NF-e ao manifesto.');
     const proxNum = Math.max(0, ...docs.filter(d => d.tipo === aba).map(d => d.numero)) + 1;
     const novo: Doc = {
       id: crypto.randomUUID(), tipo: aba, numero: proxNum, placa: placa.toUpperCase(), motorista,

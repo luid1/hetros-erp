@@ -1,3 +1,4 @@
+import { toast } from '../../../components/ui/feedback';
 import { useState, useMemo, useEffect } from 'react';
 import {
   Printer, Truck, CheckSquare,
@@ -347,7 +348,7 @@ th{background:#eee;text-align:center}
       const w = window.open('', '_blank');
       if (w) { w.document.write(html); w.document.close(); }
     } catch {
-      alert('Não foi possível gerar a Capa de Rota.');
+      toast('Não foi possível gerar a Capa de Rota.');
     }
   };
 
@@ -396,7 +397,7 @@ th{border-bottom:2px solid #000}
       const w = window.open('', '_blank');
       if (w) { w.document.write(html); w.document.close(); }
     } catch {
-      alert('Não foi possível gerar o Espelho do pedido.');
+      toast('Não foi possível gerar o Espelho do pedido.');
     }
   };
 

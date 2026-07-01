@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { podeVerTela, rotaInicial } from '../../config/telas';
+import { FeedbackHost } from '../ui/feedback';
 import {
   LayoutDashboard, Users, Package, Warehouse, FileText,
   DollarSign, Truck, ClipboardList, BarChart3, Settings,
@@ -214,6 +215,7 @@ export default function AppShell() {
           <TelaGuard><Outlet /></TelaGuard>
         </main>
       </div>
+      <FeedbackHost />
     </div>
   );
 }

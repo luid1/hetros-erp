@@ -1,3 +1,4 @@
+import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect } from 'react';
 import { Apple, Pencil, Trash2, Package, Box, Tag } from 'lucide-react';
 import api from '../../../services/api';
@@ -37,9 +38,9 @@ export default function Produtos() {
   const filtrados = cat ? lista.filter(p => p.categoria === cat) : lista;
 
   const excluir = async (p: any) => {
-    if (!confirm(`Inativar o produto "${p.descricao}"?`)) return;
+    if (!await confirmDialog(`Inativar o produto "${p.descricao}"?`)) return;
     try { await api.delete(`/produtos/${p.id}`); carregar(); }
-    catch (e: any) { alert(e.response?.data?.message || 'Não foi possível inativar.'); }
+    catch (e: any) { toast(e.response?.data?.message || 'Não foi possível inativar.'); }
   };
 
   return (

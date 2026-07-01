@@ -1,3 +1,4 @@
+import { toast, promptDialog } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { AlertTriangle, RefreshCw, Trash2, ShieldAlert, CalendarClock } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -32,12 +33,12 @@ export default function Pereciveis() {
   }, [filtradas]);
 
   const baixar = async (item: any, tipo: 'PERDA' | 'AVARIA') => {
-    const qtd = prompt(`Quantidade a baixar como ${tipo} de "${item.produto?.descricao}" (lote ${item.lote?.numero || '—'})?`, String(item.quantidade));
+    const qtd = await promptDialog(`Quantidade a baixar como ${tipo} de "${item.produto?.descricao}" (lote ${item.lote?.numero || '—'})?`, String(item.quantidade));
     if (!qtd) return;
     try {
       await api.post('/estoque/ajuste', { filialId: filialAtiva!.id, produtoId: item.produtoId, loteId: item.loteId || undefined, tipo, quantidade: Number(qtd), observacoes: `Baixa ${tipo} por validade` });
       carregar();
-    } catch (e: any) { alert(e.response?.data?.message || 'Erro ao baixar.'); }
+    } catch (e: any) { toast(e.response?.data?.message || 'Erro ao baixar.'); }
   };
 
   const corDias = (d: number | null) => d == null ? 'text-slate-400' : d < 0 ? 'text-rose-400' : d <= 2 ? 'text-orange-400' : d <= Number(dias) ? 'text-amber-400' : 'text-emerald-400';
