@@ -238,6 +238,12 @@ function abrirImpressao(html: string) {
   if (w) {
     w.document.write(html);
     w.document.close();
-    setTimeout(() => { try { w.focus(); w.print(); } catch { /* noop */ } }, 500);
+    setTimeout(() => {
+      try {
+        w.onafterprint = () => w.close(); // fecha sozinha após imprimir (inclui modo kiosk)
+        w.focus();
+        w.print();
+      } catch { /* noop */ }
+    }, 500);
   }
 }
