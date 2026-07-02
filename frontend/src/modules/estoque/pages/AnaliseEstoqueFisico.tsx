@@ -435,7 +435,7 @@ export default function AnaliseEstoqueFisico() {
         {/* Botões de ação */}
         <div className="flex gap-2">
           <button
-            onClick={handleExecutar}
+            onClick={() => handleExecutar()}
             disabled={processando}
             className="flex items-center gap-1.5 bg-white border-2 border-green-600 hover:bg-green-50 px-4 py-2 rounded text-green-700 font-bold disabled:opacity-50 shadow-sm"
           >
