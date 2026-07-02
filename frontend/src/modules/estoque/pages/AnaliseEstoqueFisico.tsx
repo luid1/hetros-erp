@@ -237,16 +237,18 @@ export default function AnaliseEstoqueFisico() {
     const all = loadEdits(); all[id] = { ...(all[id] || {}), ...patch };
     localStorage.setItem(EDITS_KEY, JSON.stringify(all));
   };
-  const calcSaldo = (p: any) => (p.saldoInicial || 0) + (p.entradas || 0) + (p.chao || 0) + (p.ordensCompra || 0) - (p.perdas || 0) - (p.quebra || 0);
+  // Entrada já inclui a Ordem de Compra → OC não é somada de novo aqui
+  const calcSaldo = (p: any) => (p.saldoInicial || 0) + (p.entradas || 0) + (p.chao || 0) - (p.perdas || 0) - (p.quebra || 0);
 
   // Mapeia uma linha da API (dados reais) para a linha da tela, aplicando os valores salvos
   const mapLinha = (r: any, edits: Record<string, any>): ProdutoEstoque => {
     const e = edits[r.id] || {};
     const base = {
-      entradas: r.entradas, chao: 0,
-      ordensCompra: r.ordensCompra, perdas: r.perdasReal || 0, quebra: r.quebraReal || 0,
+      entradas: (r.entradas || 0) + (r.ordensCompra || 0), // Entrada já soma a Ordem de Compra
+      chao: 0, perdas: r.perdasReal || 0, quebra: r.quebraReal || 0,
       contagemFisica: null as number | null, ...e,
-      saldoInicial: r.saldoInicial, // sempre do sistema (não editável)
+      saldoInicial: r.saldoInicial,     // sempre do sistema (não editável)
+      ordensCompra: r.ordensCompra || 0, // informativo (não editável), já incluso na Entrada
     };
     const saldoFinal = calcSaldo(base);
     return {
@@ -292,13 +294,13 @@ export default function AnaliseEstoqueFisico() {
 
   // ── Edita um campo e RECALCULA o Saldo Final sozinho ──────────
   // Saldo Final = Saldo Inicial + Entrada + Ordem de Compra − Perdas − Quebra
-  const setCampo = (id: string, campo: 'entradas' | 'chao' | 'ordensCompra' | 'perdas' | 'quebra', valor: string) => {
+  const setCampo = (id: string, campo: 'entradas' | 'chao' | 'perdas' | 'quebra', valor: string) => {
     const v = valor === '' ? 0 : parseFloat(valor.replace(',', '.')) || 0;
     saveEdit(id, { [campo]: v }); // salva pra não perder ao recarregar
     setProdutos(prev => prev.map(p => {
       if (p.id !== id) return p;
       const np = { ...p, [campo]: v };
-      const saldoFinal = (np.saldoInicial || 0) + (np.entradas || 0) + (np.chao || 0) + (np.ordensCompra || 0) - (np.perdas || 0) - (np.quebra || 0);
+      const saldoFinal = (np.saldoInicial || 0) + (np.entradas || 0) + (np.chao || 0) - (np.perdas || 0) - (np.quebra || 0);
       const valorAtualEstoque = saldoFinal * (np.precoCusto || 0);
       const diferencaEstoque = np.contagemFisica !== null ? (np.contagemFisica as number) - saldoFinal : 0;
       return { ...np, saldoFinal, valorAtualEstoque, diferencaEstoque };
@@ -549,9 +551,7 @@ export default function AnaliseEstoqueFisico() {
                       <input type="number" step="0.001" className={cellInp} value={p.chao ?? 0} onChange={e => setCampo(p.id, 'chao', e.target.value)} />
                     </td>
                     {!semOrdCompra && (
-                      <td className="px-1 py-0.5 border-r border-gray-200" onClick={e => e.stopPropagation()}>
-                        <input type="number" step="0.001" className={cellInp} value={p.ordensCompra ?? 0} onChange={e => setCampo(p.id, 'ordensCompra', e.target.value)} />
-                      </td>
+                      <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${sel ? '' : 'text-sky-300'}`} title="Já incluído na Entrada (informativo)">{p.ordensCompra ? fmtN(p.ordensCompra) : ''}</td>
                     )}
                     <td className="px-1 py-0.5 border-r border-gray-200 bg-rose-950/50" onClick={e => e.stopPropagation()}>
                       <input type="number" step="0.001" min="0" className={cellInp} value={p.perdas ?? 0} onChange={e => setCampo(p.id, 'perdas', e.target.value)} />
