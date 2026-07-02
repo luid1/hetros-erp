@@ -20,6 +20,51 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-02] — Separação touch: teclado numérico + navegação anterior/próximo
+
+- Na fila da **Separação (Operacional)**: botão **lupa** abre um **teclado numérico** (touch)
+  pra pesquisar o pedido pelo número (filtra e já abre se achar); botões **← anterior / próximo →**
+  navegam pela fila. Pensado pra chão de separação sem teclado físico.
+- Arquivo: `frontend/src/modules/logistica/pages/Operacional.tsx`.
+
+---
+
+## [2026-07-02] — Análise de Estoque Físico conectada ao banco real
+
+- A tela **deixou de usar dados fixos (mock)** e passou a puxar do banco: lista de **todos os
+  produtos ativos** (os novos aparecem sozinhos), **Saldo Inicial** (calculado do período),
+  **Entrada** (movimentações reais), **Saídas**, **Ordem de Compra** (OCs pendentes), **Perdas/
+  Quebra** (lançamentos reais). Novo endpoint `GET /estoque/:filialId/analise`.
+- **Colunas**: Saldo Inicial (só leitura) · Entrada (já soma a OC) · Chão (manual) · Ordem de
+  Compra (só leitura, informativa) · Perdas · Quebra · **= Saldo Final** (calculado sozinho).
+  Fórmula: `Saldo Inicial + Entrada + Chão − Perdas − Quebra`.
+- **Carrega automático** ao abrir e **salva os valores editados** (Chão/Perdas/Quebra) no
+  navegador (localStorage) — persistem ao recarregar. Contraste corrigido no dark.
+- Arquivos: `backend/src/modules/estoque/{estoque.service.ts, estoque.controller.ts}`,
+  `frontend/src/modules/estoque/pages/AnaliseEstoqueFisico.tsx`.
+
+---
+
+## [2026-07-01] — Painel Operacional vira dashboard real (KPIs + gráficos)
+
+- Backend agrega do banco: KPIs (estoque, alertas de validade, pedidos por status, NF-e/faturado
+  hoje, a receber 7 dias, movimentações), **série de faturamento de 7 dias**, **pedidos por status**
+  e **fluxo do dia**. Frontend com KPIs reais + gráfico de barras + barras por status.
+- Arquivos: `backend/src/modules/dashboard/*`, `frontend/src/pages/DashboardPage.tsx`.
+
+---
+
+## [2026-07-01] — Notas térmicas 80mm: Bilhete Separador + Cupom fiscal (NFC-e)
+
+- **Bilhete Separador** (picking) e **Cupom fiscal estilo NFC-e** (com preços, total, forma de
+  pagamento, tributos Lei 12.741, chave + QR), ambos 80mm com a **logo da Hetros**, pra sair na
+  térmica (ex.: Benetech MP-4200 TH). Botões **Nota** (cupom) e **Bilhete** no Líder e na Separação.
+- Impressão **fecha a janela sozinha** após imprimir (`onafterprint`); atalho `.bat`
+  `HETROS - Imprimir Direto` com Chrome `--kiosk-printing` (imprime direto na padrão, sem diálogo).
+- Arquivo: `frontend/src/modules/logistica/notaTermica.ts` + páginas do Líder/Separação.
+
+---
+
 ## [2026-07-01] — Operacional: nota térmica (bilhete de separação 80mm) + cartões melhorados
 
 ### O que mudou
