@@ -377,4 +377,68 @@ export class EstoqueService {
       orderBy: { lote: { dataValidade: 'asc' } },
     });
   }
+
+  /**
+   * Análise de estoque físico — dados REAIS por produto no período:
+   * saldo inicial, entradas, saídas, ordens de compra pendentes, perdas, quebra,
+   * saldo atual e custo. A tela soma com os campos manuais (Chão) e recalcula.
+   */
+  async getAnaliseEstoque(tenantId: string, filialId: string, dataIni?: string, dataFim?: string) {
+    const ini = dataIni ? new Date(`${dataIni}T00:00:00`) : null;
+    const fim = dataFim ? new Date(`${dataFim}T23:59:59`) : null;
+
+    const [produtos, movs, ocItens] = await Promise.all([
+      this.prisma.produto.findMany({
+        where: { tenantId, ativo: true },
+        select: {
+          id: true, codigo: true, descricao: true, categoria: true, grupo: true, precoCusto: true,
+          unidadeMedida: { select: { sigla: true } },
+          estoques: { where: { filialId }, select: { quantidade: true, custoMedio: true } },
+        },
+        orderBy: { descricao: 'asc' },
+      }),
+      this.prisma.movimentacaoEstoque.findMany({
+        where: { tenantId, filialId, ...(ini && { dataMovimento: { gte: ini, ...(fim && { lte: fim }) } }) },
+        select: { produtoId: true, tipo: true, quantidade: true },
+      }),
+      this.prisma.itemOrdemCompra.findMany({
+        where: { produtoId: { not: null }, ordem: { tenantId, status: { in: ['PENDENTE', 'APROVADA', 'PARCIAL'] } } },
+        select: { produtoId: true, quantidade: true },
+      }),
+    ]);
+
+    const ENTRADAS = ['ENTRADA_COMPRA', 'ENTRADA_DEVOLUCAO', 'AJUSTE_POSITIVO', 'TRANSFERENCIA_ENTRADA'];
+    const SAIDAS = ['SAIDA_VENDA', 'SAIDA_DEVOLUCAO_FORNECEDOR', 'AJUSTE_NEGATIVO', 'TRANSFERENCIA_SAIDA', 'PICKING'];
+
+    const agg = new Map<string, { entradas: number; saidas: number; perdas: number; quebra: number; net: number }>();
+    const get = (id: string) => { if (!agg.has(id)) agg.set(id, { entradas: 0, saidas: 0, perdas: 0, quebra: 0, net: 0 }); return agg.get(id)!; };
+    for (const m of movs) {
+      const q = Number(m.quantidade); const g = get(m.produtoId);
+      if (ENTRADAS.includes(m.tipo)) { g.entradas += q; g.net += q; }
+      else if (m.tipo === 'PERDA') { g.perdas += q; g.net -= q; }
+      else if (m.tipo === 'AVARIA') { g.quebra += q; g.net -= q; }
+      else if (SAIDAS.includes(m.tipo)) { g.saidas += q; g.net -= q; }
+    }
+    const ocByProd = new Map<string, number>();
+    for (const it of ocItens) if (it.produtoId) ocByProd.set(it.produtoId, (ocByProd.get(it.produtoId) || 0) + Number(it.quantidade));
+
+    return produtos.map((p) => {
+      const g = agg.get(p.id) || { entradas: 0, saidas: 0, perdas: 0, quebra: 0, net: 0 };
+      const saldoAtual = p.estoques.reduce((s, e) => s + Number(e.quantidade), 0);
+      const custo = Number(p.estoques.find((e) => Number(e.custoMedio) > 0)?.custoMedio ?? p.precoCusto ?? 0);
+      return {
+        id: p.id, codigo: p.codigo, descricao: p.descricao,
+        familia: p.categoria || '-', grupo: p.grupo || '-',
+        undEstoque: p.unidadeMedida?.sigla || 'UN',
+        saldoInicial: saldoAtual - g.net,       // saldo no início do período
+        entradas: g.entradas,
+        saidas: -g.saidas,                      // negativo (para exibição)
+        ordensCompra: ocByProd.get(p.id) || 0,
+        perdasReal: g.perdas,
+        quebraReal: g.quebra,
+        saldoAtual,
+        precoCusto: custo,
+      };
+    });
+  }
 }

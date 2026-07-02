@@ -239,37 +239,43 @@ export default function AnaliseEstoqueFisico() {
   };
   const calcSaldo = (p: any) => (p.saldoInicial || 0) + (p.entradas || 0) + (p.chao || 0) + (p.ordensCompra || 0) - (p.perdas || 0) - (p.quebra || 0);
 
-  // Monta a lista já mesclando os valores salvos e recalculando o Saldo Final
-  const montarLista = () => {
-    const edits = loadEdits();
-    return TODOS_PRODUTOS
-      .filter(p => (familia === '<Todas>' || p.familia === familia) && (grupo === '<Todas>' || p.grupo === grupo))
-      .map(p => {
-        const merged = { ...p, perdas: p.perdas || 0, quebra: p.quebra || 0, chao: p.chao || 0, ...(edits[p.id] || {}) };
-        const saldoFinal = calcSaldo(merged);
-        const diferencaEstoque = merged.contagemFisica != null ? merged.contagemFisica - saldoFinal : 0;
-        return { ...merged, saldoFinal, valorAtualEstoque: saldoFinal * (merged.precoCusto || 0), diferencaEstoque };
-      });
+  // Mapeia uma linha da API (dados reais) para a linha da tela, aplicando os valores salvos
+  const mapLinha = (r: any, edits: Record<string, any>): ProdutoEstoque => {
+    const e = edits[r.id] || {};
+    const base = {
+      saldoInicial: r.saldoInicial, entradas: r.entradas, chao: 0,
+      ordensCompra: r.ordensCompra, perdas: r.perdasReal || 0, quebra: r.quebraReal || 0,
+      contagemFisica: null as number | null, ...e,
+    };
+    const saldoFinal = calcSaldo(base);
+    return {
+      id: r.id, codigo: r.codigo, descricao: r.descricao, familia: r.familia, grupo: r.grupo, undEstoque: r.undEstoque,
+      saldoInicial: base.saldoInicial, entradas: base.entradas, chao: base.chao || 0, ordensCompra: base.ordensCompra,
+      perdas: base.perdas || 0, quebra: base.quebra || 0, saidas: r.saidas, saldoFinal,
+      precoCusto: r.precoCusto, valorAtualEstoque: saldoFinal * (r.precoCusto || 0),
+      contagemFisica: base.contagemFisica ?? null,
+      diferencaEstoque: base.contagemFisica != null ? (base.contagemFisica as number) - saldoFinal : 0,
+    };
   };
 
-  // ── Executar: filtra e exibe resultados ────────
-  const handleExecutar = (comAnimacao = true) => {
-    const lista = montarLista();
-    if (!comAnimacao) { setProdutos(lista); setExecutado(true); return; }
-    setProcessando(true);
-    setExecutado(false);
-    setProdutos([]);
-    setProdProcessando(lista.length > 0 ? lista[Math.floor(Math.random() * lista.length)].descricao : '...');
-    window.setTimeout(() => {
-      setProdutos(montarLista());
-      setProcessando(false);
-      setExecutado(true);
-      setProdProcessando('');
-    }, 1200);
+  // ── Executar: busca os dados REAIS do backend ────────
+  const handleExecutar = async (comAnimacao = true) => {
+    if (!filialAtiva) return;
+    if (comAnimacao) { setProcessando(true); setExecutado(false); setProdutos([]); }
+    try {
+      const { data } = await api.get(`/estoque/${filialAtiva.id}/analise`, { params: { dataIni, dataFim } });
+      const edits = loadEdits();
+      const lista = (data as any[])
+        .filter(r => (familia === '<Todas>' || r.familia === familia) && (grupo === '<Todas>' || r.grupo === grupo))
+        .map(r => mapLinha(r, edits));
+      const finish = () => { setProdutos(lista); setProcessando(false); setExecutado(true); setProdProcessando(''); };
+      if (comAnimacao) { setProdProcessando(lista[0]?.descricao || '...'); window.setTimeout(finish, 700); }
+      else finish();
+    } catch { setProcessando(false); setExecutado(true); setProdutos([]); }
   };
 
-  // Carrega automaticamente ao abrir a tela
-  useEffect(() => { handleExecutar(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Carrega automaticamente ao abrir / trocar de filial
+  useEffect(() => { handleExecutar(false); }, [filialAtiva?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Contagem física: editar valor ──────────────
   const handleContagemChange = (id: string, valor: string) => {

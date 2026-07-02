@@ -50,6 +50,17 @@ export class EstoqueController {
     return this.service.getFefoLotes(tenantId, filialId, produtoId);
   }
 
+  @Get(':filialId/analise')
+  @ApiOperation({ summary: 'Análise de estoque físico (dados reais por produto no período)' })
+  analise(
+    @CurrentTenant() tenantId: string,
+    @Param('filialId') filialId: string,
+    @Query('dataIni') dataIni?: string,
+    @Query('dataFim') dataFim?: string,
+  ) {
+    return this.service.getAnaliseEstoque(tenantId, filialId, dataIni, dataFim);
+  }
+
   @Get(':filialId/a-comprar')
   @ApiOperation({ summary: 'Produtos com estoque negativo ou abaixo do mínimo (a comprar/repor)' })
   aComprar(@CurrentTenant() tenantId: string, @Param('filialId') filialId: string) {
