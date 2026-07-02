@@ -243,9 +243,10 @@ export default function AnaliseEstoqueFisico() {
   const mapLinha = (r: any, edits: Record<string, any>): ProdutoEstoque => {
     const e = edits[r.id] || {};
     const base = {
-      saldoInicial: r.saldoInicial, entradas: r.entradas, chao: 0,
+      entradas: r.entradas, chao: 0,
       ordensCompra: r.ordensCompra, perdas: r.perdasReal || 0, quebra: r.quebraReal || 0,
       contagemFisica: null as number | null, ...e,
+      saldoInicial: r.saldoInicial, // sempre do sistema (não editável)
     };
     const saldoFinal = calcSaldo(base);
     return {
@@ -291,7 +292,7 @@ export default function AnaliseEstoqueFisico() {
 
   // ── Edita um campo e RECALCULA o Saldo Final sozinho ──────────
   // Saldo Final = Saldo Inicial + Entrada + Ordem de Compra − Perdas − Quebra
-  const setCampo = (id: string, campo: 'saldoInicial' | 'entradas' | 'chao' | 'ordensCompra' | 'perdas' | 'quebra', valor: string) => {
+  const setCampo = (id: string, campo: 'entradas' | 'chao' | 'ordensCompra' | 'perdas' | 'quebra', valor: string) => {
     const v = valor === '' ? 0 : parseFloat(valor.replace(',', '.')) || 0;
     saveEdit(id, { [campo]: v }); // salva pra não perder ao recarregar
     setProdutos(prev => prev.map(p => {
@@ -540,9 +541,7 @@ export default function AnaliseEstoqueFisico() {
                     </td>
                     <td className={`px-2 py-1 border-r border-gray-200 ${sel ? '' : 'text-blue-600'}`}>{p.descricao}</td>
                     <td className="px-2 py-1 border-r border-gray-200">{p.familia}</td>
-                    <td className="px-1 py-0.5 border-r border-gray-200" onClick={e => e.stopPropagation()}>
-                      <input type="number" step="0.001" className={cellInp} value={p.saldoInicial ?? 0} onChange={e => setCampo(p.id, 'saldoInicial', e.target.value)} />
-                    </td>
+                    <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${sel ? '' : negClass(p.saldoInicial)}`} title="Calculado pelo sistema (não editável)">{fmtN(p.saldoInicial)}</td>
                     <td className="px-1 py-0.5 border-r border-gray-200" onClick={e => e.stopPropagation()}>
                       <input type="number" step="0.001" className={cellInp} value={p.entradas ?? 0} onChange={e => setCampo(p.id, 'entradas', e.target.value)} />
                     </td>
