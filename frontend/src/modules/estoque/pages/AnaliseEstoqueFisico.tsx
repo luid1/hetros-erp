@@ -230,36 +230,51 @@ export default function AnaliseEstoqueFisico() {
     setGrupo('<Todas>');
   };
 
-  // ── Executar: filtra e exibe resultados ────────
-  const handleExecutar = () => {
-    const filtrado = TODOS_PRODUTOS.filter(p => {
-      if (familia !== '<Todas>' && p.familia !== familia) return false;
-      if (grupo !== '<Todas>' && p.grupo !== grupo) return false;
-      return true;
-    });
+  // ── Persistência dos valores editados (localStorage) ────────
+  const EDITS_KEY = 'hetros_analise_estoque_edits';
+  const loadEdits = (): Record<string, any> => { try { return JSON.parse(localStorage.getItem(EDITS_KEY) || '{}'); } catch { return {}; } };
+  const saveEdit = (id: string, patch: Record<string, any>) => {
+    const all = loadEdits(); all[id] = { ...(all[id] || {}), ...patch };
+    localStorage.setItem(EDITS_KEY, JSON.stringify(all));
+  };
+  const calcSaldo = (p: any) => (p.saldoInicial || 0) + (p.entradas || 0) + (p.chao || 0) + (p.ordensCompra || 0) - (p.perdas || 0) - (p.quebra || 0);
 
+  // Monta a lista já mesclando os valores salvos e recalculando o Saldo Final
+  const montarLista = () => {
+    const edits = loadEdits();
+    return TODOS_PRODUTOS
+      .filter(p => (familia === '<Todas>' || p.familia === familia) && (grupo === '<Todas>' || p.grupo === grupo))
+      .map(p => {
+        const merged = { ...p, perdas: p.perdas || 0, quebra: p.quebra || 0, chao: p.chao || 0, ...(edits[p.id] || {}) };
+        const saldoFinal = calcSaldo(merged);
+        const diferencaEstoque = merged.contagemFisica != null ? merged.contagemFisica - saldoFinal : 0;
+        return { ...merged, saldoFinal, valorAtualEstoque: saldoFinal * (merged.precoCusto || 0), diferencaEstoque };
+      });
+  };
+
+  // ── Executar: filtra e exibe resultados ────────
+  const handleExecutar = (comAnimacao = true) => {
+    const lista = montarLista();
+    if (!comAnimacao) { setProdutos(lista); setExecutado(true); return; }
     setProcessando(true);
     setExecutado(false);
     setProdutos([]);
-    setProdProcessando(filtrado.length > 0 ? filtrado[Math.floor(Math.random() * filtrado.length)].descricao : '...');
-
+    setProdProcessando(lista.length > 0 ? lista[Math.floor(Math.random() * lista.length)].descricao : '...');
     window.setTimeout(() => {
-      // Recalcula o Saldo Final pela nova fórmula (SI + Entrada + OC − Perdas − Quebra)
-      const recalculado = filtrado.map(p => {
-        const perdas = p.perdas || 0, quebra = p.quebra || 0;
-        const saldoFinal = (p.saldoInicial || 0) + (p.entradas || 0) + (p.chao || 0) + (p.ordensCompra || 0) - perdas - quebra;
-        return { ...p, perdas, quebra, chao: p.chao || 0, saldoFinal, valorAtualEstoque: saldoFinal * (p.precoCusto || 0) };
-      });
-      setProdutos(recalculado);
+      setProdutos(montarLista());
       setProcessando(false);
       setExecutado(true);
       setProdProcessando('');
     }, 1200);
   };
 
+  // Carrega automaticamente ao abrir a tela
+  useEffect(() => { handleExecutar(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Contagem física: editar valor ──────────────
   const handleContagemChange = (id: string, valor: string) => {
     const num = valor === '' ? null : parseFloat(valor.replace(',', '.'));
+    saveEdit(id, { contagemFisica: num });
     setProdutos(prev => prev.map(p => {
       if (p.id !== id) return p;
       const contagem = num;
@@ -272,6 +287,7 @@ export default function AnaliseEstoqueFisico() {
   // Saldo Final = Saldo Inicial + Entrada + Ordem de Compra − Perdas − Quebra
   const setCampo = (id: string, campo: 'saldoInicial' | 'entradas' | 'chao' | 'ordensCompra' | 'perdas' | 'quebra', valor: string) => {
     const v = valor === '' ? 0 : parseFloat(valor.replace(',', '.')) || 0;
+    saveEdit(id, { [campo]: v }); // salva pra não perder ao recarregar
     setProdutos(prev => prev.map(p => {
       if (p.id !== id) return p;
       const np = { ...p, [campo]: v };
