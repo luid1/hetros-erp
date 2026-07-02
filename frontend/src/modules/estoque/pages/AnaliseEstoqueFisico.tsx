@@ -12,6 +12,7 @@ interface ProdutoEstoque {
   grupo: string;
   saldoInicial: number;
   entradas: number;
+  chao?: number;
   ordensCompra: number;
   perdas?: number;
   quebra?: number;
@@ -246,8 +247,8 @@ export default function AnaliseEstoqueFisico() {
       // Recalcula o Saldo Final pela nova fórmula (SI + Entrada + OC − Perdas − Quebra)
       const recalculado = filtrado.map(p => {
         const perdas = p.perdas || 0, quebra = p.quebra || 0;
-        const saldoFinal = (p.saldoInicial || 0) + (p.entradas || 0) + (p.ordensCompra || 0) - perdas - quebra;
-        return { ...p, perdas, quebra, saldoFinal, valorAtualEstoque: saldoFinal * (p.precoCusto || 0) };
+        const saldoFinal = (p.saldoInicial || 0) + (p.entradas || 0) + (p.chao || 0) + (p.ordensCompra || 0) - perdas - quebra;
+        return { ...p, perdas, quebra, chao: p.chao || 0, saldoFinal, valorAtualEstoque: saldoFinal * (p.precoCusto || 0) };
       });
       setProdutos(recalculado);
       setProcessando(false);
@@ -269,12 +270,12 @@ export default function AnaliseEstoqueFisico() {
 
   // ── Edita um campo e RECALCULA o Saldo Final sozinho ──────────
   // Saldo Final = Saldo Inicial + Entrada + Ordem de Compra − Perdas − Quebra
-  const setCampo = (id: string, campo: 'saldoInicial' | 'entradas' | 'ordensCompra' | 'perdas' | 'quebra', valor: string) => {
+  const setCampo = (id: string, campo: 'saldoInicial' | 'entradas' | 'chao' | 'ordensCompra' | 'perdas' | 'quebra', valor: string) => {
     const v = valor === '' ? 0 : parseFloat(valor.replace(',', '.')) || 0;
     setProdutos(prev => prev.map(p => {
       if (p.id !== id) return p;
       const np = { ...p, [campo]: v };
-      const saldoFinal = (np.saldoInicial || 0) + (np.entradas || 0) + (np.ordensCompra || 0) - (np.perdas || 0) - (np.quebra || 0);
+      const saldoFinal = (np.saldoInicial || 0) + (np.entradas || 0) + (np.chao || 0) + (np.ordensCompra || 0) - (np.perdas || 0) - (np.quebra || 0);
       const valorAtualEstoque = saldoFinal * (np.precoCusto || 0);
       const diferencaEstoque = np.contagemFisica !== null ? (np.contagemFisica as number) - saldoFinal : 0;
       return { ...np, saldoFinal, valorAtualEstoque, diferencaEstoque };
@@ -479,7 +480,8 @@ export default function AnaliseEstoqueFisico() {
                 <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">Descrição</th>
                 <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-16">Família</th>
                 <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Saldo Inicial</th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Entrada (Chão)</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Entrada</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Chão</th>
                 {!semOrdCompra && (
                   <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Ordem de Compra</th>
                 )}
@@ -521,6 +523,9 @@ export default function AnaliseEstoqueFisico() {
                     </td>
                     <td className="px-1 py-0.5 border-r border-gray-200" onClick={e => e.stopPropagation()}>
                       <input type="number" step="0.001" className={cellInp} value={p.entradas ?? 0} onChange={e => setCampo(p.id, 'entradas', e.target.value)} />
+                    </td>
+                    <td className="px-1 py-0.5 border-r border-gray-200" onClick={e => e.stopPropagation()}>
+                      <input type="number" step="0.001" className={cellInp} value={p.chao ?? 0} onChange={e => setCampo(p.id, 'chao', e.target.value)} />
                     </td>
                     {!semOrdCompra && (
                       <td className="px-1 py-0.5 border-r border-gray-200" onClick={e => e.stopPropagation()}>
