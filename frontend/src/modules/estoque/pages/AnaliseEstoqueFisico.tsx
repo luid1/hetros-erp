@@ -317,7 +317,7 @@ export default function AnaliseEstoqueFisico() {
             <span className="ml-1 inline-flex flex-wrap gap-1.5">
               {aRepor.slice(0, 14).map(p => (
                 <span key={p.produtoId}
-                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${p.negativo ? 'bg-red-100 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${p.negativo ? 'bg-rose-900/40 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
                   {p.descricao} · disp. {p.disponivel}{p.negativo && ` · comprar ${p.sugestaoCompra}`}
                 </span>
               ))}
@@ -474,7 +474,7 @@ export default function AnaliseEstoqueFisico() {
         ) : (
           <table className="w-full border-collapse text-[11px]" style={{ minWidth: 1300 }}>
             <thead className="sticky top-0 z-10">
-              <tr className="bg-gray-300 border-b-2 border-gray-500">
+              <tr className="bg-slate-800 border-b-2 border-slate-600">
                 <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Código Produto</th>
                 <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">Descrição</th>
                 <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-16">Família</th>
@@ -483,14 +483,14 @@ export default function AnaliseEstoqueFisico() {
                 {!semOrdCompra && (
                   <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Ordem de Compra</th>
                 )}
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-20 bg-red-100">Perdas</th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-20 bg-red-100">Quebra</th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24 bg-emerald-100">= Saldo Final</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-20 bg-rose-900/40">Perdas</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-20 bg-rose-900/40">Quebra</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24 bg-emerald-900/40">= Saldo Final</th>
                 <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-12">Und</th>
                 {confFisica && (
                   <>
-                    <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24 bg-yellow-100">✎ Contagem Física</th>
-                    <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-28 bg-yellow-100">⊘ Diferença de Estoque</th>
+                    <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24 bg-amber-900/40">✎ Contagem Física</th>
+                    <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-28 bg-amber-900/40">⊘ Diferença de Estoque</th>
                   </>
                 )}
                 <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-20">Preço Custo</th>
@@ -527,17 +527,17 @@ export default function AnaliseEstoqueFisico() {
                         <input type="number" step="0.001" className={cellInp} value={p.ordensCompra ?? 0} onChange={e => setCampo(p.id, 'ordensCompra', e.target.value)} />
                       </td>
                     )}
-                    <td className="px-1 py-0.5 border-r border-gray-200 bg-red-50" onClick={e => e.stopPropagation()}>
+                    <td className="px-1 py-0.5 border-r border-gray-200 bg-rose-950/50" onClick={e => e.stopPropagation()}>
                       <input type="number" step="0.001" min="0" className={cellInp} value={p.perdas ?? 0} onChange={e => setCampo(p.id, 'perdas', e.target.value)} />
                     </td>
-                    <td className="px-1 py-0.5 border-r border-gray-200 bg-red-50" onClick={e => e.stopPropagation()}>
+                    <td className="px-1 py-0.5 border-r border-gray-200 bg-rose-950/50" onClick={e => e.stopPropagation()}>
                       <input type="number" step="0.001" min="0" className={cellInp} value={p.quebra ?? 0} onChange={e => setCampo(p.id, 'quebra', e.target.value)} />
                     </td>
-                    <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono font-bold bg-emerald-50 ${sel ? '' : negClass(p.saldoFinal)}`}>{fmtN(p.saldoFinal)}</td>
+                    <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono font-bold bg-emerald-900/30 ${sel ? '' : negClass(p.saldoFinal)}`}>{fmtN(p.saldoFinal)}</td>
                     <td className="px-2 py-1 border-r border-gray-200">{p.undEstoque}</td>
                     {confFisica && (
                       <>
-                        <td className="px-2 py-1 border-r border-gray-200 bg-yellow-50" onClick={e => e.stopPropagation()}>
+                        <td className="px-2 py-1 border-r border-gray-200 bg-amber-950/40" onClick={e => e.stopPropagation()}>
                           <input
                             type="number"
                             step="0.001"
@@ -547,7 +547,7 @@ export default function AnaliseEstoqueFisico() {
                             placeholder="0,000"
                           />
                         </td>
-                        <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono font-bold bg-yellow-50 ${sel ? '' : p.diferencaEstoque < 0 ? 'text-red-600' : p.diferencaEstoque > 0 ? 'text-green-600' : ''}`}>
+                        <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono font-bold bg-amber-950/40 ${sel ? '' : p.diferencaEstoque < 0 ? 'text-red-600' : p.diferencaEstoque > 0 ? 'text-green-600' : ''}`}>
                           {p.contagemFisica !== null ? fmtN(p.diferencaEstoque) : ''}
                         </td>
                       </>
@@ -566,7 +566,7 @@ export default function AnaliseEstoqueFisico() {
       </div>
 
       {/* ── Rodapé com totais ── */}
-      <div className="shrink-0 bg-gray-300 border-t-2 border-gray-500 px-3 py-1.5 flex items-center justify-between text-gray-800">
+      <div className="shrink-0 bg-slate-800 border-t-2 border-slate-600 px-3 py-1.5 flex items-center justify-between text-gray-800">
         <span>Registros encontrados: <strong>{totais.count}</strong></span>
         <div className="flex gap-8 font-mono text-[11px]">
           <span className={negClass(totais.saldoFinal)}>{fmtN(totais.saldoFinal)}</span>
