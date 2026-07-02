@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { PackageCheck, RefreshCw, PackageSearch, Printer } from 'lucide-react';
+import { PackageCheck, RefreshCw, PackageSearch, Printer, Search, ChevronLeft, ChevronRight, X, Delete } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import SeparacaoPainel from './SeparacaoPesagem';
@@ -26,6 +26,8 @@ export default function Operacional() {
   const [loading, setLoading] = useState(false);
   const [filtro, setFiltro] = useState<StatusKey | 'TODOS'>('TODOS');
   const [selId, setSelId] = useState<string | null>(null);
+  const [busca, setBusca] = useState('');
+  const [keypad, setKeypad] = useState(false);
   const [params] = useSearchParams();
 
   // Veio da tela do Líder com um pedido específico → já abre ele
@@ -47,9 +49,22 @@ export default function Operacional() {
     return c;
   }, [linhas]);
 
-  const filtradas = useMemo(
-    () => filtro === 'TODOS' ? linhas : linhas.filter(l => l.statusPedido === filtro),
-    [linhas, filtro]);
+  const filtradas = useMemo(() => {
+    let r = filtro === 'TODOS' ? linhas : linhas.filter(l => l.statusPedido === filtro);
+    if (busca.trim()) {
+      const q = busca.trim().toLowerCase();
+      r = r.filter(l => String(l.idVenda ?? l.numero ?? '').includes(q) || (l.nomeFantasia || '').toLowerCase().includes(q));
+    }
+    return r;
+  }, [linhas, filtro, busca]);
+
+  // Navegação anterior / próximo na fila
+  const irPara = (delta: number) => {
+    if (filtradas.length === 0) return;
+    const idx = filtradas.findIndex(l => l.id === selId);
+    const nextIdx = idx < 0 ? (delta > 0 ? 0 : filtradas.length - 1) : Math.min(filtradas.length - 1, Math.max(0, idx + delta));
+    abrirPedido(filtradas[nextIdx]);
+  };
 
   const abrirPedido = async (l: any) => {
     setSelId(l.id);
@@ -99,6 +114,17 @@ export default function Operacional() {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* ── Fila de pedidos (esquerda) ── */}
         <div className="w-[400px] shrink-0 border-r-2 border-slate-200 bg-slate-50 flex flex-col">
+          {/* Barra: pesquisar (lupa) + navegação */}
+          <div className="px-3 py-2 shrink-0 flex items-center gap-2 border-b border-slate-200">
+            <button onClick={() => setKeypad(true)}
+              className="flex items-center gap-2 flex-1 min-w-0 bg-white border-2 border-slate-300 hover:border-emerald-400 rounded-xl px-3 py-2.5 text-left active:scale-[0.98] transition-transform">
+              <Search className="h-5 w-5 text-emerald-600 shrink-0" />
+              <span className={`text-lg font-bold truncate ${busca ? 'text-slate-800' : 'text-slate-400'}`}>{busca || 'Pesquisar nº'}</span>
+            </button>
+            {busca && <button onClick={() => setBusca('')} className="h-11 w-11 shrink-0 flex items-center justify-center rounded-xl bg-white border-2 border-slate-300 text-slate-500 active:scale-95"><X className="h-5 w-5" /></button>}
+            <button onClick={() => irPara(-1)} className="h-11 w-11 shrink-0 flex items-center justify-center rounded-xl bg-white border-2 border-slate-300 text-slate-700 hover:border-emerald-400 active:scale-95" title="Anterior"><ChevronLeft className="h-6 w-6" /></button>
+            <button onClick={() => irPara(1)} className="h-11 w-11 shrink-0 flex items-center justify-center rounded-xl bg-white border-2 border-slate-300 text-slate-700 hover:border-emerald-400 active:scale-95" title="Próximo"><ChevronRight className="h-6 w-6" /></button>
+          </div>
           <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wide shrink-0">Fila de pedidos · {filtradas.length}</div>
           <div className="flex-1 overflow-auto px-3 pb-3 space-y-2">
             {loading ? (
@@ -149,6 +175,56 @@ export default function Operacional() {
             </div>
           )}
         </div>
+      </div>
+
+      {keypad && (
+        <TecladoNumerico
+          valorInicial={busca}
+          onClose={() => setKeypad(false)}
+          onBuscar={(v) => {
+            setBusca(v);
+            setKeypad(false);
+            // se achou exatamente 1 pedido, já abre
+            const achados = linhas.filter(l => String(l.idVenda ?? l.numero ?? '').includes(v.trim()));
+            if (v.trim() && achados.length >= 1) abrirPedido(achados[0]);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────── Teclado numérico (touch) ───────────
+function TecladoNumerico({ valorInicial, onClose, onBuscar }: {
+  valorInicial: string; onClose: () => void; onBuscar: (v: string) => void;
+}) {
+  const [v, setV] = useState(valorInicial || '');
+  const tecla = (d: string) => setV(p => (p + d).slice(0, 12));
+  const teclas = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-black text-slate-800 flex items-center gap-2"><Search className="h-5 w-5 text-emerald-600" /> Pesquisar pedido</h2>
+          <button onClick={onClose} className="h-9 w-9 flex items-center justify-center rounded-full bg-slate-100 text-slate-500"><X className="h-5 w-5" /></button>
+        </div>
+        {/* Visor */}
+        <div className="border-2 border-slate-300 rounded-2xl px-4 py-3 mb-4 text-center">
+          <p className="text-4xl font-black tabular-nums text-slate-800 min-h-[44px]">{v || <span className="text-slate-300">nº</span>}</p>
+        </div>
+        {/* Teclas */}
+        <div className="grid grid-cols-3 gap-2.5">
+          {teclas.map(t => (
+            <button key={t} onClick={() => tecla(t)} className="h-16 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-3xl font-black text-slate-800 transition-transform">{t}</button>
+          ))}
+          <button onClick={() => setV('')} className="h-16 rounded-2xl bg-amber-100 hover:bg-amber-200 active:scale-95 text-lg font-black text-amber-700">C</button>
+          <button onClick={() => tecla('0')} className="h-16 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-3xl font-black text-slate-800">0</button>
+          <button onClick={() => setV(p => p.slice(0, -1))} className="h-16 rounded-2xl bg-slate-100 hover:bg-slate-200 active:scale-95 flex items-center justify-center text-slate-700"><Delete className="h-7 w-7" /></button>
+        </div>
+        <button onClick={() => onBuscar(v)}
+          className="mt-4 w-full h-14 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xl font-black flex items-center justify-center gap-2 transition-transform">
+          <Search className="h-6 w-6" /> Buscar
+        </button>
       </div>
     </div>
   );
