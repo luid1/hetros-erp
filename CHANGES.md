@@ -20,6 +20,26 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-03] — Publicação no GitHub + referência da tela de Rentabilidade (cliente→produto)
+
+### O que mudou
+- **Código publicado no GitHub**: `https://github.com/luid1/hetros-erp` (branch `main`) — para
+  outras pessoas verem. `.env` (senhas) e `node_modules` **não** foram enviados.
+- **Sistema disponível pra demonstração externa** via túnel (build de produção): URL loca.lt +
+  senha do túnel (o IP público da máquina). Só no ar enquanto o PC/backend/túnel estiverem ligados.
+- **Direção do próximo passo dos Custos**: transformar a aba de custos numa **grade de
+  Rentabilidade** estilo NewOxxy — linha por **cliente** (Nome Fantasia, Vlr Líquido Vendido,
+  Resultado Líquido, Total Custos e Despesas, Peso Total) **expansível** para a sub-grade de
+  **produtos** (Código, Produto, Referência, Tipo, Qtd, Vlr Total Venda, Vlr Total CMV, Lucro
+  Bruto, % Lucro), com filtros por coluna, rodapé de totais e ações (Imprimir/Excel/E-mail).
+  Mockup de referência gerado.
+
+### Como está no ar (túneis de teste)
+- Web (demonstração): build de produção servido em `vite preview` (3005) + túnel loca.lt.
+- Backend (app mobile): túnel loca.lt → `localhost:3002` (configurado no app.json do compradores-app).
+
+---
+
 ## [2026-07-02] — Roteirização por VEÍCULO real + não duplica pedidos já roteirizados
 
 ### O que mudou
