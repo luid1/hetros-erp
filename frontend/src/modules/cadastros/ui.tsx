@@ -8,16 +8,16 @@ import { useAuth } from '../../contexts/AuthContext';
  * Visual sofisticado e minimalista, alinhado à sidebar escura do ERP.
  */
 
-// Classes reutilizáveis (dark)
-export const inp = 'w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/40';
-export const lbl = 'block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1';
+// Classes reutilizáveis (dark tech / glass)
+export const inp = 'w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-400/60 focus:ring-1 focus:ring-sky-400/30 transition-all duration-300';
+export const lbl = 'block text-[10px] font-semibold text-slate-500 uppercase tracking-[0.1em] mb-1';
 
 export const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 export const R$ = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-// Shell da página: fundo dark ocupando a área de conteúdo
+// Shell da página: transparente — deixa o glow do canvas atravessar
 export function CadastroShell({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col h-full bg-[#0b1220] text-slate-200">{children}</div>;
+  return <div className="flex flex-col h-full text-slate-200">{children}</div>;
 }
 
 // Barra superior com título + botão "Novo Cadastro"
@@ -27,18 +27,18 @@ export function TopBar({ icon, titulo, subtitulo, onNovo, novoLabel = 'Novo Cada
   const rota = useLocation().pathname;
   const podeCriar = pode ? pode(rota, 'CRIAR') : true;
   return (
-    <div className="border-b border-slate-800 px-5 py-3 flex items-center justify-between shrink-0 bg-[#0e1729]">
+    <div className="border-b border-white/[0.05] px-5 py-3.5 flex items-center justify-between shrink-0 bg-white/[0.02] backdrop-blur-xl">
       <div className="flex items-center gap-3">
-        <div className="h-9 w-9 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center">{icon}</div>
+        <span className="text-sky-300/90">{icon}</span>
         <div>
-          <h1 className="text-base font-bold text-white leading-tight">{titulo}</h1>
+          <h1 className="text-base font-bold text-white leading-tight tracking-tight">{titulo}</h1>
           {subtitulo && <p className="text-xs text-slate-500 mt-0.5">{subtitulo}</p>}
         </div>
       </div>
       <div className="flex items-center gap-2">
         {extra}
         {onNovo && podeCriar && (
-          <button onClick={onNovo} className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-sky-900/30">
+          <button onClick={onNovo} className="flex items-center gap-1.5 bg-sky-500 hover:bg-sky-400 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-sky-500/20 transition-all duration-300 hover:-translate-y-[1px] active:scale-[0.98]">
             <Plus className="h-4 w-4" /> {novoLabel}
           </button>
         )}
@@ -51,11 +51,11 @@ export function TopBar({ icon, titulo, subtitulo, onNovo, novoLabel = 'Novo Cada
 export function FilterBar({ busca, onBusca, placeholder = 'Buscar...', children }:
   { busca: string; onBusca: (v: string) => void; placeholder?: string; children?: ReactNode }) {
   return (
-    <div className="border-b border-slate-800 px-5 py-2.5 flex flex-wrap items-center gap-3 shrink-0 bg-[#0e1729]">
+    <div className="border-b border-white/[0.05] px-5 py-2.5 flex flex-wrap items-center gap-3 shrink-0 bg-white/[0.01]">
       <div className="relative flex-1 min-w-[220px] max-w-md">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
         <input value={busca} onChange={e => onBusca(e.target.value)} placeholder={placeholder}
-          className="w-full bg-slate-800 border border-slate-600 rounded-lg pl-8 pr-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-500" />
+          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg pl-8 pr-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-400/60 transition-all duration-300" />
       </div>
       {children}
     </div>
@@ -69,7 +69,7 @@ export function Chips({ value, onChange, options }:
     <div className="flex items-center gap-1.5">
       {options.map(o => (
         <button key={o.value} onClick={() => onChange(o.value)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${value === o.value ? 'bg-sky-500/15 border-sky-500/50 text-sky-300' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200'}`}>
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-300 active:scale-[0.98] ${value === o.value ? 'bg-sky-400/10 border-sky-400/40 text-sky-300' : 'bg-white/[0.03] border-white/[0.07] text-slate-400 hover:text-slate-200 hover:bg-white/[0.06]'}`}>
           {o.label}
         </button>
       ))}
@@ -77,16 +77,16 @@ export function Chips({ value, onChange, options }:
   );
 }
 
-// Wrapper de tabela dark
+// Wrapper de tabela — placa de vidro flutuante
 export function TableCard({ children }: { children: ReactNode }) {
   return (
-    <div className="bg-[#111d33] rounded-xl border border-slate-800 overflow-hidden">
+    <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] overflow-hidden shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
       <table className="w-full text-sm">{children}</table>
     </div>
   );
 }
 export function Th({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <th className={`px-3 py-2.5 text-left font-semibold text-slate-400 text-xs uppercase tracking-wide bg-slate-800/40 ${className}`}>{children}</th>;
+  return <th className={`px-3 py-2.5 text-left font-semibold text-slate-500 text-[11px] uppercase tracking-[0.08em] bg-white/[0.02] ${className}`}>{children}</th>;
 }
 
 export function StatusBadge({ ativo, ativoLabel = 'ATIVO', inativoLabel = 'INATIVO' }: { ativo: boolean; ativoLabel?: string; inativoLabel?: string }) {
@@ -114,18 +114,18 @@ export function OcupacaoBar({ pct }: { pct: number }) {
 export function Modal({ titulo, onClose, onSalvar, salvando, children, salvarLabel = 'Salvar', wide }:
   { titulo: string; onClose: () => void; onSalvar?: () => void; salvando?: boolean; children: ReactNode; salvarLabel?: string; wide?: boolean }) {
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className={`bg-[#111d33] border border-slate-700 rounded-xl shadow-2xl w-full ${wide ? 'max-w-3xl' : 'max-w-2xl'} max-h-[92vh] flex flex-col`} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700 shrink-0">
-          <h2 className="font-bold text-white text-sm">{titulo}</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-200"><X className="h-4 w-4" /></button>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in" onClick={onClose}>
+      <div className={`bg-[#0E141F]/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-[0_24px_80px_0_rgba(0,0,0,0.6)] w-full ${wide ? 'max-w-3xl' : 'max-w-2xl'} max-h-[92vh] flex flex-col animate-fade-in-up`} onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06] shrink-0">
+          <h2 className="font-bold text-white text-sm tracking-tight">{titulo}</h2>
+          <button onClick={onClose} className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/[0.06] transition-all duration-300"><X className="h-4 w-4" /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">{children}</div>
         {onSalvar && (
-          <div className="flex justify-end gap-2 px-5 py-3 border-t border-slate-700 shrink-0">
-            <button onClick={onClose} className="px-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-slate-300 hover:bg-slate-700">Cancelar</button>
+          <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/[0.06] shrink-0">
+            <button onClick={onClose} className="px-4 py-2 bg-white/[0.04] border border-white/[0.08] rounded-lg text-sm text-slate-300 hover:bg-white/[0.08] transition-all duration-300 active:scale-[0.98]">Cancelar</button>
             <button onClick={onSalvar} disabled={salvando}
-              className="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-1.5">
+              className="px-5 py-2 bg-sky-500 hover:bg-sky-400 text-white rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-1.5 shadow-lg shadow-sky-500/20 transition-all duration-300 active:scale-[0.98]">
               {salvando ? 'Salvando…' : <><Save className="h-4 w-4" /> {salvarLabel}</>}
             </button>
           </div>

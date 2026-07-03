@@ -67,6 +67,17 @@ export class EstoqueController {
     return this.service.getAComprar(tenantId, filialId);
   }
 
+  @Get(':filialId/perdas')
+  @ApiOperation({ summary: 'Resumo de perdas e quebras (avarias) do período — qtd e valor R$' })
+  resumoPerdas(
+    @CurrentTenant() tenantId: string,
+    @Param('filialId') filialId: string,
+    @Query('dataInicio') dataInicio?: string,
+    @Query('dataFim') dataFim?: string,
+  ) {
+    return this.service.getResumoPerdas(tenantId, filialId, dataInicio, dataFim);
+  }
+
   @Get(':filialId/movimentacoes')
   @ApiOperation({ summary: 'Extrato de movimentações da filial' })
   movimentacoes(

@@ -357,6 +357,42 @@ export class EstoqueService {
   }
 
   /**
+   * Resumo de PERDAS e QUEBRAS (avarias) do período, em quantidade e valor (R$).
+   * Valor = quantidade × custo unitário da movimentação. Usado no painel gerencial.
+   */
+  async getResumoPerdas(tenantId: string, filialId: string, dataInicio?: string, dataFim?: string) {
+    const movs = await this.prisma.movimentacaoEstoque.findMany({
+      where: {
+        tenantId, filialId,
+        tipo: { in: [TipoMovimentacao.PERDA, TipoMovimentacao.AVARIA] },
+        ...(dataInicio && { dataMovimento: { gte: new Date(dataInicio), ...(dataFim && { lte: new Date(dataFim) }) } }),
+      },
+      include: { produto: { select: { codigo: true, descricao: true } } },
+      orderBy: { dataMovimento: 'desc' },
+    });
+
+    const perda = { qtd: 0, valor: 0 };
+    const quebra = { qtd: 0, valor: 0 };
+    const porProduto = new Map<string, { codigo: string; descricao: string; qtd: number; valor: number }>();
+
+    for (const m of movs) {
+      const q = Number(m.quantidade);
+      const v = q * Number(m.custoUnitario || 0);
+      const alvo = m.tipo === TipoMovimentacao.AVARIA ? quebra : perda;
+      alvo.qtd += q; alvo.valor += v;
+      const key = m.produtoId;
+      const cur = porProduto.get(key) || { codigo: m.produto?.codigo || '', descricao: m.produto?.descricao || '', qtd: 0, valor: 0 };
+      cur.qtd += q; cur.valor += v; porProduto.set(key, cur);
+    }
+
+    return {
+      perda, quebra,
+      total: { qtd: perda.qtd + quebra.qtd, valor: perda.valor + quebra.valor },
+      porProduto: Array.from(porProduto.values()).sort((a, b) => b.valor - a.valor),
+    };
+  }
+
+  /**
    * Relatório de perecíveis vencendo nos próximos N dias (crítico para FLV)
    */
   async getAlertasValidade(tenantId: string, filialId: string, dias = 5) {

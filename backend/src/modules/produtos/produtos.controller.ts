@@ -21,6 +21,12 @@ export class ProdutosController {
     return this.service.listarUnidades(tenantId);
   }
 
+  @Get('categorias')
+  @ApiOperation({ summary: 'Categorias existentes em produtos ativos (para filtros)' })
+  categorias(@CurrentTenant() tenantId: string) {
+    return this.service.listarCategorias(tenantId);
+  }
+
   @Get('search')
   @ApiOperation({ summary: 'Busca de produtos (autocomplete) com saldo disponível' })
   search(

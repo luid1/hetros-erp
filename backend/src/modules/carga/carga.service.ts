@@ -144,6 +144,7 @@ export class CargaService {
     regiaoRota?: string;
     dataMovimento?: string;
     dataEntrega?: string;
+    valorFrete?: number;
     pedidoIds: string[];
   }) {
     const ultimo = await this.prisma.romaneio.findFirst({
@@ -176,6 +177,7 @@ export class CargaService {
         regiaoRota: dto.regiaoRota,
         autorizacaoCarga: autorizacao,
         pesoTotalKg: pesoTotal._sum.pesoTotal || 0,
+        valorFrete: dto.valorFrete ? Number(dto.valorFrete) : 0,
         dataMovimento: dto.dataMovimento ? new Date(dto.dataMovimento) : new Date(),
         // ancora no meio-dia local para não escorregar de dia por fuso
         dataEntrega: dto.dataEntrega ? new Date(`${dto.dataEntrega.split('T')[0]}T12:00:00`) : undefined,

@@ -64,10 +64,15 @@ export default function NotasEmitidas() {
     catch (e: any) { toast(e.response?.data?.message || 'Erro ao cancelar.'); }
   };
   const enviarCce = async (id: string) => {
-    const correcao = await promptDialog('Texto da correção (15 a 1000 caracteres):');
-    if (!correcao) return;
-    try { await api.post(`/nfe/${id}/carta-correcao`, { correcao }); await abrirDetalhe(id); carregar(); toast('CC-e registrada (modo teste).'); }
-    catch (e: any) { toast(e.response?.data?.message || 'Erro na CC-e.'); }
+    const correcao = await promptDialog(
+      'Carta de Correção (CC-e) — regra da SEFAZ: mínimo 15, máximo 1000 caracteres.\nEx.: "Corrigir o endereço de entrega do destinatário para Rua X, nº 100."',
+    );
+    if (correcao === null) return; // cancelou
+    const texto = correcao.trim();
+    if (texto.length < 15) { toast(`A correção precisa ter ao menos 15 caracteres (você digitou ${texto.length}).`, 'error'); return; }
+    if (texto.length > 1000) { toast(`A correção passa de 1000 caracteres (${texto.length}).`, 'error'); return; }
+    try { await api.post(`/nfe/${id}/carta-correcao`, { correcao: texto }); await abrirDetalhe(id); carregar(); toast('CC-e registrada (modo teste).', 'success'); }
+    catch (e: any) { toast(e.response?.data?.message || 'Erro na CC-e.', 'error'); }
   };
   const devolver = async (id: string) => {
     if (!await confirmDialog('Gerar e emitir Nota Fiscal de Devolução (total) desta NF-e? A mercadoria volta ao estoque e os títulos são anulados.')) return;

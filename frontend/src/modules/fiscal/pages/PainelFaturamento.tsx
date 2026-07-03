@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { BarChart3, RefreshCw, FileText, Landmark, TrendingUp, Users } from 'lucide-react';
+import { BarChart3, RefreshCw, FileText, Landmark, TrendingUp, Users, TrendingDown } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 
 const R$ = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const nkg = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 const primeiroDiaMes = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
 const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const diaLabel = (iso: string) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
@@ -11,6 +12,7 @@ const diaLabel = (iso: string) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
 export default function PainelFaturamento() {
   const { filialAtiva } = useAuth();
   const [notas, setNotas] = useState<any[]>([]);
+  const [perdas, setPerdas] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [ini, setIni] = useState(primeiroDiaMes());
   const [fim, setFim] = useState(hojeISO());
@@ -18,7 +20,9 @@ export default function PainelFaturamento() {
   const carregar = useCallback(() => {
     if (!filialAtiva) return;
     setLoading(true);
-    api.get(`/nfe/${filialAtiva.id}`, { params: { dataInicio: ini, dataFim: fim + 'T23:59:59' } })
+    const params = { dataInicio: ini, dataFim: fim + 'T23:59:59' };
+    api.get(`/estoque/${filialAtiva.id}/perdas`, { params }).then(r => setPerdas(r.data)).catch(() => setPerdas(null));
+    api.get(`/nfe/${filialAtiva.id}`, { params })
       .then(r => setNotas(r.data)).catch(() => setNotas([])).finally(() => setLoading(false));
   }, [filialAtiva?.id, ini, fim]);
   useEffect(() => { carregar(); }, [carregar]);
@@ -33,7 +37,11 @@ export default function PainelFaturamento() {
     return { total, impostos, qtd, ticket: qtd ? total / qtd : 0 };
   }, [validas]);
 
-  // Faturamento por dia (para o gráfico)
+  // % de perda sobre o faturamento — insight gerencial rápido
+  const perdaValor = Number(perdas?.total?.valor || 0);
+  const perdaPct = kpis.total > 0 ? (perdaValor / kpis.total) * 100 : 0;
+
+  // Faturamento por dia (gráfico)
   const porDia = useMemo(() => {
     const map = new Map<string, number>();
     for (const n of validas) {
@@ -56,81 +64,133 @@ export default function PainelFaturamento() {
     }
     return Array.from(map.values()).sort((a, b) => b.valor - a.valor);
   }, [validas]);
+  const maxCliente = Math.max(1, ...porCliente.map(c => c.valor));
+  const topProdutosPerda: any[] = perdas?.porProduto?.slice(0, 6) || [];
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      <div className="bg-white border-b border-gray-200 px-5 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
+    <div className="flex flex-col h-full bg-slate-900 text-slate-100">
+      {/* ── Cabeçalho ── */}
+      <div className="bg-slate-900/80 border-b border-slate-800 px-6 py-4 flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
-          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2"><BarChart3 className="h-5 w-5 text-emerald-500" /> Painel de Faturamento</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Visão gerencial do que foi faturado no período</p>
+          <h1 className="text-lg font-bold text-white flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-emerald-300" /> Painel de Faturamento
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5">Visão gerencial do período · vendas × prejuízo de mercadoria</p>
         </div>
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs text-gray-500 font-semibold">De
-            <input type="date" value={ini} onChange={e => setIni(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm" />
+          <label className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold">De
+            <input type="date" value={ini} onChange={e => setIni(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-slate-100 focus:border-emerald-500 outline-none" />
           </label>
-          <label className="flex items-center gap-1.5 text-xs text-gray-500 font-semibold">Até
-            <input type="date" value={fim} onChange={e => setFim(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm" />
+          <label className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold">Até
+            <input type="date" value={fim} onChange={e => setFim(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-slate-100 focus:border-emerald-500 outline-none" />
           </label>
-          <button onClick={carregar} className="flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 px-3 py-2 rounded-lg text-gray-700 font-medium text-sm">
-            <RefreshCw className="h-4 w-4 text-emerald-600" /> Atualizar
+          <button onClick={carregar} className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 px-3.5 py-2 rounded-lg text-slate-200 font-medium text-sm">
+            <RefreshCw className={`h-4 w-4 text-emerald-300 ${loading ? 'animate-spin' : ''}`} /> Atualizar
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-4 space-y-4">
+      <div className="flex-1 overflow-auto p-6 space-y-6">
         {loading ? (
-          <div className="flex justify-center py-16"><div className="animate-spin h-6 w-6 border-2 border-emerald-500 border-t-transparent rounded-full" /></div>
+          <div className="flex justify-center py-20"><div className="animate-spin h-7 w-7 border-2 border-emerald-400 border-t-transparent rounded-full" /></div>
         ) : (
           <>
-            {/* KPIs */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <Kpi icon={<TrendingUp className="h-5 w-5" />} cor="emerald" label="Faturamento no período" valor={R$(kpis.total)} />
-              <Kpi icon={<Landmark className="h-5 w-5" />} cor="amber" label="Impostos (simulado)" valor={R$(kpis.impostos)} />
-              <Kpi icon={<FileText className="h-5 w-5" />} cor="sky" label="Notas emitidas" valor={String(kpis.qtd)} />
-              <Kpi icon={<Users className="h-5 w-5" />} cor="violet" label="Ticket médio" valor={R$(kpis.ticket)} />
+            {/* ── KPIs — número marcante, apoio discreto ── */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Kpi icon={<TrendingUp className="h-4 w-4" />} cor="emerald" label="Faturamento" valor={R$(kpis.total)} />
+              <Kpi icon={<Landmark className="h-4 w-4" />} cor="amber" label="Impostos (simulado)" valor={R$(kpis.impostos)} />
+              <Kpi icon={<FileText className="h-4 w-4" />} cor="sky" label="Notas emitidas" valor={String(kpis.qtd)} />
+              <Kpi icon={<Users className="h-4 w-4" />} cor="violet" label="Ticket médio" valor={R$(kpis.ticket)} />
             </div>
 
-            {/* Gráfico de barras por dia */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <h3 className="font-bold text-sm text-gray-700 mb-3">Faturamento por dia</h3>
+            {/* ── Gráfico de faturamento — barras finas centralizadas + insight de % perda ── */}
+            <div className="bg-slate-800/50 rounded-2xl border border-slate-700/60 p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="font-semibold text-sm text-slate-200 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-emerald-300" /> Faturamento por dia
+                </h3>
+                {/* Insight gerencial: % de perda sobre o faturamento */}
+                <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-700/60 rounded-full pl-2.5 pr-3 py-1">
+                  <TrendingDown className={`h-3.5 w-3.5 ${perdaPct > 0 ? 'text-rose-400' : 'text-slate-500'}`} />
+                  <span className="text-[11px] text-slate-400">Perda s/ faturamento</span>
+                  <span className={`text-sm font-bold ${perdaPct > 0 ? 'text-rose-400' : 'text-slate-300'}`}>{perdaPct.toFixed(1)}%</span>
+                </div>
+              </div>
               {porDia.length === 0 ? (
-                <p className="text-sm text-gray-400 py-8 text-center">Sem faturamento no período.</p>
+                <p className="text-sm text-slate-500 py-12 text-center">Sem faturamento no período.</p>
               ) : (
-                <div className="flex items-end gap-1.5 h-48 overflow-x-auto pt-4">
+                <div className="flex items-end justify-center gap-6 h-48 pt-6">
                   {porDia.map(d => (
-                    <div key={d.dia} className="flex flex-col items-center gap-1 min-w-[34px] flex-1" title={`${diaLabel(d.dia)} — ${R$(d.valor)}`}>
-                      <span className="text-[9px] text-gray-500 font-mono">{(d.valor / 1000).toFixed(1)}k</span>
-                      <div className="w-full bg-emerald-500 hover:bg-emerald-400 rounded-t transition-all"
-                        style={{ height: `${Math.max(4, (d.valor / maxDia) * 150)}px` }} />
-                      <span className="text-[9px] text-gray-400">{diaLabel(d.dia)}</span>
+                    <div key={d.dia} className="flex flex-col items-center gap-2 w-12" title={`${diaLabel(d.dia)} — ${R$(d.valor)}`}>
+                      <span className="text-[10px] text-slate-400 font-mono">{d.valor > 0 ? (d.valor / 1000).toFixed(1) + 'k' : ''}</span>
+                      {/* barra fina em pill, verde menta pastel */}
+                      <div className="w-2.5 rounded-full bg-emerald-300/70 hover:bg-emerald-300 transition-all"
+                        style={{ height: `${Math.max(6, (d.valor / maxDia) * 150)}px` }} />
+                      <span className="text-[10px] text-slate-500">{diaLabel(d.dia)}</span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Faturamento por cliente */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <h3 className="font-bold text-sm text-gray-700 px-4 py-3 border-b">Faturamento por cliente</h3>
-              {porCliente.length === 0 ? (
-                <p className="text-sm text-gray-400 py-8 text-center">Nenhum cliente faturado.</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500">
-                    <tr>{['Cliente', 'Notas', 'Faturado', '% do total'].map(h => <th key={h} className="px-4 py-2 text-left font-semibold">{h}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {porCliente.map(c => (
-                      <tr key={c.nome} className="border-t border-gray-100">
-                        <td className="px-4 py-2 font-semibold text-gray-800">{c.nome}</td>
-                        <td className="px-4 py-2 text-center">{c.qtd}</td>
-                        <td className="px-4 py-2 text-right font-mono font-bold">{R$(c.valor)}</td>
-                        <td className="px-4 py-2 text-right text-gray-500">{kpis.total ? ((c.valor / kpis.total) * 100).toFixed(1) : '0'}%</td>
-                      </tr>
+            {/* ── Linha 50/50: Maiores clientes  ×  Perdas por produto ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Esquerda: maiores clientes faturados */}
+              <div className="bg-slate-800/50 rounded-2xl border border-slate-700/60 p-5">
+                <h3 className="font-semibold text-sm text-slate-200 flex items-center gap-2 mb-4">
+                  <Users className="h-4 w-4 text-sky-300" /> Maiores clientes faturados
+                </h3>
+                {porCliente.length === 0 ? (
+                  <p className="text-sm text-slate-500 py-8 text-center">Nenhum cliente faturado.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {porCliente.slice(0, 5).map(c => (
+                      <div key={c.nome}>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-slate-300 font-medium truncate pr-2">{c.nome}</span>
+                          <span className="font-bold text-white font-mono shrink-0">{R$(c.valor)}</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-slate-700/60 overflow-hidden">
+                          <div className="h-full bg-emerald-300/70 rounded-full" style={{ width: `${(c.valor / maxCliente) * 100}%` }} />
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              )}
+                  </div>
+                )}
+              </div>
+
+              {/* Direita: perdas por produto — fundo azul-escuro, vermelho só nos números */}
+              <div className="bg-slate-800/50 rounded-2xl border border-slate-700/60 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-sm text-slate-200 flex items-center gap-2">
+                    <TrendingDown className="h-4 w-4 text-rose-400" /> Perdas &amp; quebras por produto
+                  </h3>
+                  <div className="text-right">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wide">Total perdido</p>
+                    <p className="text-base font-bold text-rose-400 font-mono leading-tight">{R$(perdaValor)}</p>
+                  </div>
+                </div>
+                {/* resumo compacto perda × quebra */}
+                <div className="flex gap-4 mb-3 text-xs">
+                  <span className="text-slate-400">Perdas <b className="text-rose-400 font-mono">{R$(perdas?.perda?.valor || 0)}</b></span>
+                  <span className="text-slate-400">Quebras <b className="text-rose-400 font-mono">{R$(perdas?.quebra?.valor || 0)}</b></span>
+                </div>
+                {topProdutosPerda.length === 0 ? (
+                  <p className="text-sm text-slate-500 py-6 text-center">Sem perdas no período. 🎉</p>
+                ) : (
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {topProdutosPerda.map((p) => (
+                        <tr key={p.codigo + p.descricao} className="border-t border-slate-700/40">
+                          <td className="py-1.5 text-slate-300 font-medium truncate max-w-0">{p.descricao}</td>
+                          <td className="py-1.5 text-right text-slate-500 font-mono px-2">{nkg(p.qtd)}</td>
+                          <td className="py-1.5 text-right font-mono font-bold text-rose-400">{R$(p.valor)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
           </>
         )}
@@ -140,19 +200,19 @@ export default function PainelFaturamento() {
 }
 
 const CORES: Record<string, string> = {
-  emerald: 'bg-emerald-50 text-emerald-600',
-  amber: 'bg-amber-50 text-amber-600',
-  sky: 'bg-sky-50 text-sky-600',
-  violet: 'bg-violet-50 text-violet-600',
+  emerald: 'bg-emerald-400/10 text-emerald-300',
+  amber: 'bg-amber-400/10 text-amber-300',
+  sky: 'bg-sky-400/10 text-sky-300',
+  violet: 'bg-violet-400/10 text-violet-300',
 };
 function Kpi({ icon, label, valor, cor }: { icon: any; label: string; valor: string; cor: string }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
-      <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${CORES[cor]}`}>{icon}</div>
-      <div className="min-w-0">
-        <p className="text-[11px] text-gray-400 font-semibold uppercase truncate">{label}</p>
-        <p className="text-lg font-bold text-gray-900 truncate">{valor}</p>
+    <div className="bg-slate-800/50 rounded-2xl border border-slate-700/60 p-5">
+      <div className="flex items-center gap-2 mb-2">
+        <span className={`h-8 w-8 rounded-lg flex items-center justify-center ${CORES[cor]}`}>{icon}</span>
+        <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider truncate">{label}</p>
       </div>
+      <p className="text-2xl font-extrabold text-white tracking-tight truncate">{valor}</p>
     </div>
   );
 }

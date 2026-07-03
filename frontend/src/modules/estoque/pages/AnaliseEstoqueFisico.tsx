@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
-import { CheckCircle, Printer, Download, X, ChevronRight, Search, AlertTriangle } from 'lucide-react';
+import { CheckCircle, Printer, Download, X, ChevronRight, Search, AlertTriangle, TrendingDown } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
+import { toast, confirmDialog } from '../../../components/ui/feedback';
 
 // ─── Tipos ───────────────────────────────────────
 interface ProdutoEstoque {
@@ -14,8 +15,8 @@ interface ProdutoEstoque {
   entradas: number;
   chao?: number;
   ordensCompra: number;
-  perdas?: number;
   quebra?: number;
+  quebraReal?: number; // já baixado no estoque (movimentações AVARIA/PERDA reais)
   saidas: number;
   saldoFinal: number;
   undEstoque: string;
@@ -238,14 +239,16 @@ export default function AnaliseEstoqueFisico() {
     localStorage.setItem(EDITS_KEY, JSON.stringify(all));
   };
   // Entrada já inclui a Ordem de Compra → OC não é somada de novo aqui
-  const calcSaldo = (p: any) => (p.saldoInicial || 0) + (p.entradas || 0) + (p.chao || 0) - (p.perdas || 0) - (p.quebra || 0);
+  const calcSaldo = (p: any) => (p.saldoInicial || 0) + (p.entradas || 0) + (p.chao || 0) - (p.quebra || 0);
 
   // Mapeia uma linha da API (dados reais) para a linha da tela, aplicando os valores salvos
   const mapLinha = (r: any, edits: Record<string, any>): ProdutoEstoque => {
     const e = edits[r.id] || {};
+    // Quebra única: soma o que já foi baixado como PERDA + AVARIA no sistema
+    const quebraBase = (r.perdasReal || 0) + (r.quebraReal || 0);
     const base = {
       entradas: (r.entradas || 0) + (r.ordensCompra || 0), // Entrada já soma a Ordem de Compra
-      chao: 0, perdas: r.perdasReal || 0, quebra: r.quebraReal || 0,
+      chao: 0, quebra: quebraBase,
       contagemFisica: null as number | null, ...e,
       saldoInicial: r.saldoInicial,     // sempre do sistema (não editável)
       ordensCompra: r.ordensCompra || 0, // informativo (não editável), já incluso na Entrada
@@ -254,7 +257,9 @@ export default function AnaliseEstoqueFisico() {
     return {
       id: r.id, codigo: r.codigo, descricao: r.descricao, familia: r.familia, grupo: r.grupo, undEstoque: r.undEstoque,
       saldoInicial: base.saldoInicial, entradas: base.entradas, chao: base.chao || 0, ordensCompra: base.ordensCompra,
-      perdas: base.perdas || 0, quebra: base.quebra || 0, saidas: r.saidas, saldoFinal,
+      quebra: base.quebra || 0,
+      quebraReal: quebraBase, // baseline já baixado (PERDA + AVARIA)
+      saidas: r.saidas, saldoFinal,
       precoCusto: r.precoCusto, valorAtualEstoque: saldoFinal * (r.precoCusto || 0),
       contagemFisica: base.contagemFisica ?? null,
       diferencaEstoque: base.contagemFisica != null ? (base.contagemFisica as number) - saldoFinal : 0,
@@ -293,20 +298,69 @@ export default function AnaliseEstoqueFisico() {
   };
 
   // ── Edita um campo e RECALCULA o Saldo Final sozinho ──────────
-  // Saldo Final = Saldo Inicial + Entrada + Ordem de Compra − Perdas − Quebra
-  const setCampo = (id: string, campo: 'entradas' | 'chao' | 'perdas' | 'quebra', valor: string) => {
+  // Saldo Final = Saldo Inicial + Entrada + Chão − Quebra
+  const setCampo = (id: string, campo: 'entradas' | 'chao' | 'quebra', valor: string) => {
     const v = valor === '' ? 0 : parseFloat(valor.replace(',', '.')) || 0;
     saveEdit(id, { [campo]: v }); // salva pra não perder ao recarregar
     setProdutos(prev => prev.map(p => {
       if (p.id !== id) return p;
       const np = { ...p, [campo]: v };
-      const saldoFinal = (np.saldoInicial || 0) + (np.entradas || 0) + (np.chao || 0) - (np.perdas || 0) - (np.quebra || 0);
+      const saldoFinal = (np.saldoInicial || 0) + (np.entradas || 0) + (np.chao || 0) - (np.quebra || 0);
       const valorAtualEstoque = saldoFinal * (np.precoCusto || 0);
       const diferencaEstoque = np.contagemFisica !== null ? (np.contagemFisica as number) - saldoFinal : 0;
       return { ...np, saldoFinal, valorAtualEstoque, diferencaEstoque };
     }));
   };
   const cellInp = 'w-full text-right font-mono text-[11px] px-1 py-0.5 rounded border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-400';
+
+  // ── Faturar quebra: gera a baixa REAL no estoque (AVARIA) ──────
+  // "Delta" = o que foi digitado além do que já estava baixado (quebraReal),
+  // então clicar de novo não duplica a baixa.
+  const deltaQuebra = (p: ProdutoEstoque) => Math.max(0, (p.quebra || 0) - (p.quebraReal || 0));
+  // Linhas com quebra ainda não baixada
+  const pendentes = useMemo(
+    () => produtos.filter(p => deltaQuebra(p) > 0),
+    [produtos],
+  );
+  // Valor perdido a faturar (só o delta pendente) — em R$
+  const valorPendente = useMemo(
+    () => pendentes.reduce((s, p) => s + deltaQuebra(p) * (p.precoCusto || 0), 0),
+    [pendentes],
+  );
+  const [faturando, setFaturando] = useState(false);
+
+  const handleFaturarQuebra = async () => {
+    if (!filialAtiva || pendentes.length === 0) return;
+    const qtdTot = pendentes.reduce((s, p) => s + deltaQuebra(p), 0);
+    const ok = await confirmDialog(
+      `Faturar ${pendentes.length} item(ns) com quebra?\n\n` +
+      `Total a baixar: ${fmtN(qtdTot)} · Valor perdido: R$ ${fmtR(valorPendente)}\n\n` +
+      `Isso gera a baixa REAL no estoque (AVARIA) e não pode ser desfeito por aqui.`,
+      { tone: 'danger', okLabel: 'Faturar quebra' },
+    );
+    if (!ok) return;
+    setFaturando(true);
+    try {
+      const edits = loadEdits();
+      for (const p of pendentes) {
+        const dq = deltaQuebra(p);
+        if (dq > 0) await api.post('/estoque/ajuste', {
+          filialId: filialAtiva.id, produtoId: p.id, tipo: 'AVARIA',
+          quantidade: dq, custoUnitario: p.precoCusto || 0, observacoes: 'Análise de Estoque Físico — quebra',
+        });
+        // Limpa o valor manual salvo: o total real passa a vir do backend (quebraReal)
+        if (edits[p.id]) { delete edits[p.id].quebra; delete edits[p.id].perdas; }
+      }
+      localStorage.setItem(EDITS_KEY, JSON.stringify(edits));
+      const perdido = valorPendente;
+      await handleExecutar(false); // recarrega com as baixas já refletidas
+      toast(`Quebra faturada · valor perdido R$ ${fmtR(perdido)}`, 'success');
+    } catch (e: any) {
+      toast(e?.response?.data?.message || 'Erro ao faturar a quebra', 'error');
+    } finally {
+      setFaturando(false);
+    }
+  };
 
   // Filtrar por busca
   const produtosFiltrados = useMemo(() => {
@@ -324,6 +378,8 @@ export default function AnaliseEstoqueFisico() {
     saldoFinal: produtosFiltrados.reduce((s, p) => s + p.saldoFinal, 0),
     diferenca:  produtosFiltrados.reduce((s, p) => s + p.diferencaEstoque, 0),
     valorTotal: produtosFiltrados.reduce((s, p) => s + p.valorAtualEstoque, 0),
+    // Valor perdido (quebra) × custo — inclui o que já foi baixado e o pendente
+    valorPerdido: produtosFiltrados.reduce((s, p) => s + (p.quebra || 0) * (p.precoCusto || 0), 0),
   }), [produtosFiltrados]);
 
   return (
@@ -464,6 +520,18 @@ export default function AnaliseEstoqueFisico() {
           >
             <Download className="h-4 w-4" /> Exportar
           </button>
+          <button
+            onClick={handleFaturarQuebra}
+            disabled={!executado || faturando || pendentes.length === 0}
+            title={pendentes.length === 0 ? 'Digite valores em Quebra para faturar' : `Baixar ${pendentes.length} item(ns) — R$ ${fmtR(valorPendente)} perdido`}
+            className="flex items-center gap-1.5 bg-white border-2 border-rose-600 hover:bg-rose-50 px-3 py-2 rounded text-rose-700 font-bold disabled:opacity-30 disabled:border-gray-400 disabled:text-gray-500 shadow-sm"
+          >
+            <TrendingDown className="h-4 w-4" />
+            {faturando ? 'Faturando...' : 'Faturar Quebra'}
+            {pendentes.length > 0 && !faturando && (
+              <span className="ml-0.5 bg-rose-600 text-white rounded-full px-1.5 py-0.5 text-[10px] leading-none">{pendentes.length}</span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -510,7 +578,6 @@ export default function AnaliseEstoqueFisico() {
                 {!semOrdCompra && (
                   <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Ordem de Compra</th>
                 )}
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-20 bg-rose-900/40">Perdas</th>
                 <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-20 bg-rose-900/40">Quebra</th>
                 <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24 bg-emerald-900/40">= Saldo Final</th>
                 <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-12">Und</th>
@@ -554,9 +621,6 @@ export default function AnaliseEstoqueFisico() {
                       <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${sel ? '' : 'text-sky-300'}`} title="Já incluído na Entrada (informativo)">{p.ordensCompra ? fmtN(p.ordensCompra) : ''}</td>
                     )}
                     <td className="px-1 py-0.5 border-r border-gray-200 bg-rose-950/50" onClick={e => e.stopPropagation()}>
-                      <input type="number" step="0.001" min="0" className={cellInp} value={p.perdas ?? 0} onChange={e => setCampo(p.id, 'perdas', e.target.value)} />
-                    </td>
-                    <td className="px-1 py-0.5 border-r border-gray-200 bg-rose-950/50" onClick={e => e.stopPropagation()}>
                       <input type="number" step="0.001" min="0" className={cellInp} value={p.quebra ?? 0} onChange={e => setCampo(p.id, 'quebra', e.target.value)} />
                     </td>
                     <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono font-bold bg-emerald-900/30 ${sel ? '' : negClass(p.saldoFinal)}`}>{fmtN(p.saldoFinal)}</td>
@@ -593,7 +657,14 @@ export default function AnaliseEstoqueFisico() {
 
       {/* ── Rodapé com totais ── */}
       <div className="shrink-0 bg-slate-800 border-t-2 border-slate-600 px-3 py-1.5 flex items-center justify-between text-gray-800">
-        <span>Registros encontrados: <strong>{totais.count}</strong></span>
+        <span className="flex items-center gap-3">
+          Registros encontrados: <strong>{totais.count}</strong>
+          {totais.valorPerdido > 0 && (
+            <span className="inline-flex items-center gap-1 bg-rose-600/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded text-[11px] font-semibold">
+              <TrendingDown className="h-3 w-3" /> Valor perdido: R$ {fmtR(totais.valorPerdido)}
+            </span>
+          )}
+        </span>
         <div className="flex gap-8 font-mono text-[11px]">
           <span className={negClass(totais.saldoFinal)}>{fmtN(totais.saldoFinal)}</span>
           <span className={totais.diferenca !== 0 ? (totais.diferenca < 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold') : ''}>{fmtN(totais.diferenca)}</span>

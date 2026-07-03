@@ -307,7 +307,8 @@ export class FiscalService {
       const disponivel = saldos.reduce((s, sd) => s + Number(sd.quantidade) - Number(sd.quantidadeReservada || 0), 0);
       // o pedido aprovado já reservou; basta o físico cobrir a quantidade
       const fisico = saldos.reduce((s, sd) => s + Number(sd.quantidade), 0);
-      add(`estoque-${item.id}`, `Estoque de ${item.descricao}`, fisico >= Number(item.quantidade), 'AVISO',
+      // BLOQUEIO: sem estoque físico suficiente, não fatura.
+      add(`estoque-${item.id}`, `Estoque de ${item.descricao}`, fisico >= Number(item.quantidade), 'BLOQUEIO',
         `físico ${fisico} · necessário ${item.quantidade}` + (disponivel < 0 ? ' (disponível negativo — a comprar)' : ''));
     }
 

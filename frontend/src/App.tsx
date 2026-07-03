@@ -11,6 +11,9 @@ import Clientes from './modules/cadastros/pages/Clientes';
 import Operacional from './modules/logistica/pages/Operacional';
 import Lider from './modules/logistica/pages/Lider';
 import FreteMotoristas from './modules/logistica/pages/FreteMotoristas';
+import FrotasVeiculos from './modules/logistica/pages/FrotasVeiculos';
+import Romaneios from './modules/logistica/pages/Romaneios';
+import Custos from './modules/financeiro/pages/Custos';
 import UsuariosAcessos from './modules/gerencial/pages/UsuariosAcessos';
 import Produtos from './modules/cadastros/pages/Produtos';
 import Fornecedores from './modules/cadastros/pages/Fornecedores';
@@ -81,8 +84,8 @@ export default function App() {
             <Route path="logistica/lider" element={<Lider />} />
             <Route path="logistica/operacional" element={<Operacional />} />
             <Route path="logistica/frete" element={<FreteMotoristas />} />
-            <Route path="logistica/romaneios" element={<Placeholder title="Romaneios de Carga" />} />
-            <Route path="logistica/frotas" element={<Placeholder title="Frotas & Veículos" />} />
+            <Route path="logistica/romaneios" element={<Romaneios />} />
+            <Route path="logistica/frotas" element={<FrotasVeiculos />} />
 
             {/* Fiscal */}
             <Route path="fiscal/nfe" element={<NotasEmitidas />} />
@@ -95,6 +98,7 @@ export default function App() {
             <Route path="financeiro/receber" element={<Placeholder title="Contas a Receber" />} />
             <Route path="financeiro/pagar" element={<Placeholder title="Contas a Pagar" />} />
             <Route path="financeiro/dre" element={<Placeholder title="DRE & Relatórios" />} />
+            <Route path="financeiro/custos" element={<Custos />} />
 
             {/* Gerencial */}
             <Route path="gerencial/auditoria" element={<Placeholder title="Logs de Auditoria" />} />

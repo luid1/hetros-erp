@@ -20,6 +20,466 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-02] — Roteirização por VEÍCULO real + não duplica pedidos já roteirizados
+
+### O que mudou
+- **Fim da lista de motoristas fictícia** no modal Nova Entrega: os 16 "motoristas" mock (com
+  números de rota fake #3519, #3515…) saíram. Agora você **escolhe um veículo real da frota**
+  (Frotas & Veículos), que já traz **motorista padrão + capacidade** num passo só. Escolher o
+  veículo = atribuir a rota.
+- **Pedidos já roteirizados somem da lista**: o modal exclui os pedidos que já estão em alguma
+  rota do dia (Entregas Programadas) → **não dá mais pra roteirizar 2× nem duplicar rota**.
+- O romaneio criado grava placa/modelo/tipo/motorista do **veículo real** + o frete digitado.
+- Removido o código morto do mock (`MOCK_ROTAS`, `RotaMotorista`, `frota`).
+- Seed inicial: 6 veículos da frota criados a partir dos motoristas reais (ANDRE, ELTON, GENIVAL,
+  MILTON, HENRIQUE, WILLIAN) — placas `FROTA0x` provisórias para ajustar em Frotas & Veículos.
+
+### Arquivos
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx`
+
+### Verificado no preview
+- Lista mostra veículos reais (sem números fake); barra de capacidade responde ao veículo; coluna
+  Peso e campo Frete presentes; pedidos já em rota aparecem como **0 disponíveis** (não duplica).
+
+---
+
+## [2026-07-02] — Controle de Carga: rodapé de KPIs limpo + peso/frete na roteirização
+
+### O que mudou
+- **Rodapé de KPIs redesenhado** (estava feio): o bloco cinza com ícone gigante virou 4 mini-cards
+  de vidro (Qtd Rotas · Peso Carga · Qtd Entregas · SLA) com número oversized, alinhado ao tema.
+- **Modal "Nova Entrega — Roteirizar"**:
+  - **Coluna "Peso (kg)"** por pedido na tabela + a barra de capacidade já soma o peso dos
+    selecionados × capacidade do veículo escolhido (vê se cabe no caminhão).
+  - **Campo "Frete da rota (R$)"** editável no resumo, com **% sobre a nota** calculada na hora.
+    Ao roteirizar, o frete é gravado no romaneio (`valorFrete`) e **já aparece no Frete por
+    Motorista** (que calcula o % frete/NF por rota).
+- Backend `criarRomaneio` passou a aceitar e gravar `valorFrete`.
+
+### Arquivos
+- `backend/src/modules/carga/carga.service.ts` (valorFrete no romaneio)
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx`
+
+### Observação (sobre o fluxo)
+- A lista de motoristas do modal ainda é **mock** (16 rotas fixas), separada do seletor de veículo
+  real. O ideal é unificar: escolher **um veículo real** (que já traz motorista padrão + capacidade)
+  num passo só. Fica como próximo ajuste do fluxo, se você quiser.
+
+---
+
+## [2026-07-02] — Análise de Estoque: sai a coluna Perdas, fica só Quebra
+
+### O que mudou
+- Na **Análise de Estoque Físico**, removida a coluna **Perdas** — agora existe **uma coluna
+  única "Quebra"** (editável). Fórmula: `Saldo Final = Saldo Inicial + Entrada + Chão − Quebra`.
+- O que já foi baixado no sistema como `PERDA` **entra somado na Quebra** (não some da conta).
+- Botão renomeado para **"Faturar Quebra"**: o valor digitado além do já baixado gera a
+  movimentação **AVARIA** (baixa real). Valor perdido no rodapé considera só a Quebra.
+- Verificado no preview: headers sem "Perdas", botão "Faturar Quebra".
+
+### Arquivos
+- `frontend/src/modules/estoque/pages/AnaliseEstoqueFisico.tsx`
+
+---
+
+## [2026-07-02] — Redesign visual "Dark Tech / Glass" — sistema inteiro repaginado
+
+### O que mudou
+- **Nova identidade visual** (glassmorphism cirúrgico + minimalismo): canvas espacial `#0B0F17`
+  (quase preto, não preto puro) com **glow ambiente** sutil (radiais sky/indigo desfocados).
+- **Sidebar e Topbar viram placas de vidro**: `bg-white/[0.02] backdrop-blur-xl` + **borda de
+  cristal 1px** (`border-white/[0.05]`). Item ativo com **indicador cirúrgico** (traço de 2px
+  sky) em vez de caixa pesada; tooltips do menu recolhido em vidro.
+- **Cards e tabelas flutuantes**: `.card` e `TableCard` do kit ganharam vidro (blur 20–24px),
+  sombra espalhada `0 8px 32px rgba(0,0,0,0.37)` e **hover que sobe 2px** com brilho interno.
+- **Modais cinematográficos**: overlay `bg-black/50 backdrop-blur-md` (fundo desfoca de verdade)
+  e painel entrando com **fade-in-up** (0.32s cubic-bezier). Vale pro kit (`Modal`) e pros
+  confirm/prompt/toast do `feedback.tsx`.
+- **Microinterações táteis globais**: todo botão tem `transition 200-300ms` e **`active:scale(0.98)`**
+  (clique físico); botões primários sobem 1px no hover.
+- **Tipografia**: fonte **Inter** (Google Fonts), números dos KPIs **oversized**
+  (`text-3xl font-extrabold tracking-tight tabular-nums`), rótulos pequenos em uppercase
+  espaçado; **ícones vazados soltos** (sem caixas coloridas atrás).
+- **Remap global atualizado** (`index.css`): telas legadas migram sozinhas pra paleta nova
+  (superfícies `#0E141F/#131B29`, bordas rgba brancas translúcidas). Scrollbar de 5px translúcida.
+- **Verificado no preview** (porta 3010): login, dashboard, Romaneios (tabela vidro), modal de
+  Frotas (pop-up com blur) e Análise Estoque Físico (legada) — tudo ok, console limpo.
+
+### Arquivos
+- `frontend/src/index.css` (design system), `frontend/index.html` (fonte Inter)
+- `frontend/src/components/layout/AppShell.tsx` (sidebar/topbar vidro + glow)
+- `frontend/src/modules/cadastros/ui.tsx` (kit: TopBar, FilterBar, Chips, TableCard, Modal, inputs)
+- `frontend/src/components/ui/feedback.tsx` (toasts/dialogs cinematográficos)
+- `frontend/src/pages/DashboardPage.tsx` (KPIs oversized, ícones limpos)
+
+### Observação
+- A DANFE e impressos térmicos **não são afetados** (abrem em janela própria, fundo branco).
+- O acento continua **sky/azul elétrico** usado cirurgicamente (ação principal, foco, item ativo).
+
+---
+
+## [2026-07-02] — Faturamento: SEM estoque físico agora BLOQUEIA (era só aviso)
+
+### O que mudou
+- A checagem "Estoque de <produto>" na validação de faturamento passou de **AVISO** para
+  **BLOQUEIO**: se o **estoque físico não cobrir a quantidade do item, não fatura** (a NF-e não é
+  emitida). Reverte a permissão anterior de faturar com saldo negativo ("a comprar").
+- Já reflete em toda a cadeia: o modal **Conferir** mostra o item em vermelho (bloqueio) e o
+  `POST /nfe/:id/emitir` barra a emissão citando os produtos sem estoque.
+
+### Arquivos
+- `backend/src/modules/fiscal/fiscal.service.ts`
+
+### Observação
+- Consequência prática: pedidos com produto faltando **precisam de entrada/ajuste de estoque
+  antes de faturar**. A aprovação do pedido continua permitindo saldo negativo (regra "a comprar"),
+  mas o **faturamento** agora exige o físico.
+
+---
+
+## [2026-07-03] — App dos Compradores (Expo/RN) recriado + túnel: cotações e Nova OC
+
+### O que mudou
+- **App `compradores-app` recriado do zero** (Expo SDK 57, mesmo pacote `com.hetros.compradores`
+  e projectId EAS) — o APK anterior estava em branco. Empacota sem erro (841 módulos).
+- Telas: **Login** (auth do ERP), **Cotações** (lê `GET /custos/:filial/cotacoes`, só preço, com
+  **cache offline** AsyncStorage), **Nova OC** (puxa fornecedores + 316 produtos do banco, escolhe
+  **unidade KG/UN/CX/BJ/PC/BD/MC/SC/DZ**, qtd e preço → `POST /compras`), **Minhas OCs** (lista +
+  botão **Aprovar** pra quem tem o módulo Compras — ex.: Leide/líder).
+- **Mesma base**: o app consome a mesma API/PostgreSQL do Web (sem Supabase). Fornecedores e
+  produtos aparecem automáticos porque vêm de `GET /fornecedores` e `GET /produtos`.
+- **Ordem de Compra** no backend já tinha **aprovação** (`PATCH /compras/:id/status` → APROVADA) e
+  **unidade** no item — nada a mudar ali.
+- **Túnel de teste** (localtunnel) expõe o backend numa URL pública pra o celular alcançar
+  (localhost não funciona no celular). Configurado em `app.json > extra.apiUrl`.
+
+### Arquivos
+- `compradores-app/*` (novo projeto Expo): App.js, src/{config,api,auth}.js, src/screens/*, README
+
+### Como usar
+- Testar já: `cd compradores-app && npx expo start` → Expo Go no celular (QR).
+- APK: `eas build -p android --profile preview`.
+- ⚠️ Túnel só vale com o PC + backend + túnel ligados; p/ definitivo, publicar o backend.
+
+---
+
+## [2026-07-03] — Cotações persistidas no banco (base única Web ↔ app dos compradores)
+
+### O que mudou
+- Nova tabela **`Cotacao` (historico_cotacoes)**: guarda o preço do dia por produto definido no Web.
+- Endpoints no módulo custos:
+  - `POST /custos/:filial/cotacao` — salva as cotações (chamado ao exportar no WhatsApp).
+  - `GET /custos/:filial/cotacoes?data=` — lista as cotações do dia **só com o preço final** (sem
+    custo nem margem) — é o que o **app dos compradores** vai consumir na pedra da CEAGESP.
+- O Web (gaveta de cotação) agora **persiste as cotações** ao clicar em "Copiar para WhatsApp",
+  além de copiar o texto. Assim o preço fica na **mesma base** (PostgreSQL) que o app lê.
+
+### Arquivos
+- `backend/prisma/schema.prisma` (model Cotacao), `backend/src/modules/custos/*`
+- `frontend/src/modules/financeiro/pages/Custos.tsx`
+
+### Verificado
+- POST salvou 2 cotações; GET retornou só o preço (custo interno **não** exposto). ✔️
+
+### Observação (app mobile)
+- O `compradores-app` é **Expo/React Native** (não Flutter) e **não tem fonte no repositório** —
+  o APK baixado está em branco (sem backend). Para o app mostrar as cotações: (1) criar/recuperar
+  o fonte + tela que consome `GET /custos/:filial/cotacoes`, (2) **expor o backend numa URL
+  pública** (o celular não alcança `localhost`), (3) `eas build` do novo APK.
+
+---
+
+## [2026-07-03] — Custos: cotação em LOTE (multi-seleção) + Motivo da Execução + export WhatsApp
+
+### O que mudou
+- **Seleção múltipla** na tabela de composição: checkbox por linha + "selecionar todos" no
+  cabeçalho; ao marcar itens aparece **"Cotar Selecionados (X)"** que abre a gaveta em **modo lote**.
+- **Gaveta adaptável**: 1 produto → painel individual detalhado; N produtos → **lista rolável
+  compacta**, cada item com preço, **margem % e lucro R$ em tempo real** (vermelho se negativo) e
+  mini-switch de "cobrir preço" individual. Estado por produto num único objeto keyado (performático).
+- **Motivo da Execução (obrigatório)**: ao cobrir preço abaixo do custo composto, badge
+  "Atenção: venda abaixo do custo composto!" + **select obrigatório** (Garantir Cliente / Desovar
+  Estoque / Combater Concorrência). O export é bloqueado se faltar o motivo num item em prejuízo.
+- **Exportar para WhatsApp**: gera **uma única mensagem** formatada (data + emoji + nome +
+  preço final), copiada pro clipboard. **Nunca expõe custo nem margem** — só o preço ao cliente.
+  Formato verificado: `*HETROS WMS - Cotação do Dia (dd/mm/aaaa)* … 🍍 *PRODUTO* -> R$ XX,XX`.
+
+### Arquivos
+- `frontend/src/modules/financeiro/pages/Custos.tsx`
+
+### Verificado no preview
+- Multi-seleção (316 checkboxes), botão "Cotar Selecionados (3)", gaveta em lote com margens ao
+  vivo por item, e formato do WhatsApp conferido (sem custo/margem).
+
+---
+
+## [2026-07-02] — Custos: custo base composto (auto) + gaveta de cotação e "cobrir preço"
+
+### O que mudou
+- **Fim da digitação manual de custo**: o custo agora é **herdado/calculado automaticamente**:
+  **Custo Base Composto = Aquisição (custo médio das entradas) + Frete rateado (romaneios) +
+  Chapa/descarga**. Novo endpoint `GET /custos/:filial/composicao` (todos os produtos).
+  - Frete rateado: Σ frete dos romaneios ÷ peso entregue, com guarda (só ≥200 kg) e **teto FLV
+    R$ 0,40/kg** (dados incompletos de peso não inflam mais o rateio).
+- **Aba "Custos por produto (cotação)"**: lista todos os produtos com as colunas **Aquisição ·
+  Frete · Chapa · Custo composto · Preço venda · Margem** — clicar abre a gaveta.
+- **Gaveta lateral (Drawer) de cotação**:
+  - Cabeçalho com **Custo Base Composto** + breakdown (aquisição/frete/chapa).
+  - **Bloco 1 · Cotação rápida**: digita o preço sugerido → **Margem, Markup e Lucro/un em tempo
+    real** (antes de fechar o pedido na pedra).
+  - **Bloco 2 · Cobrir preço**: switch → "Preço alvo do cliente" → margem instantânea; se ficar
+    **abaixo do custo**, badge crítico **"VENDA COM PREJUÍZO −X%"** exigindo liberação do gerente.
+- **Tabela de Lucratividade** agora usa **Custo Composto Médio** (compra+frete+chapa) na coluna de
+  custo e no lucro/margem, e as linhas abrem a mesma gaveta de cotação.
+
+### Arquivos
+- `backend/src/modules/custos/{custos.service.ts, custos.controller.ts}`
+- `frontend/src/modules/financeiro/pages/Custos.tsx`
+
+### Verificado no preview
+- 316 produtos com composição; gaveta abre; cotação calcula margem/markup ao vivo; "cobrir preço"
+  com alvo abaixo do custo dispara **"VENDA COM PREJUÍZO −24,5%"** + flag de gerente.
+
+---
+
+## [2026-07-02] — Custos: aba "Custos por produto" (edita TODOS os produtos) + item no menu
+
+### O que mudou
+- **Custos & Margem** ganhou **abas**: **Margem & Lucratividade** (análise das vendas) e
+  **Custos por produto (editar)** — que lista **TODOS os produtos ativos** (não só os que
+  venderam) com o **custo editável** (salva ao sair do campo, com ✓ de confirmação) + margem
+  estimada (preço de venda × custo).
+- Corrigido o backend: `PUT /produtos/:id` **não salvava `precoCusto`** — agora salva.
+- Corrigido: o item **Custos & Margem** não aparecia no menu lateral (a lista do AppShell é fixa) —
+  adicionado em **E · Financeiro**.
+
+### Arquivos
+- `backend/src/modules/produtos/produtos.service.ts` (update salva precoCusto)
+- `frontend/src/modules/financeiro/pages/Custos.tsx` (abas + edição), `frontend/src/components/layout/AppShell.tsx`
+
+---
+
+## [2026-07-02] — Custos & Margem: área do Financeiro separada da Análise Estoque Físico
+
+### O que mudou
+- Nova tela **E • Financeiro → Custos & Margem** (`/financeiro/custos`), **separada** da Análise
+  de Estoque Físico: a contagem física é do pessoal de estoque; **custo/margem é do Financeiro**
+  (perfil diferente, o menu já respeita quem vê o quê).
+- **KPIs**: **CMV** (custo das vendas), **Receita**, **Perdas monetizadas** e **Margem média %**.
+- **Tabela de lucratividade por produto**: Produto · Qtd vendida · Preço médio de venda · Custo
+  médio atual · Lucro bruto R$ · **Margem %** (verde ≥25 / âmbar 10–25 / **vermelho <10 ou
+  negativa**). O custo vem das saídas de venda (custo do momento), então já reflete perdas absorvidas.
+- Novo módulo backend **`custos`**: `GET /custos/:filialId/margem?dataIni&dataFim`.
+
+### Arquivos
+- `backend/src/modules/custos/*` (novo), `backend/src/app.module.ts`
+- `frontend/src/modules/financeiro/pages/Custos.tsx` (novo), `frontend/src/App.tsx`, `frontend/src/config/telas.ts`
+
+### Observação
+- A **Análise Estoque Físico** segue como está (para o pessoal de estoque). O custo virou tela
+  própria do Financeiro. Se quiser, dá pra tirar as colunas de custo da Análise para deixá-la 100%
+  operacional.
+
+---
+
+## [2026-07-02] — Romaneios: tela real (era placeholder) — lista, detalhe e checklist de impressão
+
+### O que mudou
+- A aba **Logística → Romaneios** virou tela real (dark). **Lista** as viagens (filtro por período e
+  status) com nº, veículo/placa, motorista, período, **entregas X/Y**, peso (com % de ocupação),
+  valor e **status** (Em montagem / Em trânsito / Parcial / Concluído).
+- **Detalhe** da viagem: pedidos consolidados **ordenados por sequência de entrega**, com endereço,
+  volumes, peso e valor; **checkbox de entregue** por parada (ao marcar todas, conclui o romaneio).
+- Ações: **Iniciar trânsito** (ABERTO→EM_ROTA), **Concluir** (→ENTREGUE) e **Imprimir** um
+  **checklist A4** para o motorista (sequência, cliente, endereço, volumes, peso, [ ] entregue,
+  assinatura, km inicial/final).
+- Backend `romaneios` (era stub) implementado: `GET /romaneios` (com filtros), `GET /romaneios/:id`,
+  `PATCH /romaneios/:id/status`, `PATCH /romaneios/item/:itemId/entrega`.
+
+### Arquivos
+- `backend/src/modules/romaneios/{romaneios.service.ts, romaneios.controller.ts}`
+- `frontend/src/modules/logistica/pages/Romaneios.tsx` (novo), `frontend/src/App.tsx`
+
+---
+
+## [2026-07-02] — Controle de Carga: barra de capacidade do veículo em tempo real
+
+### O que mudou
+- No modal **Nova Entrega — Roteirizar**, novo seletor de **veículo** (da frota real) + **duas
+  barras de capacidade** que atualizam ao selecionar pedidos: **Peso** (soma `pesoTotal` ÷
+  `capacidadeKg`) e **Caixas** (soma `volumes` ÷ `capacidadeCaixasH`).
+- Cores por nível: **verde < 90%**, **âmbar 90–100%**, **vermelho > 100%**, com selo
+  "🚚 X% ocupado". Se passar de 100%, o **Roteirizar pede confirmação** (trava/alerta) informando
+  se estourou no peso ou nas caixas.
+
+### Arquivos
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx`
+
+---
+
+## [2026-07-02] — Frotas & Veículos: tela CRUD real (era placeholder) + campos FLV
+
+### O que mudou
+- A aba **Logística → Frotas & Veículos** deixou de ser placeholder e virou **CRUD real** (dark):
+  placa, modelo, tipo, **motorista padrão**, **propriedade (Próprio/Terceiro)**, **capacidade em kg**,
+  **capacidade em caixas H** (padrão FLV), refrigerado ❄️, ano. Busca por placa/modelo/motorista;
+  inativar em vez de apagar (preserva romaneios históricos).
+- `Veiculo` ganhou os campos: `propriedade`, `capacidadeCaixasH`, `motoristaPadrao`, `refrigerado`
+  e `transportadoraId` passou a ser opcional (veículo próprio não exige transportadora).
+- Novo módulo backend **`veiculos`** (CRUD) em `/veiculos`.
+
+### Arquivos
+- `backend/prisma/schema.prisma` (Veiculo), `backend/src/modules/veiculos/*` (novo), `backend/src/app.module.ts`
+- `frontend/src/modules/logistica/pages/FrotasVeiculos.tsx` (novo), `frontend/src/App.tsx`
+
+### Observação
+- Aplicado com `prisma db push` no banco `erp_wms`. Base para a **barra de capacidade** no Controle
+  de Carga (usa `capacidadeKg`/`capacidadeCaixasH`) e para o fechamento de frete.
+
+---
+
+## [2026-07-02] — CC-e: mensagem clara da regra 15–1000 caR (não era bug, era validação)
+
+### O que mudou
+- A **Carta de Correção (CC-e)** parecia "não funcionar": na verdade o backend valida a regra da
+  SEFAZ (**mín. 15, máx. 1000 caracteres**) e recusava correções curtas, só mostrando um toast
+  rápido. Agora o prompt **explica a regra + dá exemplo**, e o front **valida antes de enviar**
+  dizendo quantos caracteres faltam. Toasts de erro/sucesso com tom correto.
+- Verificado que a rota, a tabela `CartaCorrecao` e a gravação funcionam ponta a ponta (o CC-e
+  aparece no detalhe da nota após registrar).
+
+### Arquivos
+- `frontend/src/modules/fiscal/pages/NotasEmitidas.tsx`
+
+---
+
+## [2026-07-02] — Painel de Faturamento redesenhado (minimalista, dark, perdas discretas)
+
+### O que mudou
+- **Reestruturação visual** do Painel de Faturamento (`/fiscal/painel`) pra ficar limpo e gerencial:
+  - **Perdas & Quebras** deixou de ser um bloco vermelho agressivo no centro. Agora é **azul-escuro
+    padrão** (slate), com o **vermelho só nos números**. A linha foi dividida **50/50**: à esquerda
+    **Maiores clientes faturados** (mini barras) e à direita **Perdas por produto** (resumo compacto
+    perda × quebra + top produtos).
+  - **Gráfico de faturamento** com **barras finas em pill, centralizadas** (não estica mais com
+    poucos dias) e verde **menta pastel** (`emerald-300/70`). Novo **insight "% de Perda sobre o
+    Faturamento"** no canto do gráfico.
+  - **KPIs** com número **extrabold marcante**, rótulo de apoio menor/uppercase, ícone em chip suave.
+  - Paddings maiores (p-6 / gap-4-6) e paleta slate coerente pra tela respirar.
+
+### Arquivos
+- `frontend/src/modules/fiscal/pages/PainelFaturamento.tsx`
+
+---
+
+## [2026-07-02] — Painel Operacional (dashboard): KPI de Perdas/Quebras Hoje (R$)
+
+### O que mudou
+- No **Painel Operacional** (dashboard inicial), novo KPI **"Perdas/Quebras Hoje"** com o **valor
+  perdido do dia em R$** (fica cinza se zero, vermelho se houver perda) + subtítulo com a
+  quantidade baixada. Bate o olho sem precisar entrar no fiscal.
+- Backend `dashboard` agrega as movimentações `PERDA`/`AVARIA` do dia (valor = qtd × custo).
+
+### Arquivos
+- `backend/src/modules/dashboard/dashboard.service.ts` (perdaHojeValor/perdaHojeQtd)
+- `frontend/src/pages/DashboardPage.tsx`
+
+---
+
+## [2026-07-02] — Painel de Faturamento mostra Perdas & Quebras (R$) do período
+
+### O que mudou
+- No **Painel de Faturamento** (`/fiscal/painel`), abaixo dos KPIs, novo bloco **"Perdas &
+  Quebras no período"** (vermelho) com **total perdido em R$**, split **Perdas × Quebras (avaria)**
+  e um **top de produtos** que mais geraram prejuízo. Deixa claro que é **baixa de estoque, não
+  faturamento** (some quando não há perda no período).
+- Puxa das movimentações reais `PERDA`/`AVARIA` — inclusive as geradas pelo botão **Faturar
+  Perdas** da Análise de Estoque. Valor = quantidade × custo unitário da baixa.
+- Novo endpoint `GET /estoque/:filialId/perdas?dataInicio&dataFim` → `{ perda, quebra, total,
+  porProduto }`.
+
+### Arquivos
+- `backend/src/modules/estoque/{estoque.service.ts, estoque.controller.ts}` (getResumoPerdas)
+- `frontend/src/modules/fiscal/pages/PainelFaturamento.tsx`
+
+### Observação
+- Faturamento = venda/NF-e (entra dinheiro); Perda/Quebra = prejuízo de mercadoria (baixa de
+  estoque). São números separados; o painel agora mostra os dois lado a lado.
+
+---
+
+## [2026-07-02] — Fix Inventário: categoria vinha fixa (FRUTA/LEGUME/VERDURA) e dava erro
+
+### O que mudou
+- O modal **Novo Inventário** oferecia as categorias fixas **FRUTA/LEGUME/VERDURA**, mas os
+  produtos no banco usam outras (`FLV`, `FRUTA`). Escolher **VERDURA/LEGUME** filtrava 0 produtos
+  e o abrir estourava ("Erro ao abrir inventário").
+- Agora o dropdown carrega **as categorias que existem de verdade** (produtos ativos), via novo
+  endpoint `GET /produtos/categorias`. Some a opção que não tem produto → sem erro.
+
+### Arquivos
+- `backend/src/modules/produtos/{produtos.service.ts, produtos.controller.ts}` (endpoint categorias)
+- `frontend/src/modules/estoque/pages/Inventario.tsx` (dropdown dinâmico)
+
+---
+
+## [2026-07-02] — Agente Local (.exe): balança + impressão térmica ESC/POS num serviço só
+
+### O que mudou
+- Novo **Agente Local HETROS** (`agente-local/`): um único serviço Node.js, **empacotável em
+  `.exe` clicável**, que roda em cada máquina do galpão e faz a ponte com o hardware:
+  - **Balança PRIX TI200 → WebSocket `8765`** — porta fiel do `balanca_ws.py` (mesmo parser de
+    frame, mesmo formato `"peso,estavel"`), então o `useBalanca.ts` do ERP conecta **sem mudar nada**.
+  - **Impressão térmica → HTTP `3131`** — recebe a nota em **JSON** do navegador e manda os bytes
+    crus em **ESC/POS** pra impressora USB. Endpoints `POST /imprimir/{cupom,bilhete,raw}` e
+    `GET /status`. Layouts espelham o `notaTermica.ts` (**Cupom NFC-e** com QR nativo + **Bilhete
+    Separador**).
+  - **3 modos de impressão** (config): `share` (impressora compartilhada do Windows — recomendado,
+    via `copy /b`, sem driver especial), `serial` (COM/LPT) e `tcp` (rede 9100). Acentos via CP860.
+- **Front-end**: helper `agenteImpressao.ts` (`imprimirCupomAgente`, `imprimirBilheteAgente`,
+  `agenteStatus`) pra o ERP mandar direto pra térmica, com **fallback** pro diálogo do navegador
+  se o agente não estiver rodando.
+- Config em `config.json` **ao lado do exe** (porta da balança, nome do compartilhamento, colunas,
+  dados da empresa) — dá pra editar sem recompilar. README com o passo a passo do `pkg` (gerar o
+  `.exe`) e de iniciar junto com o Windows.
+
+### Arquivos
+- `agente-local/*` (novo): `index.js`, `src/{balanca,servidor,notas,escpos,impressora}.js`,
+  `config.json`, `package.json`, `HETROS Agente.bat`, `README.md`
+- `frontend/src/modules/logistica/agenteImpressao.ts` (novo)
+
+### Observação
+- Substitui o `balanca_ws.py` (Python) + a impressão via janela do navegador por **um serviço só**.
+- O `serialport` é módulo nativo; o `pkg` já embute os `prebuilds` (ver README). A impressão em
+  `share`/`tcp` **não usa serialport** e funciona mesmo sem ele.
+- Notas continuam **"SEM VALOR FISCAL"** (modo teste) — nada é transmitido à SEFAZ.
+
+---
+
+## [2026-07-02] — Análise de Estoque: Faturar Perdas/Quebras (baixa real + valor perdido em R$)
+
+### O que mudou
+- Na **Análise de Estoque Físico**, as colunas **Perdas** e **Quebra** deixaram de ser só
+  anotação no navegador: agora dá pra **faturar** (dar baixa de verdade no estoque).
+- Botão **"Faturar Perdas"** na barra de ações (com badge da quantidade de itens pendentes):
+  digita a perda/quebra nas linhas → clica → gera a movimentação **real** (`PERDA` e `AVARIA`)
+  via `POST /estoque/ajuste`, reduzindo o saldo. Pede confirmação mostrando **quantos itens,
+  quantidade total e o valor perdido em R$**.
+- **Valor perdido aparece**: total em **R$** no rodapé (perdas + quebra × preço de custo) e no
+  toast de conclusão / na confirmação. Ex.: baixou 10kg a R$ 5,00 → "valor perdido R$ 50,00".
+- **Não duplica**: registra só o **delta** (o que foi digitado além do que já tinha sido baixado);
+  após faturar, o total real passa a vir do backend e o valor manual salvo é limpo. Clicar de
+  novo sem digitar mais nada não gera baixa nova.
+
+### Arquivos
+- `frontend/src/modules/estoque/pages/AnaliseEstoqueFisico.tsx`
+
+### Observação
+- Usa o endpoint que já existia (`POST /estoque/ajuste` → `EstoqueService.movimentar`). A baixa
+  cai como `PERDA`/`AVARIA` e aparece nas **Movimentações** e nos **Perecíveis**.
+
+---
+
 ## [2026-07-02] — Separação touch: teclado numérico + navegação anterior/próximo
 
 - Na fila da **Separação (Operacional)**: botão **lupa** abre um **teclado numérico** (touch)

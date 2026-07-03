@@ -38,6 +38,18 @@ export class ProdutosService {
     return this.prisma.unidadeMedida.findMany({ where: { tenantId }, orderBy: { sigla: 'asc' } });
   }
 
+  /** Categorias que realmente existem em produtos ativos (pra popular filtros). */
+  async listarCategorias(tenantId: string): Promise<string[]> {
+    const grupos = await this.prisma.produto.groupBy({
+      by: ['categoria'],
+      where: { tenantId, ativo: true, categoria: { not: null } },
+    });
+    return grupos
+      .map((g) => g.categoria as string)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+  }
+
   async create(tenantId: string, dto: any) {
     const num = (v: any) => (v === '' || v === null || v === undefined ? undefined : Number(v));
     // Resolve a unidade de medida pela sigla (cria se não existir)
@@ -82,6 +94,19 @@ export class ProdutosService {
     const p = await this.prisma.produto.findFirst({ where: { id, tenantId } });
     if (!p) throw new NotFoundException('Produto não encontrado.');
     const num = (v: any) => (v === '' || v === null || v === undefined ? undefined : Number(v));
+
+    // Se veio composição de custo, recalcula o precoCusto (custo real com absorção da perda).
+    const temComposicao = ['custoBase', 'custoAliquotaImp', 'custoEmbalagem', 'custoFrete', 'custoChapa', 'fatorPerdaPct']
+      .some((k) => dto[k] !== undefined);
+    const pick = (k: string) => (dto[k] !== undefined ? Number(dto[k] || 0) : Number((p as any)[k] || 0));
+    let precoCustoCalc = num(dto.precoCusto);
+    if (temComposicao) {
+      const base = pick('custoBase');
+      const antesPerda = base + base * (pick('custoAliquotaImp') / 100) + pick('custoEmbalagem') + pick('custoFrete') + pick('custoChapa');
+      const perda = Math.min(99.99, pick('fatorPerdaPct'));
+      precoCustoCalc = Math.round((antesPerda / (1 - perda / 100)) * 10000) / 10000; // absorção da perda
+    }
+
     await this.prisma.produto.update({
       where: { id },
       data: {
@@ -99,6 +124,14 @@ export class ProdutosService {
         pesoLiquido: num(dto.pesoLiquido),
         pesoBruto: num(dto.pesoBruto),
         precoVenda: num(dto.precoVenda),
+        precoCusto: precoCustoCalc,
+        // Composição analítica do custo
+        custoBase: num(dto.custoBase),
+        custoAliquotaImp: num(dto.custoAliquotaImp),
+        custoEmbalagem: num(dto.custoEmbalagem),
+        custoFrete: num(dto.custoFrete),
+        custoChapa: num(dto.custoChapa),
+        fatorPerdaPct: num(dto.fatorPerdaPct),
       },
     });
     return this.prisma.produto.findUnique({ where: { id }, include: { unidadeMedida: { select: { sigla: true } } } });

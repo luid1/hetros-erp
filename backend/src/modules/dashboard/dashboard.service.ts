@@ -20,7 +20,7 @@ export class DashboardService {
 
     const [
       itensEstoque, alertasValidade, porStatus, nfesHoje, faturadoHoje,
-      crAgg, movimentacoesHoje, entradasHoje, romaneiosDia, nfes7d,
+      crAgg, movimentacoesHoje, entradasHoje, romaneiosDia, nfes7d, perdasHoje,
     ] = await Promise.all([
       this.prisma.estoqueSaldo.count({ where: { tenantId, ...filFiltro, quantidade: { gt: 0 } } }),
       this.prisma.estoqueSaldo.count({ where: { tenantId, ...filFiltro, quantidade: { gt: 0 }, lote: { dataValidade: { lte: em5dias } } } }),
@@ -35,7 +35,15 @@ export class DashboardService {
         where: { tenantId, ...filFiltro, status: 'EMITIDO', dataEmissao: { gte: new Date(inicioHoje.getTime() - 6 * 86400000) } },
         select: { dataEmissao: true, valorNfe: true },
       }),
+      // Perdas e quebras (avaria) baixadas hoje — pra somar o valor perdido do dia
+      this.prisma.movimentacaoEstoque.findMany({
+        where: { tenantId, ...filFiltro, tipo: { in: ['PERDA', 'AVARIA'] }, dataMovimento: { gte: inicioHoje, lte: fimHoje } },
+        select: { quantidade: true, custoUnitario: true },
+      }),
     ]);
+
+    const perdaHojeValor = perdasHoje.reduce((s, m) => s + Number(m.quantidade) * Number(m.custoUnitario || 0), 0);
+    const perdaHojeQtd = perdasHoje.reduce((s, m) => s + Number(m.quantidade), 0);
 
     const statusMap: Record<string, number> = {};
     for (const g of porStatus) statusMap[g.status] = (g as any)._count;
@@ -66,6 +74,8 @@ export class DashboardService {
         contasReceberQtd: (crAgg as any)._count || 0,
         contasReceberValor: receberEmAberto,
         movimentacoesHoje,
+        perdaHojeValor,
+        perdaHojeQtd,
       },
       pedidosPorStatus: {
         CONFIRMADO: statusMap['CONFIRMADO'] || 0,

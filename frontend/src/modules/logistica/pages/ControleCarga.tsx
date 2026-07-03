@@ -1,4 +1,4 @@
-import { toast } from '../../../components/ui/feedback';
+import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useMemo, useEffect } from 'react';
 import {
   Printer, Truck, CheckSquare,
@@ -40,17 +40,6 @@ interface PedidoCarga {
   idVenda: string;
 }
 
-interface RotaMotorista {
-  id: string;
-  numero: number;
-  motorista: string;
-  tipoVeiculo: string;
-  refrigerado: boolean;
-  pesoKg: number;
-  qtdEntregas: number;
-  periodo: string;
-  slaPercent: number;
-}
 
 const R$ = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -159,25 +148,6 @@ const _MOCK_PEDIDOS_UNUSED: PedidoCarga[] = [
   { id:'22', numero:29, data:'2026-06-26', liberadoEm:'07:46', nomeFantasia:'HOSPITAL...',           referencia:'00539',volumes:539, pesoKg:'205.',  empresa:'Hetr.', tipoFaturamento:'NFe',      autorizacao:'', status:'', statusCarga:'IMPRESSO',           aurCargaOk:false, regiao:'ARUJÁ',       cep:'07402015', bairro:'CENTRO',      subRegiao:'MARIA DE L.', onda:1, periodo:'MANHA', rota:'06:30-0.', recebimento:'',       motorista:'HOSPITAL I.', andamento:0, valorTotal:7800, idMltvenda:'', idVenda:'29' },
 ];
 
-const MOCK_ROTAS: RotaMotorista[] = [
-  { id:'r1',  numero:3519, motorista:'ANDRE LUIZ CELESTINO',    tipoVeiculo:'VAN',             refrigerado:false, pesoKg:591.11,  qtdEntregas:4,  periodo:'MANHA', slaPercent:0 },
-  { id:'r2',  numero:3515, motorista:'ELINALDO TAVARES DE',     tipoVeiculo:'KOMBI',           refrigerado:false, pesoKg:1155.53, qtdEntregas:7,  periodo:'MANHA', slaPercent:0 },
-  { id:'r3',  numero:3189, motorista:'ELTON DE OLIVEIRA CO',    tipoVeiculo:'VAN REFRIGERADA', refrigerado:true,  pesoKg:819.7,   qtdEntregas:5,  periodo:'MANHA', slaPercent:0 },
-  { id:'r4',  numero:3518, motorista:'GENIVAL BEZERRA DOS',     tipoVeiculo:'KOMBI',           refrigerado:false, pesoKg:300.16,  qtdEntregas:3,  periodo:'MANHA', slaPercent:0 },
-  { id:'r5',  numero:3518, motorista:'GENIVAL BEZERRA DOS',     tipoVeiculo:'KOMBI',           refrigerado:false, pesoKg:508.91,  qtdEntregas:4,  periodo:'MANHA', slaPercent:0 },
-  { id:'r6',  numero:3195, motorista:'HENRIQUE SILVA DOS A',    tipoVeiculo:'MINI-VAN',        refrigerado:false, pesoKg:272.73,  qtdEntregas:3,  periodo:'MANHA', slaPercent:0 },
-  { id:'r7',  numero:3195, motorista:'JEFERSON DE ALMEIDA',     tipoVeiculo:'MINI-VAN',        refrigerado:false, pesoKg:287.75,  qtdEntregas:2,  periodo:'MANHA', slaPercent:0 },
-  { id:'r8',  numero:3186, motorista:'MILTON SANTOS',           tipoVeiculo:'VAN',             refrigerado:false, pesoKg:947.8,   qtdEntregas:6,  periodo:'MANHA', slaPercent:0 },
-  { id:'r9',  numero:3187, motorista:'MILTON SANTOS',           tipoVeiculo:'VAN',             refrigerado:false, pesoKg:858.4,   qtdEntregas:5,  periodo:'MANHA', slaPercent:0 },
-  { id:'r10', numero:3520, motorista:'MILTON SANTOS',           tipoVeiculo:'VAN',             refrigerado:false, pesoKg:1424.48, qtdEntregas:8,  periodo:'TARDE', slaPercent:0 },
-  { id:'r11', numero:3519, motorista:'SIDNEY FERNANDO TEIX',    tipoVeiculo:'VAN',             refrigerado:false, pesoKg:51.8,    qtdEntregas:1,  periodo:'MANHA', slaPercent:0 },
-  { id:'r12', numero:3518, motorista:'SIDNEY FERNANDO TEIX',    tipoVeiculo:'VAN',             refrigerado:false, pesoKg:1342.61, qtdEntregas:7,  periodo:'TARDE', slaPercent:0 },
-  { id:'r13', numero:3185, motorista:'WILLIAN EUFRORSINO A',    tipoVeiculo:'VAN',             refrigerado:false, pesoKg:119.73,  qtdEntregas:2,  periodo:'MANHA', slaPercent:0 },
-  { id:'r14', numero:3190, motorista:'WILLIAN EUFRORSINO A',    tipoVeiculo:'VAN',             refrigerado:false, pesoKg:654.34,  qtdEntregas:4,  periodo:'MANHA', slaPercent:0 },
-  { id:'r15', numero:3198, motorista:'WILSON LUIZ DE OLIVE',    tipoVeiculo:'VAN',             refrigerado:false, pesoKg:350.5,   qtdEntregas:3,  periodo:'MANHA', slaPercent:0 },
-  { id:'r16', numero:3512, motorista:'WILLIAN EUFRORSINO A',    tipoVeiculo:'VAN',             refrigerado:false, pesoKg:342.26,  qtdEntregas:3,  periodo:'MANHA', slaPercent:0 },
-];
-
 // ─── Cor da linha conforme statusCarga ───────────
 function rowBg(p: PedidoCarga, sel: boolean) {
   if (sel) return 'bg-blue-700 text-white';
@@ -208,7 +178,6 @@ export default function ControleCarga() {
   // ── Estado da grade ──
   const [pedidos, setPedidos]         = useState<PedidoCarga[]>([]);
   const [carregando, setCarregando]   = useState(false);
-  const frota                         = MOCK_ROTAS; // frota disponível p/ escolher no modal
   const [rotasProgramadas, setRotasProgramadas] = useState<any[]>([]); // romaneios reais (Entregas Programadas)
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [abaRota, setAbaRota]         = useState<'rotas' | 'horario'>('rotas');
@@ -431,6 +400,12 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
     qtdEntregas: rotasProgramadas.reduce((s, r) => s + Number(r.qtdEntregas || 0), 0),
     slaPercent: 0,
   }), [rotasProgramadas]);
+
+  // Pedidos que JÁ estão numa rota do dia → não podem ser roteirizados de novo (evita duplicar)
+  const pedidosJaRoteirizados = useMemo(
+    () => new Set<string>(rotasProgramadas.flatMap((r: any) => (r.entregas || []).map((e: any) => e.pedidoId))),
+    [rotasProgramadas],
+  );
 
   return (
     <div className="flex flex-col h-full bg-gray-100 text-[11px] select-none overflow-hidden">
@@ -699,28 +674,17 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
             </table>
           </div>
 
-          {/* KPIs (canto inferior direito) */}
-          <div className="w-72 shrink-0 border-l-2 border-gray-400 bg-gray-100 flex flex-col">
-            <div className="flex items-center justify-center pt-3 pb-1">
-              <Truck className="h-12 w-16 text-gray-500" />
+          {/* KPIs (canto inferior direito) — clean/glass */}
+          <div className="w-72 shrink-0 border-l border-white/[0.06] bg-white/[0.02] flex flex-col p-3 gap-2">
+            <div className="flex items-center gap-2 text-slate-500">
+              <Truck className="h-4 w-4" strokeWidth={1.75} />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">Resumo das rotas</span>
             </div>
-            <div className="grid grid-cols-2 gap-0 flex-1 border-t border-gray-400">
-              <div className="flex flex-col items-center justify-center border-r border-b border-gray-300 py-1">
-                <span className="text-[10px] text-gray-500 font-semibold">Qtd Rotas</span>
-                <span className="text-2xl font-black text-gray-900">{kpis.qtdRotas}</span>
-              </div>
-              <div className="flex flex-col items-center justify-center border-b border-gray-300 py-1">
-                <span className="text-[10px] text-gray-500 font-semibold">Peso Carga (Kg)</span>
-                <span className="text-2xl font-black text-gray-900">{kpis.pesoCargaKg.toLocaleString('pt-BR', { minimumFractionDigits: 3 })}</span>
-              </div>
-              <div className="flex flex-col items-center justify-center border-r border-gray-300 py-1">
-                <span className="text-[10px] text-gray-500 font-semibold">Qtd Entregas</span>
-                <span className="text-2xl font-black text-gray-900">{kpis.qtdEntregas}</span>
-              </div>
-              <div className="flex flex-col items-center justify-center py-1">
-                <span className="text-[10px] text-gray-500 font-semibold">SLA (%)</span>
-                <span className="text-2xl font-black text-gray-900">{kpis.slaPercent.toFixed(2)}%</span>
-              </div>
+            <div className="grid grid-cols-2 gap-2 flex-1">
+              <KpiMini label="Qtd Rotas" valor={String(kpis.qtdRotas)} />
+              <KpiMini label="Peso Carga" valor={`${kpis.pesoCargaKg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`} sufixo="kg" />
+              <KpiMini label="Qtd Entregas" valor={String(kpis.qtdEntregas)} />
+              <KpiMini label="SLA" valor={`${kpis.slaPercent.toFixed(0)}`} sufixo="%" />
             </div>
           </div>
         </div>
@@ -762,7 +726,7 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
         <ModalNovaEntrega
           dataCarga={dataCarga}
           filialId={filialAtiva?.id}
-          rotas={frota}
+          pedidosJaRoteirizados={pedidosJaRoteirizados}
           onClose={() => setModalNovaEntrega(false)}
           onCriado={handleRotaCriada}
         />
@@ -774,18 +738,14 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
 // ─── Tipo para pedido a roteirizar ───
 
 // ─── Modal Roteirizar (busca pedidos CONFIRMADOS e atribui a motorista) ───
-function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
+function ModalNovaEntrega({ dataCarga, filialId, pedidosJaRoteirizados, onClose, onCriado }: {
   dataCarga: string;
   filialId?: string;
-  rotas: RotaMotorista[];
+  pedidosJaRoteirizados: Set<string>;
   onClose: () => void;
   onCriado: () => void;
 }) {
   const { filialAtiva } = useAuth();
-
-  // Motorista selecionado
-  const [rotaSelId, setRotaSelId] = useState<string>('none');
-  const rotaSel = rotas.find(r => r.id === rotaSelId) || null;
 
   // Pedidos disponíveis (CONFIRMADOS sem rota)
   const [pedidosDisp, setPedidosDisp] = useState<any[]>([]);
@@ -796,6 +756,13 @@ function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [salvando, setSalvando]         = useState(false);
   const [erro, setErro]                 = useState('');
+  const [freteRota, setFreteRota]       = useState(''); // frete da rota (vai p/ Frete por Motorista)
+
+  // Veículo escolhido (traz motorista padrão + capacidade) — é a atribuição da rota
+  const [veiculos, setVeiculos]   = useState<any[]>([]);
+  const [veicSelId, setVeicSelId] = useState('');
+  useEffect(() => { api.get('/veiculos').then(r => setVeiculos((r.data || []).filter((v: any) => v.ativo))).catch(() => setVeiculos([])); }, []);
+  const veic = veiculos.find(v => v.id === veicSelId) || null;
 
   // Carrega os pedidos do DIA da carga que ainda podem entrar numa rota
   // (CONFIRMADO, EM_SEPARACAO ou SEPARADO — exclui rascunho, faturado e cancelado)
@@ -808,19 +775,20 @@ function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
       .finally(() => setLoadingPed(false));
   }, [filialAtiva?.id, dataCarga]);
 
-  // Filtro por busca
+  // Filtro por busca — E remove os pedidos que já estão numa rota (não duplica)
   const pedidosFiltrados = useMemo(() => {
-    if (!busca) return pedidosDisp;
+    const disp = pedidosDisp.filter((p: any) => !pedidosJaRoteirizados.has(p.id));
+    if (!busca) return disp;
     const q = busca.toLowerCase();
-    return pedidosDisp.filter((p: any) =>
+    return disp.filter((p: any) =>
       (p.cliente?.razaoSocial || '').toLowerCase().includes(q) ||
       (p.cliente?.nomeFantasia || '').toLowerCase().includes(q) ||
       String(p.numero).includes(q)
     );
-  }, [pedidosDisp, busca]);
+  }, [pedidosDisp, busca, pedidosJaRoteirizados]);
 
   const toggleSel = (id: string) => {
-    if (rotaSelId === 'none') { setErro('Escolha o motorista primeiro (lado direito).'); return; }
+    if (!veic) { setErro('Escolha o veículo primeiro (lado direito).'); return; }
     setErro('');
     setSelecionados(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
@@ -831,28 +799,46 @@ function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
   const pedidosSel = pedidosFiltrados.filter((p: any) => selecionados.has(p.id));
   // Valor total da entrega = soma do valor de todos os pedidos selecionados
   const valorTotalEntrega = pedidosSel.reduce((s: number, p: any) => s + Number(p.valorTotal || 0), 0);
-  const freteTotalEntrega = pedidosSel.reduce((s: number, p: any) => s + Number(p.valorFrete || 0), 0);
   const R$ = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  // Só permite clicar nos pedidos depois de escolher o motorista
-  const motoristaEscolhido = rotaSelId !== 'none' && !!rotaSel;
+  const pesoSel   = pedidosSel.reduce((s: number, p: any) => s + Number(p.pesoTotal || 0), 0);
+  const caixasSel = pedidosSel.reduce((s: number, p: any) => s + Number(p.volumes || 0), 0);
+  const pesoPct   = veic?.capacidadeKg ? (pesoSel / Number(veic.capacidadeKg)) * 100 : 0;
+  const caixasPct = veic?.capacidadeCaixasH ? (caixasSel / Number(veic.capacidadeCaixasH)) * 100 : 0;
+  const ocupPct   = Math.max(pesoPct, caixasPct);
+
+  // Só permite clicar nos pedidos depois de escolher o veículo (traz motorista + capacidade)
+  const veiculoEscolhido = !!veic;
+  const periodoRota = pedidosSel[0]?.periodo || 'MANHA';
 
   // Roteirizar: PERSISTE a rota (cria o Romaneio / Capa de Rota) no backend
   const handleRoteirizar = async () => {
-    if (!motoristaEscolhido || !rotaSel) { setErro('Escolha o motorista.'); return; }
+    if (!veic) { setErro('Escolha o veículo (lado direito).'); return; }
     if (selecionados.size === 0) { setErro('Selecione pelo menos um pedido.'); return; }
     if (!filialId) return;
+    // Trava de capacidade: se passar de 100% do veículo escolhido, pede confirmação
+    if (ocupPct > 100) {
+      const qual = pesoPct >= caixasPct ? `${pesoPct.toFixed(0)}% do peso` : `${caixasPct.toFixed(0)}% das caixas`;
+      const ok = await confirmDialog(
+        `O veículo ${veic.placa} ficaria com ${qual} (acima de 100% da capacidade). Roteirizar mesmo assim?`,
+        { tone: 'danger', okLabel: 'Roteirizar assim mesmo' },
+      );
+      if (!ok) return;
+    }
     setSalvando(true); setErro('');
     try {
       await api.post('/carga/romaneio', {
         filialId,
-        motorista: rotaSel.motorista,
-        codigoCondutor: String(rotaSel.numero),
-        tipoVeiculo: rotaSel.tipoVeiculo,
-        refrigerado: rotaSel.refrigerado,
-        periodo: rotaSel.periodo,
+        motorista: veic.motoristaPadrao || 'A definir',
+        codigoCondutor: veic.placa,
+        placaVeiculo: veic.placa,
+        modeloVeiculo: veic.modelo,
+        tipoVeiculo: veic.tipo,
+        refrigerado: veic.refrigerado,
+        periodo: periodoRota,
         dataMovimento: new Date().toISOString(),
         dataEntrega: dataCarga,
+        valorFrete: Number(freteRota) || 0,
         pedidoIds: Array.from(selecionados),
       });
       onCriado();
@@ -873,9 +859,9 @@ function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
             <RotateCcw className="h-5 w-5 text-blue-600" />
             <h2 className="font-bold text-gray-900 text-sm">Nova Entrega — Roteirizar</h2>
             <span className="text-xs text-gray-400">
-              {motoristaEscolhido
-                ? `Clique nos pedidos do dia para incluir na rota de ${rotaSel?.motorista}`
-                : '1º escolha o motorista (à direita) · depois clique nos pedidos do dia'}
+              {veiculoEscolhido
+                ? `Clique nos pedidos do dia para incluir na rota do ${veic?.placa}`
+                : '1º escolha o veículo (à direita) · depois clique nos pedidos do dia'}
             </span>
             {selecionados.size > 0 && (
               <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -921,7 +907,7 @@ function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
                         <input type="checkbox" checked={selecionados.size === pedidosFiltrados.length && pedidosFiltrados.length > 0}
                           onChange={toggleAll} className="accent-blue-600 h-3 w-3 cursor-pointer" />
                       </th>
-                      {['Nº', 'Cliente', 'Data Entrega', 'Valor', 'Frete', 'Status'].map(h => (
+                      {['Nº', 'Cliente', 'Data Entrega', 'Peso (kg)', 'Valor', 'Status'].map(h => (
                         <th key={h} className="px-2 py-1.5 text-left font-semibold text-gray-600 border-b border-gray-200 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -940,8 +926,8 @@ function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
                             <p className="font-semibold text-gray-900 truncate max-w-[200px]">{p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '—'}</p>
                           </td>
                           <td className="px-2 py-1.5 whitespace-nowrap">{p.dataEntrega ? new Date(p.dataEntrega).toLocaleDateString('pt-BR') : '—'}</td>
+                          <td className="px-2 py-1.5 text-right font-mono font-semibold text-sky-300">{Number(p.pesoTotal || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</td>
                           <td className="px-2 py-1.5 text-right font-mono">{Number(p.valorTotal || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                          <td className="px-2 py-1.5 text-right font-mono text-blue-600">{Number(p.valorFrete || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                           <td className="px-2 py-1.5">
                             <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full text-[9px] font-bold">{p.status}</span>
                           </td>
@@ -954,32 +940,30 @@ function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
             </div>
           </div>
 
-          {/* ── Col direita: Motoristas ── */}
+          {/* ── Col direita: Veículos da frota (traz motorista + capacidade) ── */}
           <div className="w-64 shrink-0 border-l border-gray-200 flex flex-col bg-gray-50">
             <div className="bg-gray-200 px-3 py-2 border-b border-gray-300 shrink-0">
               <p className="text-[10px] font-bold text-gray-700 uppercase flex items-center gap-1">
-                <Truck className="h-3 w-3" /> Atribuir ao Motorista
+                <Truck className="h-3 w-3" /> Escolher Veículo
               </p>
             </div>
             <div className="flex-1 overflow-y-auto">
-              <button onClick={() => setRotaSelId('none')}
-                className={`w-full text-left px-2 py-1.5 border-b border-gray-200 flex items-center gap-1.5 text-[11px] ${rotaSelId === 'none' ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}>
-                <div className={`h-2.5 w-2.5 rounded-full border-2 shrink-0 ${rotaSelId === 'none' ? 'border-white bg-white' : 'border-gray-400'}`} />
-                <span className="italic">Sem motorista</span>
-              </button>
-              {rotas.map(r => {
-                const sel = rotaSelId === r.id;
+              {veiculos.length === 0 && (
+                <p className="text-[10px] text-gray-400 italic px-3 py-3">Nenhum veículo ativo. Cadastre em Frotas &amp; Veículos.</p>
+              )}
+              {veiculos.map(v => {
+                const sel = veicSelId === v.id;
                 return (
-                  <button key={r.id} onClick={() => setRotaSelId(r.id)}
+                  <button key={v.id} onClick={() => setVeicSelId(sel ? '' : v.id)}
                     className={`w-full text-left px-2 py-1.5 border-b border-gray-200 flex items-center gap-1.5 ${sel ? 'bg-blue-600 text-white' : 'hover:bg-blue-50'}`}>
                     <div className={`h-2.5 w-2.5 rounded-full border-2 shrink-0 ${sel ? 'border-white' : 'border-gray-400'}`}>
                       {sel && <div className="h-1 w-1 bg-white rounded-full m-px" />}
                     </div>
-                    <Truck className={`h-3 w-3 shrink-0 ${sel ? 'text-white' : r.refrigerado ? 'text-cyan-500' : 'text-gray-400'}`} />
+                    <Truck className={`h-3 w-3 shrink-0 ${sel ? 'text-white' : v.refrigerado ? 'text-cyan-500' : 'text-gray-400'}`} />
                     <div className="flex-1 min-w-0">
-                      <p className={`text-[10px] font-bold truncate ${sel ? 'text-white' : 'text-gray-900'}`}>{r.motorista}</p>
+                      <p className={`text-[10px] font-bold truncate ${sel ? 'text-white' : 'text-gray-900'}`}>{v.placa} · {v.motoristaPadrao || 'sem motorista'}</p>
                       <span className={`text-[9px] ${sel ? 'text-blue-100' : 'text-gray-400'}`}>
-                        {r.tipoVeiculo.slice(0, 8)} · {r.pesoKg.toFixed(0)}Kg · #{r.numero}
+                        {(v.tipo || 'VEÍCULO')} · {Number(v.capacidadeKg || 0).toFixed(0)}kg · {v.capacidadeCaixasH || 0}cx
                       </span>
                     </div>
                   </button>
@@ -989,20 +973,44 @@ function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
 
             {/* Resumo da entrega */}
             <div className="bg-gray-900 text-white border-t border-gray-300 px-3 py-2 shrink-0 space-y-1">
-              {rotaSel ? (
+              {veic ? (
                 <div className="flex items-center gap-1 text-[11px]">
-                  <Truck className={`h-3.5 w-3.5 ${rotaSel.refrigerado ? 'text-cyan-400' : 'text-blue-400'}`} />
-                  <strong className="truncate">{rotaSel.motorista}</strong>
+                  <Truck className={`h-3.5 w-3.5 ${veic.refrigerado ? 'text-cyan-400' : 'text-blue-400'}`} />
+                  <strong className="truncate">{veic.placa} · {veic.motoristaPadrao || 'sem motorista'}</strong>
                 </div>
               ) : (
-                <p className="text-gray-400 italic text-[11px]">Nenhum motorista selecionado</p>
+                <p className="text-gray-400 italic text-[11px]">Nenhum veículo selecionado</p>
               )}
+
+              {/* Barras de capacidade (peso × caixas H) do veículo escolhido */}
+              {veic && (
+                <div className="pt-1 border-t border-gray-700 space-y-1.5">
+                  <CapBar label={`Peso ${pesoSel.toFixed(0)}/${Number(veic.capacidadeKg || 0).toFixed(0)} kg`} pct={pesoPct} />
+                  <CapBar label={`Caixas ${caixasSel}/${veic.capacidadeCaixasH || 0}`} pct={caixasPct} />
+                  <p className={`text-[10px] font-bold text-center ${ocupPct > 100 ? 'text-rose-400' : ocupPct >= 90 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    🚚 {ocupPct.toFixed(0)}% ocupado{ocupPct > 100 ? ' · ACIMA DA CAPACIDADE' : ''}
+                  </p>
+                </div>
+              )}
+
               <div className="flex justify-between text-[10px] text-gray-300">
-                <span>Pedidos na rota</span><strong className="text-white">{selecionados.size}</strong>
+                <span>Pedidos na rota · Peso</span><strong className="text-white font-mono">{selecionados.size} · {pesoSel.toFixed(0)} kg</strong>
               </div>
-              <div className="flex justify-between text-[10px] text-gray-300">
-                <span>Frete total</span><strong className="text-white font-mono">{R$(freteTotalEntrega)}</strong>
+
+              {/* Frete da rota — já vai pro Frete por Motorista */}
+              <div className="pt-1 border-t border-gray-700">
+                <label className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] text-gray-300 shrink-0">Frete da rota (R$)</span>
+                  <input type="number" step="0.01" min="0" value={freteRota} onChange={e => setFreteRota(e.target.value)}
+                    placeholder="0,00"
+                    className="w-24 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-[11px] text-right font-mono text-emerald-300 focus:outline-none focus:border-sky-500" />
+                </label>
+                <div className="flex justify-between text-[9px] text-gray-500 mt-0.5">
+                  <span>% sobre a nota</span>
+                  <span className="font-mono">{valorTotalEntrega > 0 && Number(freteRota) > 0 ? ((Number(freteRota) / valorTotalEntrega) * 100).toFixed(2) + '%' : '—'}</span>
+                </div>
               </div>
+
               <div className="border-t border-gray-700 pt-1 flex justify-between items-baseline">
                 <span className="text-[10px] text-gray-300 uppercase font-semibold">Valor total</span>
                 <strong className="text-lg font-black text-green-400 font-mono">{R$(valorTotalEntrega)}</strong>
@@ -1014,7 +1022,7 @@ function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0">
           <div className="flex items-center gap-4">
-            {rotaSel && <span className="text-xs text-gray-500">🚛 <strong>{rotaSel.motorista}</strong> — {rotaSel.tipoVeiculo} · #{rotaSel.numero}</span>}
+            {veic && <span className="text-xs text-gray-500">🚛 <strong>{veic.placa}</strong> — {veic.motoristaPadrao || 'sem motorista'} · {veic.tipo}</span>}
             <span className="text-xs text-gray-500">
               Valor da entrega: <strong className="text-green-700 font-mono text-sm">{R$(valorTotalEntrega)}</strong>
             </span>
@@ -1022,12 +1030,40 @@ function ModalNovaEntrega({ dataCarga, filialId, rotas, onClose, onCriado }: {
           {erro && <span className="text-xs text-red-600 font-semibold">{erro}</span>}
           <div className="flex gap-2">
             <button onClick={onClose} className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50 font-medium">Cancelar</button>
-            <button onClick={handleRoteirizar} disabled={salvando || selecionados.size === 0 || !motoristaEscolhido}
+            <button onClick={handleRoteirizar} disabled={salvando || selecionados.size === 0 || !veiculoEscolhido}
               className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-40 flex items-center gap-1.5 shadow-sm">
               <RotateCcw className="h-3.5 w-3.5" /> Roteirizar {selecionados.size} Pedido{selecionados.size !== 1 ? 's' : ''}
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// KPI minimalista do resumo de rotas
+function KpiMini({ label, valor, sufixo }: { label: string; valor: string; sufixo?: string }) {
+  return (
+    <div className="glass rounded-xl px-3 py-2 flex flex-col justify-center">
+      <span className="text-[9px] text-slate-500 font-semibold uppercase tracking-[0.1em] truncate">{label}</span>
+      <span className="text-xl font-extrabold text-white tabular-nums leading-tight">
+        {valor}{sufixo && <span className="text-xs font-semibold text-slate-500 ml-0.5">{sufixo}</span>}
+      </span>
+    </div>
+  );
+}
+
+// Barra de capacidade (verde <90% · âmbar 90–100% · vermelho >100%)
+function CapBar({ label, pct }: { label: string; pct: number }) {
+  const cor = pct > 100 ? 'bg-rose-500' : pct >= 90 ? 'bg-amber-400' : 'bg-emerald-400';
+  return (
+    <div>
+      <div className="flex justify-between text-[9px] text-gray-300 mb-0.5">
+        <span>{label}</span>
+        <span className={`font-bold ${pct > 100 ? 'text-rose-400' : 'text-gray-200'}`}>{pct.toFixed(0)}%</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-gray-700 overflow-hidden">
+        <div className={`h-full ${cor} rounded-full transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />
       </div>
     </div>
   );

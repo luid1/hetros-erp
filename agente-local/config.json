@@ -1,0 +1,42 @@
+{
+  "_comentario": "Configuração do Agente Local HETROS. Edite e salve; reinicie o agente.",
+
+  "balanca": {
+    "ativa": true,
+    "porta": "COM4",
+    "bauds": [4800, 9600, 2400, 19200, 115200],
+    "wsPort": 8765
+  },
+
+  "impressora": {
+    "ativa": true,
+    "httpPort": 3131,
+
+    "_modo": "Como o agente envia os bytes p/ a térmica. Opções: 'share' (impressora compartilhada do Windows — recomendado), 'serial' (COM/LPT) ou 'tcp' (impressora de rede).",
+    "modo": "share",
+
+    "_share": "Nome do compartilhamento da impressora no Windows (Painel > Impressoras > Propriedades > Compartilhamento). Ex.: POS80",
+    "share": "POS80",
+
+    "_serial": "Usado só quando modo='serial'. Ex.: COM3 ou LPT1",
+    "serialPorta": "COM3",
+    "serialBaud": 9600,
+
+    "_tcp": "Usado só quando modo='tcp' (impressora de rede na porta 9100)",
+    "tcpHost": "192.168.0.100",
+    "tcpPort": 9100,
+
+    "_largura": "Colunas de texto normal na bobina (80mm = 48, 58mm = 32)",
+    "colunas": 48,
+    "cortarPapel": true,
+    "codepage": "CP860"
+  },
+
+  "empresa": {
+    "nome": "HETROS IMP. E EXP. LTDA",
+    "cnpj": "12.345.678/0001-95",
+    "ie": "111.111.111.111",
+    "endereco": "AV DR GASTAO VIDIGAL, S/N - BOX 19",
+    "cidade": "CEASA - V. LEOPOLDINA - SAO PAULO/SP"
+  }
+}

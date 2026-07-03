@@ -8,6 +8,8 @@ import { FiliaisModule } from './modules/filiais/filiais.module';
 import { ClientesModule } from './modules/clientes/clientes.module';
 import { FornecedoresModule } from './modules/fornecedores/fornecedores.module';
 import { TransportadorasModule } from './modules/transportadoras/transportadoras.module';
+import { VeiculosModule } from './modules/veiculos/veiculos.module';
+import { CustosModule } from './modules/custos/custos.module';
 import { ProdutosModule } from './modules/produtos/produtos.module';
 import { EstoqueModule } from './modules/estoque/estoque.module';
 import { MovimentacoesModule } from './modules/movimentacoes/movimentacoes.module';
@@ -39,6 +41,8 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     ClientesModule,
     FornecedoresModule,
     TransportadorasModule,
+    VeiculosModule,
+    CustosModule,
     ProdutosModule,
     EstoqueModule,
     MovimentacoesModule,

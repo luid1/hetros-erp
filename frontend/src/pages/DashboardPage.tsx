@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import {
   Package, AlertTriangle, TrendingUp, Truck, Receipt, DollarSign,
-  Activity, RefreshCw, BarChart3, PackageCheck,
+  Activity, RefreshCw, BarChart3, PackageCheck, TrendingDown,
 } from 'lucide-react';
 
 const R$ = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
@@ -13,20 +13,29 @@ interface Resumo {
   kpis: {
     itensEstoque: number; alertasValidade: number; pedidosPendentes: number; pedidosSeparacao: number;
     pedidosSeparados: number; nfesHoje: number; faturadoHoje: number; contasReceberQtd: number;
-    contasReceberValor: number; movimentacoesHoje: number;
+    contasReceberValor: number; movimentacoesHoje: number; perdaHojeValor?: number; perdaHojeQtd?: number;
   };
   pedidosPorStatus: Record<string, number>;
   serieFaturamento: { dia: string; label: string; valor: number }[];
   fluxoDia: { entradas: number; faturados: number; romaneios: number; entregues: number };
 }
 
+// Ícone vazado, solto e sutil — sem caixa colorida pesada (map estático p/ o Tailwind enxergar as classes)
+const KPI_ICON_COLOR: Record<string, string> = {
+  'bg-sky-500': 'text-sky-400', 'bg-red-500': 'text-red-400', 'bg-amber-500': 'text-amber-400',
+  'bg-violet-500': 'text-violet-400', 'bg-teal-500': 'text-teal-400', 'bg-emerald-500': 'text-emerald-400',
+  'bg-blue-500': 'text-blue-400', 'bg-indigo-500': 'text-indigo-400', 'bg-rose-500': 'text-rose-400',
+  'bg-gray-500': 'text-slate-500',
+};
 function KPICard({ icon: Icon, label, value, sub, color }: { icon: any; label: string; value: string; sub?: string; color: string }) {
   return (
-    <div className="card p-5">
-      <div className={`h-9 w-9 rounded-lg flex items-center justify-center ${color} mb-3`}><Icon className="h-4 w-4 text-white" /></div>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-xs font-medium text-gray-500 mt-0.5">{label}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    <div className="card glass-hover p-5 cursor-default">
+      <div className="flex items-center gap-2 mb-3">
+        <Icon className={`h-4 w-4 ${KPI_ICON_COLOR[color] || 'text-slate-400'}`} strokeWidth={1.75} />
+        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.12em] truncate">{label}</p>
+      </div>
+      <p className="text-3xl font-extrabold text-white tracking-tight tabular-nums truncate">{value}</p>
+      {sub && <p className="text-xs text-slate-500 mt-1 truncate">{sub}</p>}
     </div>
   );
 }
@@ -79,6 +88,7 @@ export default function DashboardPage() {
         <KPICard icon={TrendingUp} label="Faturado Hoje" value={R$(k?.faturadoHoje ?? 0)} color="bg-emerald-500" />
         <KPICard icon={DollarSign} label="A Receber (7 dias)" value={String(k?.contasReceberQtd ?? 0)} sub={R$(k?.contasReceberValor ?? 0)} color="bg-blue-500" />
         <KPICard icon={Activity} label="Movimentações Hoje" value={String(k?.movimentacoesHoje ?? 0)} color="bg-indigo-500" />
+        <KPICard icon={TrendingDown} label="Perdas/Quebras Hoje" value={R$(k?.perdaHojeValor ?? 0)} sub={`${(k?.perdaHojeQtd ?? 0).toLocaleString('pt-BR', { maximumFractionDigits: 3 })} baixados`} color={k?.perdaHojeValor ? 'bg-rose-500' : 'bg-gray-500'} />
       </div>
 
       {/* Alerta de validade */}

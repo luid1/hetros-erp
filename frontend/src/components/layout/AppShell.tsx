@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Package, Warehouse, FileText,
   DollarSign, Truck, ClipboardList, BarChart3, Settings,
   ChevronLeft, ChevronRight, LogOut, Building2, AlertTriangle,
-  Receipt, ShieldCheck, Menu, X, MapPin, PackageCheck, ShoppingCart,
+  Receipt, ShieldCheck, Menu, X, MapPin, PackageCheck, ShoppingCart, Coins,
 } from 'lucide-react';
 
 interface NavItem { to: string; icon: React.ElementType; label: string; badge?: string; badgeColor?: string; highlight?: boolean }
@@ -70,6 +70,7 @@ const navigation: NavGroup[] = [
       { to: '/financeiro/receber', icon: DollarSign, label: 'Contas a Receber' },
       { to: '/financeiro/pagar',   icon: DollarSign, label: 'Contas a Pagar' },
       { to: '/financeiro/dre',     icon: BarChart3,  label: 'DRE & Relatórios' },
+      { to: '/financeiro/custos',  icon: Coins,      label: 'Custos & Margem' },
     ],
   },
   {
@@ -95,37 +96,43 @@ export default function AppShell() {
     .filter((g) => g.items.length > 0), [user?.telas, user?.role]);
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="relative flex h-screen overflow-hidden" style={{ backgroundColor: '#0B0F17' }}>
+      {/* Glow ambiente — profundidade no canvas (não intercepta cliques) */}
+      <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
+        <div className="absolute -top-40 -left-40 h-[480px] w-[480px] rounded-full bg-sky-500/[0.05] blur-[140px]" />
+        <div className="absolute bottom-0 right-0 h-[420px] w-[420px] rounded-full bg-indigo-500/[0.04] blur-[140px]" />
+      </div>
+
       {mobileOpen && (
-        <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setMobileOpen(false)} />
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-md z-40 lg:hidden animate-fade-in" onClick={() => setMobileOpen(false)} />
       )}
 
-      {/* Sidebar */}
-      <aside className={`fixed lg:relative z-50 h-full flex flex-col bg-gray-950 border-r border-gray-800 transition-all duration-200 shrink-0 ${sw} ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      {/* Sidebar — placa de vidro */}
+      <aside className={`fixed lg:relative z-50 h-full flex flex-col bg-white/[0.02] backdrop-blur-xl border-r border-white/[0.05] transition-all duration-300 ease-in-out shrink-0 ${sw} ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
 
         {/* Logo */}
-        <div className={`flex items-center border-b border-gray-800 h-12 px-3 shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+        <div className={`flex items-center border-b border-white/[0.05] h-12 px-3 shrink-0 ${collapsed ? 'justify-center' : 'justify-between'}`}>
           {!collapsed && (
             <div className="flex items-center gap-2 min-w-0">
               <img src="/logo-hetros-icone.png" alt="Hetros" className="h-7 w-7 object-contain shrink-0" />
               <div className="min-w-0">
-                <p className="text-white text-xs font-bold leading-none truncate">Hetros WMS</p>
-                <p className="text-gray-600 text-[10px] truncate">{filialAtiva?.nome || '—'}</p>
+                <p className="text-white text-xs font-bold leading-none truncate tracking-tight">Hetros WMS</p>
+                <p className="text-slate-500 text-[10px] truncate">{filialAtiva?.nome || '—'}</p>
               </div>
             </div>
           )}
           {collapsed && <img src="/logo-hetros-icone.png" alt="Hetros" className="h-6 w-6 object-contain" />}
-          <button onClick={() => setCollapsed(!collapsed)} className="hidden lg:flex h-5 w-5 items-center justify-center rounded text-gray-500 hover:text-gray-300 hover:bg-gray-800 transition-colors shrink-0">
+          <button onClick={() => setCollapsed(!collapsed)} className="hidden lg:flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:text-slate-200 hover:bg-white/[0.06] transition-all duration-300 shrink-0 active:scale-[0.9]">
             {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
           </button>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-2 px-1.5 space-y-2">
+        <nav className="flex-1 overflow-y-auto py-2.5 px-1.5 space-y-3">
           {navVisivel.map((group) => (
             <div key={group.group}>
               {!collapsed && (
-                <p className="text-[9px] font-bold text-gray-600 uppercase tracking-widest px-1.5 mb-0.5">{group.group}</p>
+                <p className="text-[9px] font-semibold text-slate-600 uppercase tracking-[0.14em] px-2 mb-1">{group.group}</p>
               )}
               <div className="space-y-0.5">
                 {group.items.map(({ to, icon: Icon, label, badge, badgeColor, highlight }) => (
@@ -134,20 +141,22 @@ export default function AppShell() {
                     to={to}
                     title={collapsed ? label : undefined}
                     className={({ isActive }) => `
-                      flex items-center gap-2 rounded-md px-1.5 py-1.5 text-[11px] font-medium
-                      transition-all group relative border
+                      flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] font-medium
+                      transition-all duration-300 ease-in-out group relative active:scale-[0.98]
                       ${isActive
-                        ? 'bg-sky-500/15 text-sky-400 border-sky-500/20'
+                        ? 'bg-sky-400/10 text-sky-300'
                         : highlight
-                          ? 'text-amber-300 hover:bg-amber-500/10 border-amber-500/20 bg-amber-500/5'
-                          : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200 border-transparent'
+                          ? 'text-amber-300/90 hover:bg-white/[0.05]'
+                          : 'text-slate-400 hover:bg-white/[0.05] hover:text-slate-100'
                       }
                       ${collapsed ? 'justify-center' : ''}
                     `}
                   >
                     {({ isActive }) => (
                       <>
-                        <Icon className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-sky-400' : highlight && !isActive ? 'text-amber-400' : ''}`} />
+                        {/* Indicador cirúrgico de foco */}
+                        {isActive && !collapsed && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-sky-400" />}
+                        <Icon className={`h-3.5 w-3.5 shrink-0 transition-colors duration-300 ${isActive ? 'text-sky-300' : highlight && !isActive ? 'text-amber-300/80' : 'text-slate-500 group-hover:text-slate-200'}`} />
                         {!collapsed && <span className="truncate">{label}</span>}
                         {badge && !collapsed && (
                           <span className={`ml-auto h-3.5 w-3.5 rounded-full text-[8px] font-bold text-white flex items-center justify-center ${badgeColor}`}>
@@ -155,7 +164,7 @@ export default function AppShell() {
                           </span>
                         )}
                         {collapsed && (
-                          <span className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-gray-200 text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 transition-opacity">
+                          <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#0E141F]/90 backdrop-blur-xl border border-white/[0.08] text-slate-200 text-xs rounded-lg shadow-2xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 transition-opacity duration-200">
                             {label}
                           </span>
                         )}
@@ -169,24 +178,24 @@ export default function AppShell() {
         </nav>
 
         {/* User footer */}
-        <div className={`px-1.5 py-2 border-t border-gray-800 ${collapsed ? 'flex justify-center' : ''}`}>
+        <div className={`px-1.5 py-2 border-t border-white/[0.05] ${collapsed ? 'flex justify-center' : ''}`}>
           {!collapsed ? (
             <div>
               <div className="flex items-center gap-2 px-1 mb-1.5">
-                <div className="h-6 w-6 rounded-full bg-sky-700 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                <div className="h-6 w-6 rounded-full bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-300 text-[10px] font-bold shrink-0">
                   {user?.nome?.[0]?.toUpperCase()}
                 </div>
                 <div className="min-w-0">
                   <p className="text-white text-[11px] font-medium truncate">{user?.nome}</p>
-                  <p className="text-gray-600 text-[9px]">{user?.role}</p>
+                  <p className="text-slate-600 text-[9px]">{user?.role}</p>
                 </div>
               </div>
-              <button onClick={() => { logout(); navigate('/login'); }} className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 text-[10px] w-full px-1.5 py-1 rounded hover:bg-gray-800 transition-colors">
+              <button onClick={() => { logout(); navigate('/login'); }} className="flex items-center gap-1.5 text-slate-500 hover:text-slate-200 text-[10px] w-full px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-all duration-300 active:scale-[0.98]">
                 <LogOut className="h-3 w-3" /> Sair
               </button>
             </div>
           ) : (
-            <button onClick={() => { logout(); navigate('/login'); }} className="text-gray-500 hover:text-gray-300 p-1.5 rounded hover:bg-gray-800 transition-colors" title="Sair">
+            <button onClick={() => { logout(); navigate('/login'); }} className="text-slate-500 hover:text-slate-200 p-1.5 rounded-lg hover:bg-white/[0.05] transition-all duration-300" title="Sair">
               <LogOut className="h-3.5 w-3.5" />
             </button>
           )}
@@ -194,25 +203,25 @@ export default function AppShell() {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 shadow-sm">
+      <div className="relative z-10 flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="h-12 bg-white/[0.02] backdrop-blur-xl border-b border-white/[0.05] flex items-center justify-between px-4 shrink-0">
           <div className="flex items-center gap-3">
-            <button className="lg:hidden p-1.5 text-gray-500 hover:bg-gray-100 rounded" onClick={() => setMobileOpen(!mobileOpen)}>
+            <button className="lg:hidden p-1.5 text-slate-400 hover:bg-white/[0.06] rounded-lg transition-all duration-300" onClick={() => setMobileOpen(!mobileOpen)}>
               {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
             <FilialSelector />
           </div>
           <div className="flex items-center gap-3">
-            <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" title="Online" />
-            <span className="text-xs text-gray-400 hidden sm:block">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" title="Online" />
+            <span className="text-xs text-slate-500 hidden sm:block">
               {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
             </span>
-            <span className="text-xs font-mono text-gray-500 hidden sm:block">
+            <span className="text-xs font-mono text-slate-400 hidden sm:block tabular-nums">
               {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto bg-gray-50">
+        <main className="flex-1 overflow-y-auto">
           <TelaGuard><Outlet /></TelaGuard>
         </main>
       </div>
@@ -234,9 +243,9 @@ function FilialSelector() {
   const { filiais, filialAtiva, setFilialAtiva } = useAuth();
   return (
     <div className="flex items-center gap-1.5">
-      <Building2 className="h-3.5 w-3.5 text-gray-400" />
+      <Building2 className="h-3.5 w-3.5 text-slate-500" />
       <select
-        className="text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-sky-400"
+        className="text-xs rounded-lg px-2 py-1 text-slate-300 bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.07] focus:outline-none focus:border-sky-400/50 transition-all duration-300 cursor-pointer"
         value={filialAtiva?.id || ''}
         onChange={(e) => { const f = filiais?.find((f) => f.id === e.target.value); if (f) setFilialAtiva(f); }}
       >

@@ -37,6 +37,7 @@ export const TELAS: TelaDef[] = [
   { key: '/financeiro/receber', label: 'Contas a Receber', grupo: 'Financeiro' },
   { key: '/financeiro/pagar', label: 'Contas a Pagar', grupo: 'Financeiro' },
   { key: '/financeiro/dre', label: 'DRE & Relatórios', grupo: 'Financeiro' },
+  { key: '/financeiro/custos', label: 'Custos & Margem', grupo: 'Financeiro' },
   // Gerencial
   { key: '/gerencial/auditoria', label: 'Logs de Auditoria', grupo: 'Gerencial' },
   { key: '/gerencial/usuarios', label: 'Usuários & Acessos', grupo: 'Gerencial' },

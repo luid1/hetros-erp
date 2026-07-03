@@ -1,0 +1,28 @@
+{
+  "name": "hetros-agente-local",
+  "version": "1.0.0",
+  "description": "Agente Local HETROS — ponte da balança (WebSocket) + impressão de nota térmica (ESC/POS) para rodar em cada máquina do galpão.",
+  "main": "index.js",
+  "bin": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "build": "pkg . --targets node18-win-x64 --output dist/HETROS-Agente.exe"
+  },
+  "dependencies": {
+    "iconv-lite": "^0.6.3",
+    "serialport": "^12.0.0",
+    "ws": "^8.16.0"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "assets": [
+      "node_modules/@serialport/bindings-cpp/prebuilds/**/*",
+      "public/**/*"
+    ],
+    "scripts": [
+      "src/**/*.js"
+    ]
+  }
+}

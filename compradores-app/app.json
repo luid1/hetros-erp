@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Compradores ERP",
+    "slug": "compradores-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "compradores",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hetros.compradores"
+    },
+    "android": {
+      "package": "com.hetros.compradores",
+      "adaptiveIcon": {
+        "backgroundColor": "#F7F5F1",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": { "projectId": "9612b101-a053-4fe6-b542-a41bd998b177" },
+      "apiUrl": "https://quiet-deer-tickle.loca.lt/api/v1"
+    },
+    "owner": "luixik"
+  }
+}

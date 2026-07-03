@@ -414,6 +414,13 @@ model Produto {
   precoCusto          Decimal   @default(0) @db.Decimal(12, 4)
   precoVenda          Decimal   @default(0) @db.Decimal(12, 4)
   margemMinima        Decimal   @default(0) @db.Decimal(5, 2) // %
+  // Composição analítica do custo (FLV) — precoCusto = resultado calculado
+  custoBase           Decimal   @default(0) @db.Decimal(12, 4) // preço do fornecedor / unidade
+  custoAliquotaImp    Decimal   @default(0) @db.Decimal(6, 4)  // % imposto não recuperável s/ custo base
+  custoEmbalagem      Decimal   @default(0) @db.Decimal(12, 4) // embalagem/caixa / unidade
+  custoFrete          Decimal   @default(0) @db.Decimal(12, 4) // frete de entrada rateado / unidade
+  custoChapa          Decimal   @default(0) @db.Decimal(12, 4) // chapa/descarga rateada / unidade
+  fatorPerdaPct       Decimal   @default(0) @db.Decimal(5, 2)  // % de quebra esperada
   estoqueMinimo       Decimal   @default(0) @db.Decimal(12, 4)
   estoqueMaximo       Decimal?  @db.Decimal(12, 4)
   ativo               Boolean   @default(true)
@@ -896,6 +903,26 @@ model CartaCorrecao {
   @@index([nfeId])
 }
 
+// Histórico de cotações (preço do dia por produto) — definido no Web, lido pelo app dos compradores.
+model Cotacao {
+  id            String   @id @default(uuid())
+  tenantId      String
+  filialId      String
+  produtoId     String?
+  codigo        String
+  descricao     String
+  unidade       String?
+  precoVenda    Decimal  @db.Decimal(12, 4) // preço final ao cliente (o que o app mostra)
+  custoComposto Decimal  @default(0) @db.Decimal(12, 4) // interno (não vai pro cliente)
+  cobrir        Boolean  @default(false)
+  motivo        String?  // GARANTIR_CLIENTE | DESOVAR_ESTOQUE | COMBATER_CONCORRENCIA
+  usuarioId     String?
+  data          DateTime @default(now())
+
+  @@index([tenantId, filialId, data])
+  @@index([tenantId, produtoId])
+}
+
 // Matriz fiscal — regra tributária por NCM (e opcionalmente UF destino / CFOP).
 // Resolve CFOP, CST/CSOSN e alíquotas na geração da NF-e (motor de regras fiscais).
 model RegraFiscal {
@@ -971,16 +998,20 @@ model CTe {
 model Veiculo {
   id                String    @id @default(uuid())
   tenantId          String
-  transportadoraId  String
-  transportadora    Transportadora @relation(fields: [transportadoraId], references: [id])
+  transportadoraId  String?
+  transportadora    Transportadora? @relation(fields: [transportadoraId], references: [id])
   placa             String
-  uf                String
-  tipo              String    // TRUCK, BITRUCK, CARRETA, VAN, MOTO
+  uf                String    @default("SP")
+  tipo              String    // TRUCK, BITRUCK, CARRETA, VAN, KOMBI, MOTO
   marca             String?
   modelo            String?
   anoFabricacao     Int?
   capacidadeKg      Decimal?  @db.Decimal(10, 2)
   capacidadeM3      Decimal?  @db.Decimal(10, 2)
+  capacidadeCaixasH Int?      // capacidade em caixas tipo H (padrão FLV)
+  propriedade       String    @default("PROPRIO") // PROPRIO | TERCEIRO
+  motoristaPadrao   String?   // nome do motorista padrão (denormalizado)
+  refrigerado       Boolean   @default(false)
   ativo             Boolean   @default(true)
   romaneios         Romaneio[]
 

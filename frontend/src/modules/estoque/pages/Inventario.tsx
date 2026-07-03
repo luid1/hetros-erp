@@ -59,8 +59,14 @@ export default function Inventario() {
 function ModalNovo({ filialId, onClose, onCriado }: { filialId?: string; onClose: () => void; onCriado: (id: string) => void }) {
   const [descricao, setDescricao] = useState('');
   const [categoria, setCategoria] = useState('');
+  const [categorias, setCategorias] = useState<string[]>([]);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
+
+  // Carrega só as categorias que existem de verdade (evita filtrar por uma sem produtos)
+  useEffect(() => {
+    api.get('/produtos/categorias').then(r => setCategorias(r.data || [])).catch(() => setCategorias([]));
+  }, []);
   const abrir = async () => {
     setSalvando(true); setErro('');
     try {
@@ -75,7 +81,7 @@ function ModalNovo({ filialId, onClose, onCriado }: { filialId?: string; onClose
       <Campo label="Categoria (opcional — filtra os produtos)">
         <select value={categoria} onChange={e => setCategoria(e.target.value)} className={inp}>
           <option value="">Todas as categorias</option>
-          {['FRUTA', 'LEGUME', 'VERDURA'].map(c => <option key={c}>{c}</option>)}
+          {categorias.map(c => <option key={c}>{c}</option>)}
         </select>
       </Campo>
       {erro && <p className="text-xs text-rose-400 bg-rose-500/10 px-3 py-2 rounded-lg">{erro}</p>}

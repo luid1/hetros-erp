@@ -69,10 +69,10 @@ export function FeedbackHost() {
       {/* Toasts */}
       <div className="fixed top-4 right-4 z-[200] space-y-2 w-80 max-w-[90vw]">
         {ts.map((t) => (
-          <div key={t.id} className={`bg-[#111d33] border-l-4 ${TONE_STYLE[t.tone].border} border-y border-r border-slate-700 rounded-lg shadow-xl px-3 py-2.5 flex items-start gap-2 animate-[fadeIn_.15s_ease-out]`}>
+          <div key={t.id} className={`bg-[#0E141F]/90 backdrop-blur-xl border-l-4 ${TONE_STYLE[t.tone].border} border-y border-r border-white/[0.08] rounded-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] px-3 py-2.5 flex items-start gap-2 animate-[fadeIn_.15s_ease-out]`}>
             <div className="mt-0.5 shrink-0">{TONE_STYLE[t.tone].icon}</div>
             <p className="text-sm text-slate-100 flex-1">{t.message}</p>
-            <button onClick={() => { toasts = toasts.filter((x) => x.id !== t.id); notifyToasts?.(toasts); }} className="text-slate-500 hover:text-slate-300"><X className="h-3.5 w-3.5" /></button>
+            <button onClick={() => { toasts = toasts.filter((x) => x.id !== t.id); notifyToasts?.(toasts); }} className="text-slate-500 hover:text-slate-300 transition-colors duration-200"><X className="h-3.5 w-3.5" /></button>
           </div>
         ))}
       </div>
@@ -100,8 +100,8 @@ function DialogView({ req, onClose }: { req: DialogReq; onClose: (v: any) => voi
   }, [req, onClose]);
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[210] p-4" onClick={() => onClose(req.kind === 'prompt' ? null : false)}>
-      <div className="bg-[#111d33] border border-slate-700 rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-[210] p-4 animate-fade-in" onClick={() => onClose(req.kind === 'prompt' ? null : false)}>
+      <div className="bg-[#0E141F]/90 backdrop-blur-2xl border border-white/[0.08] rounded-2xl shadow-[0_24px_80px_0_rgba(0,0,0,0.6)] w-full max-w-md animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-4 flex items-start gap-3">
           {danger && <div className="h-9 w-9 rounded-lg bg-rose-500/15 text-rose-400 flex items-center justify-center shrink-0"><AlertTriangle className="h-5 w-5" /></div>}
           <div className="flex-1 pt-0.5">
@@ -113,9 +113,9 @@ function DialogView({ req, onClose }: { req: DialogReq; onClose: (v: any) => voi
             )}
           </div>
         </div>
-        <div className="px-5 py-3 border-t border-slate-700 flex justify-end gap-2">
-          <button onClick={() => onClose(req.kind === 'prompt' ? null : false)} className="px-4 py-2 rounded-lg bg-slate-800 border border-slate-600 text-sm text-slate-300 hover:bg-slate-700">Cancelar</button>
-          <button onClick={() => onClose(req.kind === 'prompt' ? val : true)} className={`px-5 py-2 rounded-lg text-white text-sm font-bold ${okBtn}`}>{req.okLabel || 'Confirmar'}</button>
+        <div className="px-5 py-3 border-t border-white/[0.06] flex justify-end gap-2">
+          <button onClick={() => onClose(req.kind === 'prompt' ? null : false)} className="px-4 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-sm text-slate-300 hover:bg-white/[0.08] transition-all duration-300 active:scale-[0.98]">Cancelar</button>
+          <button onClick={() => onClose(req.kind === 'prompt' ? val : true)} className={`px-5 py-2 rounded-lg text-white text-sm font-bold transition-all duration-300 active:scale-[0.98] ${okBtn}`}>{req.okLabel || 'Confirmar'}</button>
         </div>
       </div>
     </div>
