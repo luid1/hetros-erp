@@ -1,0 +1,28 @@
+# Blueprint do Render — sobe o backend HETROS + Postgres grátis num clique.
+# Como usar: Render Dashboard → New → Blueprint → aponta pro repo luid1/hetros-erp.
+databases:
+  - name: hetros-db
+    plan: free
+    databaseName: erp_wms
+    user: hetros
+
+services:
+  - type: web
+    name: hetros-backend
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: hetros-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: NODE_ENV
+        value: production

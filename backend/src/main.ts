@@ -8,7 +8,8 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
-  app.enableCors({ origin: process.env.FRONTEND_URL || 'http://localhost:3000' });
+  // CORS: se FRONTEND_URL definido, restringe (aceita lista separada por vírgula); senão libera (app nativo + demo)
+  app.enableCors({ origin: process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : true });
 
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,

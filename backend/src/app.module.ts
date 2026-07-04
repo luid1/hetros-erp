@@ -30,6 +30,7 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     CargaModule,
     UsuariosModule,
   ],
+  controllers: [HealthController],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantInterceptor },
