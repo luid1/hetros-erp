@@ -20,6 +20,28 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-03] — Aba Rentabilidade (cliente → produto) real e funcional
+
+### O que mudou
+- Nova aba **"Rentabilidade por cliente"** em Custos & Margem (agora é a aba padrão): grade por
+  **cliente** (Nome Fantasia · Vlr Líquido Vendido · Result. Líquido · Total Custos/Desp. · % ·
+  Peso Total), **expansível** — clicando abre a sub-grade dos **produtos** que o cliente comprou
+  (Código · Produto · Qtd · Vlr Venda · Vlr CMV · Lucro Bruto · % Lucro), com **rodapé de totais**.
+  Cores por margem (verde/âmbar/vermelho) e destaque azul/verde nos valores-chave — estilo do
+  relatório NewOxxy.
+- Novo endpoint `GET /custos/:filial/rentabilidade?dataIni&dataFim` — agrupa os itens de NF-e
+  emitida por cliente e por produto, usando o **custo composto** (compra+frete+chapa) como CMV.
+
+### Arquivos
+- `backend/src/modules/custos/{custos.service.ts (getRentabilidade), custos.controller.ts}`
+- `frontend/src/modules/financeiro/pages/Custos.tsx`
+
+### Verificado no preview
+- Grade de clientes renderiza, expande pra sub-grade de produtos com todas as colunas, e mostra
+  o TOTAL GERAL. (Margem sai negativa nos dados de teste por custo composto alto; no real fica ok.)
+
+---
+
 ## [2026-07-03] — Publicação no GitHub + referência da tela de Rentabilidade (cliente→produto)
 
 ### O que mudou

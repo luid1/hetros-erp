@@ -60,7 +60,7 @@ export class CustosService {
 
       porProduto.set(p.id, {
         produtoId: p.id, codigo: p.codigo, descricao: p.descricao, unidade: sigla, estoqueKg,
-        precoVenda: Number(p.precoVenda) || 0,
+        precoVenda: Number(p.precoVenda) || 0, kgPorUn,
         aquisicao, frete, chapa, composto,
       });
     }
@@ -80,6 +80,83 @@ export class CustosService {
     }
     linhas.sort((a, b) => a.descricao.localeCompare(b.descricao));
     return { freteKg, chapaCaixa, produtos: linhas };
+  }
+
+  /**
+   * Rentabilidade por CLIENTE (expansível para produtos) — estilo relatório NewOxxy.
+   * Cada cliente: receita, CMV (custo composto), resultado líquido, margem e peso;
+   * ao expandir, os produtos que ele comprou com lucro e % por item.
+   */
+  async getRentabilidade(tenantId: string, filialId: string, dataIni?: string, dataFim?: string) {
+    const range = dataIni
+      ? { gte: new Date(dataIni), ...(dataFim && { lte: new Date(dataFim + 'T23:59:59') }) }
+      : undefined;
+
+    const itens = await this.prisma.itemNFe.findMany({
+      where: {
+        produtoId: { not: null },
+        nfe: { tenantId, filialId, status: 'EMITIDO', finalidade: { not: '4' }, ...(range && { dataEmissao: range }) },
+      },
+      select: {
+        produtoId: true, codigo: true, descricao: true, quantidade: true, valorTotal: true,
+        nfe: { select: { cliente: { select: { id: true, razaoSocial: true, nomeFantasia: true } } } },
+      },
+    });
+
+    const { porProduto } = await this.composicao(tenantId, filialId);
+
+    type Prod = { codigo: string; descricao: string; qtd: number; venda: number; cmv: number };
+    type Cli = { clienteId: string; nome: string; receita: number; cmv: number; peso: number; produtos: Map<string, Prod> };
+    const clientes = new Map<string, Cli>();
+
+    for (const it of itens) {
+      const cli = it.nfe?.cliente;
+      if (!cli) continue;
+      const comp = porProduto.get(it.produtoId as string);
+      const qtd = Number(it.quantidade);
+      const venda = Number(it.valorTotal || 0);
+      const cmv = (comp?.composto || 0) * qtd;
+      const peso = (comp?.kgPorUn || 1) * qtd;
+
+      if (!clientes.has(cli.id)) {
+        clientes.set(cli.id, { clienteId: cli.id, nome: cli.nomeFantasia || cli.razaoSocial || '—', receita: 0, cmv: 0, peso: 0, produtos: new Map() });
+      }
+      const c = clientes.get(cli.id)!;
+      c.receita += venda; c.cmv += cmv; c.peso += peso;
+
+      const pk = it.produtoId as string;
+      if (!c.produtos.has(pk)) c.produtos.set(pk, { codigo: it.codigo || comp?.codigo || '', descricao: it.descricao || comp?.descricao || '—', qtd: 0, venda: 0, cmv: 0 });
+      const pr = c.produtos.get(pk)!;
+      pr.qtd += qtd; pr.venda += venda; pr.cmv += cmv;
+    }
+
+    const linhas = Array.from(clientes.values()).map((c) => {
+      const resultado = c.receita - c.cmv;
+      return {
+        clienteId: c.clienteId, nome: c.nome,
+        receita: c.receita, custos: c.cmv, resultado,
+        margemPct: c.receita > 0 ? (resultado / c.receita) * 100 : 0,
+        peso: c.peso,
+        produtos: Array.from(c.produtos.values())
+          .map((p) => ({
+            codigo: p.codigo, descricao: p.descricao, qtd: p.qtd, venda: p.venda, cmv: p.cmv,
+            lucroBruto: p.venda - p.cmv, margemPct: p.venda > 0 ? ((p.venda - p.cmv) / p.venda) * 100 : 0,
+          }))
+          .sort((a, b) => b.margemPct - a.margemPct),
+      };
+    }).sort((a, b) => b.receita - a.receita);
+
+    const totais = {
+      receita: linhas.reduce((s, l) => s + l.receita, 0),
+      custos: linhas.reduce((s, l) => s + l.custos, 0),
+      resultado: linhas.reduce((s, l) => s + l.resultado, 0),
+      peso: linhas.reduce((s, l) => s + l.peso, 0),
+      clientes: linhas.length,
+      produtos: linhas.reduce((s, l) => s + l.produtos.length, 0),
+    };
+    totais['margemPct'] = totais.receita > 0 ? (totais.resultado / totais.receita) * 100 : 0;
+
+    return { clientes: linhas, totais };
   }
 
   /** Salva as cotações (preço do dia) definidas no Web — o app dos compradores lê depois. */

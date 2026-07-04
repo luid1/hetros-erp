@@ -21,6 +21,17 @@ export class CustosController {
     return this.service.getMargem(tenantId, filialId, dataIni, dataFim);
   }
 
+  @Get(':filialId/rentabilidade')
+  @ApiOperation({ summary: 'Rentabilidade por cliente (expansível para produtos) — estilo relatório' })
+  rentabilidade(
+    @CurrentTenant() tenantId: string,
+    @Param('filialId') filialId: string,
+    @Query('dataIni') dataIni?: string,
+    @Query('dataFim') dataFim?: string,
+  ) {
+    return this.service.getRentabilidade(tenantId, filialId, dataIni, dataFim);
+  }
+
   @Get(':filialId/composicao')
   @ApiOperation({ summary: 'Todos os produtos com custo base composto (aquisição+frete+chapa) — para a gaveta de cotação' })
   composicao(

@@ -36,7 +36,7 @@ interface ProdCotacao {
 
 export default function Custos() {
   const { filialAtiva } = useAuth();
-  const [aba, setAba] = useState<'margem' | 'produtos'>('margem');
+  const [aba, setAba] = useState<'rentabilidade' | 'margem' | 'produtos'>('rentabilidade');
   const [dados, setDados] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [ini, setIni] = useState(primeiroDiaMes());
@@ -62,7 +62,7 @@ export default function Custos() {
             <h1 className="text-lg font-bold text-white flex items-center gap-2"><Coins className="h-5 w-5 text-amber-300" /> Custos & Margem</h1>
             <p className="text-xs text-slate-500 mt-0.5">Custo base composto (compra + frete + chapa) herdado automaticamente · cotação individual e em lote</p>
           </div>
-          {aba === 'margem' && (
+          {aba !== 'produtos' && (
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold">De
                 <input type="date" value={ini} onChange={e => setIni(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-slate-100" />
@@ -70,14 +70,11 @@ export default function Custos() {
               <label className="flex items-center gap-1.5 text-xs text-slate-400 font-semibold">Até
                 <input type="date" value={fim} onChange={e => setFim(e.target.value)} className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-slate-100" />
               </label>
-              <button onClick={carregar} className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 px-3.5 py-2 rounded-lg text-slate-200 font-medium text-sm">
-                <RefreshCw className={`h-4 w-4 text-amber-300 ${loading ? 'animate-spin' : ''}`} /> Atualizar
-              </button>
             </div>
           )}
         </div>
         <div className="flex items-center gap-1 mt-3">
-          {([['margem', 'Margem & Lucratividade'], ['produtos', 'Custos por produto (cotação)']] as const).map(([key, label]) => (
+          {([['rentabilidade', 'Rentabilidade por cliente'], ['margem', 'Margem & Lucratividade'], ['produtos', 'Custos por produto (cotação)']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setAba(key)}
               className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${aba === key ? 'border-amber-400 text-amber-300' : 'border-transparent text-slate-400 hover:text-slate-200'}`}>
               {label}
@@ -87,7 +84,8 @@ export default function Custos() {
       </div>
 
       {aba === 'produtos' && <ProdutosComposicao onCotar={setCotarList} />}
-      {aba === 'produtos' ? null : (
+      {aba === 'rentabilidade' && <Rentabilidade ini={ini} fim={fim} />}
+      {aba === 'margem' && (
         <div className="flex-1 overflow-auto p-6 space-y-6">
           {loading ? (
             <div className="flex justify-center py-20"><div className="animate-spin h-7 w-7 border-2 border-amber-400 border-t-transparent rounded-full" /></div>
@@ -137,6 +135,107 @@ export default function Custos() {
       )}
 
       {cotarList && <DrawerCotacao produtos={cotarList} onClose={() => setCotarList(null)} />}
+    </div>
+  );
+}
+
+// ── Aba: Rentabilidade por cliente (expansível para produtos) ──
+function Rentabilidade({ ini, fim }: { ini: string; fim: string }) {
+  const { filialAtiva } = useAuth();
+  const [dados, setDados] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [abertos, setAbertos] = useState<Set<string>>(new Set());
+
+  const carregar = useCallback(() => {
+    if (!filialAtiva) return;
+    setLoading(true);
+    api.get(`/custos/${filialAtiva.id}/rentabilidade`, { params: { dataIni: ini, dataFim: fim } })
+      .then(r => setDados(r.data)).catch(() => setDados(null)).finally(() => setLoading(false));
+  }, [filialAtiva?.id, ini, fim]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const toggle = (id: string) => setAbertos(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const clientes: any[] = dados?.clientes || [];
+  const t = dados?.totais;
+
+  if (loading) return <div className="flex-1 flex justify-center py-20"><div className="animate-spin h-7 w-7 border-2 border-amber-400 border-t-transparent rounded-full" /></div>;
+
+  return (
+    <div className="flex-1 overflow-auto p-4">
+      <div className="bg-slate-800/50 rounded-2xl border border-slate-700/60 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-900/50 text-xs text-slate-400">
+            <tr>
+              <th className="px-4 py-2.5 text-left font-semibold">Nome Fantasia</th>
+              <th className="px-4 py-2.5 text-right font-semibold bg-sky-500/5 text-sky-300">Vlr Líquido Vendido</th>
+              <th className="px-4 py-2.5 text-right font-semibold bg-emerald-500/5 text-emerald-300">Result. Líquido</th>
+              <th className="px-4 py-2.5 text-right font-semibold">Total Custos/Desp.</th>
+              <th className="px-4 py-2.5 text-right font-semibold">%</th>
+              <th className="px-4 py-2.5 text-right font-semibold">Peso Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {clientes.length === 0 && <tr><td colSpan={6} className="text-center text-slate-500 py-12">Sem vendas faturadas no período.</td></tr>}
+            {clientes.map(c => {
+              const aberto = abertos.has(c.clienteId);
+              return (
+                <>
+                  <tr key={c.clienteId} onClick={() => toggle(c.clienteId)} className={`border-t border-slate-800 cursor-pointer hover:bg-sky-500/5 ${aberto ? 'bg-emerald-500/[0.06]' : ''}`}>
+                    <td className="px-4 py-2.5 font-bold text-slate-100"><span className="text-slate-500 mr-1">{aberto ? '▾' : '▸'}</span>{c.nome}</td>
+                    <td className="px-4 py-2.5 text-right font-mono font-bold text-sky-300 bg-sky-500/5">{R$(c.receita)}</td>
+                    <td className="px-4 py-2.5 text-right font-mono font-extrabold text-emerald-300 bg-emerald-500/5">{R$(c.resultado)}</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-300">{R$(c.custos)}</td>
+                    <td className={`px-4 py-2.5 text-right font-mono font-bold ${corMargem(c.margemPct)}`}>{c.margemPct.toFixed(1)}%</td>
+                    <td className="px-4 py-2.5 text-right font-mono text-slate-300">{nkg(c.peso)} kg</td>
+                  </tr>
+                  {aberto && (
+                    <tr className="bg-slate-900/40">
+                      <td colSpan={6} className="px-4 py-2">
+                        <div className="rounded-lg border border-slate-700/60 overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead className="bg-slate-800/60 text-slate-400">
+                              <tr>
+                                {['Código', 'Produto', 'Qtd', 'Vlr Venda', 'Vlr CMV', 'Lucro Bruto', '% Lucro'].map((h, i) => (
+                                  <th key={h} className={`px-3 py-2 font-semibold ${i < 2 ? 'text-left' : 'text-right'}`}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {c.produtos.map((p: any, idx: number) => (
+                                <tr key={p.codigo + idx} className="border-t border-slate-800/70">
+                                  <td className="px-3 py-1.5 font-mono font-bold text-sky-300">{p.codigo}</td>
+                                  <td className="px-3 py-1.5 text-slate-200">{p.descricao}</td>
+                                  <td className="px-3 py-1.5 text-right font-mono text-slate-400">{nkg(p.qtd)}</td>
+                                  <td className="px-3 py-1.5 text-right font-mono text-slate-300">{R$(p.venda)}</td>
+                                  <td className="px-3 py-1.5 text-right font-mono text-slate-400">{R$(p.cmv)}</td>
+                                  <td className="px-3 py-1.5 text-right font-mono font-bold text-emerald-300">{R$(p.lucroBruto)}</td>
+                                  <td className={`px-3 py-1.5 text-right font-mono font-bold ${corMargem(p.margemPct)}`}>{p.margemPct.toFixed(1)}%</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
+          </tbody>
+          {t && clientes.length > 0 && (
+            <tfoot>
+              <tr className="bg-slate-900 border-t-2 border-amber-400/40 font-bold">
+                <td className="px-4 py-2.5 text-slate-200">TOTAL GERAL · {t.clientes} clientes</td>
+                <td className="px-4 py-2.5 text-right font-mono text-sky-300">{R$(t.receita)}</td>
+                <td className="px-4 py-2.5 text-right font-mono text-emerald-300">{R$(t.resultado)}</td>
+                <td className="px-4 py-2.5 text-right font-mono text-slate-300">{R$(t.custos)}</td>
+                <td className="px-4 py-2.5 text-right font-mono text-emerald-300">{(Number(t.margemPct) || 0).toFixed(1)}%</td>
+                <td className="px-4 py-2.5 text-right font-mono text-slate-300">{nkg(t.peso)} kg</td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
     </div>
   );
 }
