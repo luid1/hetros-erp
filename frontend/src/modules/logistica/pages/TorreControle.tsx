@@ -88,30 +88,30 @@ export default function TorreControle() {
   );
 
   return (
-    <div className="min-h-screen bg-[#f5f3ee] text-[#2b2925] p-6">
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-6">
       {/* Header */}
       <header className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.25em] text-[#a49b8b] font-semibold">Logística · Despacho</p>
-          <h1 className="text-4xl font-light tracking-tight">Torre de Controle</h1>
+          <p className="text-[11px] uppercase tracking-[0.25em] text-sky-400/80 font-semibold">Logística · Despacho</p>
+          <h1 className="text-4xl font-light tracking-tight text-white">Torre de Controle</h1>
         </div>
         <div className="flex items-center gap-3">
           <input
             type="date"
             value={data}
             onChange={(e) => setData(e.target.value)}
-            className="bg-white border border-[#e3ddd0] rounded-xl px-3 py-2 text-sm"
+            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 [color-scheme:dark]"
           />
           <button
             onClick={carregar}
-            className="flex items-center gap-2 bg-white border border-[#e3ddd0] rounded-xl px-4 py-2 text-sm hover:bg-[#efece4]"
+            className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm hover:bg-slate-700"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar
           </button>
           <button
             onClick={otimizarIA}
             disabled={otimizando || pedidos.length === 0}
-            className="flex items-center gap-2 bg-[#2b2925] text-[#f5f3ee] rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-black disabled:opacity-40 shadow-sm"
+            className="flex items-center gap-2 bg-sky-500 text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-sky-400 disabled:opacity-40 shadow-lg shadow-sky-500/20"
           >
             <Sparkles className={`h-4 w-4 ${otimizando ? 'animate-pulse' : ''}`} />
             🤖 Otimizar Rotas com IA
@@ -128,13 +128,13 @@ export default function TorreControle() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.4fr] gap-5">
         {/* ── Pedidos abertos (arrastáveis) ── */}
-        <section className="bg-white rounded-2xl border border-[#e3ddd0] p-4">
-          <h2 className="text-xs uppercase tracking-widest text-[#a49b8b] font-semibold mb-3 flex items-center gap-2">
+        <section className="bg-slate-800/50 rounded-2xl border border-slate-700 p-4">
+          <h2 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-3 flex items-center gap-2">
             <Package className="h-3.5 w-3.5" /> Pedidos abertos
           </h2>
           <div className="space-y-2 max-h-[62vh] overflow-y-auto pr-1">
             {pedidos.length === 0 && (
-              <p className="text-sm text-[#a49b8b] italic py-8 text-center">Tudo roteirizado. 🎉</p>
+              <p className="text-sm text-slate-500 italic py-8 text-center">Tudo roteirizado. 🎉</p>
             )}
             {pedidos.map((p) => (
               <div
@@ -143,18 +143,18 @@ export default function TorreControle() {
                 onDragStart={() => setDragId(p.id)}
                 onDragEnd={() => setDragId(null)}
                 className={`cursor-grab active:cursor-grabbing rounded-xl border px-4 py-3 flex items-center justify-between transition ${
-                  dragId === p.id ? 'border-[#2b2925] bg-[#efece4]' : 'border-[#eee8dc] hover:border-[#d8cfbc]'
+                  dragId === p.id ? 'border-sky-400 bg-sky-500/10' : 'border-slate-700 bg-slate-800/40 hover:border-slate-500'
                 }`}
               >
                 <div>
-                  <p className="text-2xl font-light leading-none">#{p.numero}</p>
-                  <p className="text-xs text-[#8a8172] mt-1 truncate max-w-[220px]">
+                  <p className="text-2xl font-light leading-none text-white">#{p.numero}</p>
+                  <p className="text-xs text-slate-400 mt-1 truncate max-w-[220px]">
                     {p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '—'}
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-medium">{kg(Number(p.pesoTotal || 0))}</p>
-                  <p className="text-[11px] text-[#a49b8b]">{p.volumes || 0} cx</p>
+                  <p className="text-sm font-medium text-slate-200">{kg(Number(p.pesoTotal || 0))}</p>
+                  <p className="text-[11px] text-slate-500">{p.volumes || 0} cx</p>
                 </div>
               </div>
             ))}
@@ -164,9 +164,9 @@ export default function TorreControle() {
         {/* ── Rotas / Motoristas (drop targets) ── */}
         <section className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           {rotas.length === 0 && (
-            <div className="bg-white rounded-2xl border border-dashed border-[#d8cfbc] p-10 text-center text-[#a49b8b]">
+            <div className="bg-slate-800/30 rounded-2xl border border-dashed border-slate-700 p-10 text-center text-slate-500">
               <Truck className="h-8 w-8 mx-auto mb-2 opacity-40" />
-              Nenhuma rota. Use <strong>Otimizar com IA</strong> para gerar automaticamente.
+              Nenhuma rota. Use <strong className="text-slate-300">Otimizar com IA</strong> para gerar automaticamente.
             </div>
           )}
           {rotas.map((r) => (
@@ -180,11 +180,11 @@ export default function TorreControle() {
 
 function Kpi({ label, value, suffix }: { label: string; value: number; suffix?: string }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#e3ddd0] px-5 py-4">
-      <p className="text-[11px] uppercase tracking-widest text-[#a49b8b] font-semibold">{label}</p>
-      <p className="mt-1 text-5xl font-extralight tracking-tight tabular-nums">
+    <div className="bg-slate-800/50 rounded-2xl border border-slate-700 px-5 py-4">
+      <p className="text-[11px] uppercase tracking-widest text-slate-400 font-semibold">{label}</p>
+      <p className="mt-1 text-5xl font-extralight tracking-tight tabular-nums text-white">
         {value.toLocaleString('pt-BR')}
-        {suffix && <span className="text-lg text-[#a49b8b] ml-2">{suffix}</span>}
+        {suffix && <span className="text-lg text-slate-500 ml-2">{suffix}</span>}
       </p>
     </div>
   );
@@ -193,38 +193,38 @@ function Kpi({ label, value, suffix }: { label: string; value: number; suffix?: 
 function RotaCard({ rota }: { rota: Rota }) {
   const pct = Math.min(rota.ocupacaoPct, 100);
   const barra =
-    rota.ocupacaoPct > 100 ? 'bg-rose-400' : rota.ocupacaoPct >= 90 ? 'bg-amber-400' : 'bg-[#7c8471]';
+    rota.ocupacaoPct > 100 ? 'bg-rose-500' : rota.ocupacaoPct >= 90 ? 'bg-amber-400' : 'bg-emerald-500';
   return (
-    <div className="bg-white rounded-2xl border border-[#e3ddd0] p-4">
+    <div className="bg-slate-800/50 rounded-2xl border border-slate-700 p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Truck className="h-4 w-4 text-[#7c8471]" />
+          <Truck className="h-4 w-4 text-emerald-400" />
           <div>
-            <p className="font-medium leading-tight">{rota.motoristaNome || 'Sem motorista'}</p>
-            <p className="text-[11px] text-[#a49b8b]">
+            <p className="font-medium leading-tight text-white">{rota.motoristaNome || 'Sem motorista'}</p>
+            <p className="text-[11px] text-slate-400">
               {rota.placaVeiculo} · {rota.regiao}
               {rota.origemOtimizacao === 'IA_OPTIMIZER' && ' · 🤖 IA'}
             </p>
           </div>
         </div>
-        <p className="text-3xl font-extralight tabular-nums">{rota.ocupacaoPct}%</p>
+        <p className="text-3xl font-extralight tabular-nums text-white">{rota.ocupacaoPct}%</p>
       </div>
       {/* Barra de ocupação de peso */}
-      <div className="h-2 rounded-full bg-[#efece4] overflow-hidden mb-1">
+      <div className="h-2 rounded-full bg-slate-700 overflow-hidden mb-1">
         <div className={`h-full ${barra} transition-all`} style={{ width: `${pct}%` }} />
       </div>
-      <p className="text-[11px] text-[#a49b8b] mb-3">
+      <p className="text-[11px] text-slate-400 mb-3">
         {kg(rota.pesoTotalKg)} / {kg(rota.capacidadeKg)} · {rota.volumesTotal} cx
       </p>
       <ol className="space-y-1">
         {rota.stops.map((s) => (
-          <li key={s.id} className="flex items-center gap-2 text-sm">
-            <span className="h-5 w-5 rounded-full bg-[#efece4] text-[10px] flex items-center justify-center font-semibold">
+          <li key={s.id} className="flex items-center gap-2 text-sm text-slate-200">
+            <span className="h-5 w-5 rounded-full bg-slate-700 text-[10px] flex items-center justify-center font-semibold text-slate-200">
               {s.ordem}
             </span>
-            <MapPin className="h-3 w-3 text-[#a49b8b]" />
+            <MapPin className="h-3 w-3 text-slate-500" />
             <span className="truncate">#{s.numeroPedido} · {s.clienteNome}</span>
-            {s.status === 'DELIVERED' && <span className="ml-auto text-[10px] text-[#7c8471]">entregue</span>}
+            {s.status === 'DELIVERED' && <span className="ml-auto text-[10px] text-emerald-400">entregue</span>}
           </li>
         ))}
       </ol>
