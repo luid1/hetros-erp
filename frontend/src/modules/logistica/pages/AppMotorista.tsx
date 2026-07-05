@@ -4,429 +4,698 @@ import {
   Navigation,
   Camera,
   Check,
-  ChevronLeft,
   Eraser,
   Loader2,
   CircleDot,
+  Clock,
+  Route as RouteIcon,
+  Map as MapIcon,
+  PenLine,
+  Phone,
+  Package,
 } from 'lucide-react';
 import { rotasApi } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { toast } from '../../../components/ui/feedback';
 
 /**
- * App do Motorista (React simulando tela de celular — pronto para Capacitor).
- * Paleta neutra (off-white / greige) + números oversized.
- *  Tela 1: Timeline das paradas na ordem otimizada.
- *  Tela 2: Foco na entrega atual + botão gigante Waze/Maps.
- *  Tela 3: Canhoto digital (Canvas de assinatura + foto + GPS real).
+ * App do Motorista — simulação fiel de um app de entregas nativo (pronto p/ Capacitor).
+ * Tema dark/navy. Bottom navigation com 3 abas:
+ *   • Rota Atual  → timeline vertical das paradas com ações
+ *   • Mapa        → foco na parada atual + botão gigante Waze/Maps
+ *   • Finalizar   → canhoto digital (canvas de assinatura real + foto + GPS)
  */
 
-type Tela = 'timeline' | 'entrega' | 'canhoto';
+type Aba = 'rota' | 'mapa' | 'finalizar';
 
-interface Stop {
+interface Parada {
   id: string;
-  numeroPedido?: number;
-  clienteNome?: string;
-  endereco?: string;
-  cep?: string;
-  ordem: number;
+  pedidoId: string;
+  numero: number;
+  cliente: string;
+  endereco: string;
+  janela: string;
+  status: 'PENDING' | 'IN_TRANSIT' | 'DELIVERED';
   pesoKg: number;
   volumes: number;
-  status: string;
+  telefone?: string;
 }
-interface Rota {
-  id: string;
-  motoristaNome?: string;
-  placaVeiculo?: string;
-  stops: Stop[];
-}
+
+/* ── Paradas de demonstração (usadas quando não há rota real na API) ── */
+const PARADAS_MOCK: Parada[] = [
+  {
+    id: 's1',
+    pedidoId: 'mock-1',
+    numero: 2001,
+    cliente: 'Bom Preço — Bela Vista',
+    endereco: 'Av. Paulista, 1500 — Bela Vista, São Paulo/SP',
+    janela: '08:00 — 10:00',
+    status: 'PENDING',
+    pesoKg: 1240,
+    volumes: 62,
+    telefone: '(11) 3000-0001',
+  },
+  {
+    id: 's2',
+    pedidoId: 'mock-2',
+    numero: 2002,
+    cliente: 'Hortifruti Central',
+    endereco: 'Rua da Cantareira, 306 — Centro, São Paulo/SP',
+    janela: '10:00 — 12:00',
+    status: 'PENDING',
+    pesoKg: 1200,
+    volumes: 60,
+    telefone: '(11) 3000-0002',
+  },
+  {
+    id: 's3',
+    pedidoId: 'mock-3',
+    numero: 2003,
+    cliente: 'Mercado do Zé — Pinheiros',
+    endereco: 'Rua dos Pinheiros, 820 — Pinheiros, São Paulo/SP',
+    janela: '13:00 — 15:00',
+    status: 'PENDING',
+    pesoKg: 1360,
+    volumes: 68,
+    telefone: '(11) 3000-0003',
+  },
+];
 
 export default function AppMotorista() {
   const { user } = useAuth() as any;
-  const motorista = user?.nome || '';
-  const [rota, setRota] = useState<Rota | null>(null);
-  const [tela, setTela] = useState<Tela>('timeline');
-  const [atual, setAtual] = useState<Stop | null>(null);
-  const [loading, setLoading] = useState(true);
+  const motorista = user?.nome || 'Motorista';
 
-  async function carregar() {
-    setLoading(true);
-    try {
-      const { data } = await rotasApi.doMotorista(motorista);
-      setRota(data?.[0] || null);
-    } catch {
-      toast('Falha ao carregar suas entregas.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [aba, setAba] = useState<Aba>('rota');
+  const [paradas, setParadas] = useState<Parada[]>(PARADAS_MOCK);
+  const [ativaIdx, setAtivaIdx] = useState(0);
+  const [carregando, setCarregando] = useState(false);
+
+  // Canhoto
+  const [recebedor, setRecebedor] = useState('');
+  const [recebedorDoc, setRecebedorDoc] = useState('');
+  const [fotoBase64, setFotoBase64] = useState<string | null>(null);
+  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
+  const [enviando, setEnviando] = useState(false);
+
+  const paradaAtiva = paradas[ativaIdx] || paradas.find((p) => p.status !== 'DELIVERED') || paradas[0];
+  const pendentes = paradas.filter((p) => p.status !== 'DELIVERED').length;
+  const total = paradas.length;
+  const progresso = total ? Math.round(((total - pendentes) / total) * 100) : 0;
+
+  /* ── Carrega rota real do motorista (se houver) ── */
   useEffect(() => {
-    if (motorista) carregar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [motorista]);
+    let vivo = true;
+    (async () => {
+      if (!user?.nome) return;
+      setCarregando(true);
+      try {
+        const { data } = await rotasApi.doMotorista(user.nome);
+        const rotas = data || [];
+        const stops: Parada[] = [];
+        rotas.forEach((r: any) =>
+          (r.stops || []).forEach((s: any) =>
+            stops.push({
+              id: s.id,
+              pedidoId: s.pedidoId,
+              numero: s.numeroPedido,
+              cliente: s.clienteNome || '—',
+              endereco: s.endereco || '—',
+              janela:
+                s.janelaInicio && s.janelaFim
+                  ? `${s.janelaInicio} — ${s.janelaFim}`
+                  : 'Sem janela',
+              status: s.status || 'PENDING',
+              pesoKg: Number(s.pesoKg || 0),
+              volumes: Number(s.volumes || 0),
+            }),
+          ),
+        );
+        if (vivo && stops.length > 0) {
+          setParadas(stops);
+          const idx = stops.findIndex((s) => s.status !== 'DELIVERED');
+          setAtivaIdx(idx >= 0 ? idx : 0);
+        }
+      } catch {
+        // Mantém as paradas de demonstração.
+      } finally {
+        if (vivo) setCarregando(false);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [user?.nome]);
 
-  const pendentes = rota?.stops.filter((s) => s.status !== 'DELIVERED') ?? [];
-  const entregues = rota?.stops.filter((s) => s.status === 'DELIVERED').length ?? 0;
+  function iniciarParada(idx: number) {
+    setParadas((prev) => prev.map((p, i) => (i === idx ? { ...p, status: 'IN_TRANSIT' } : p)));
+    setAtivaIdx(idx);
+    setAba('mapa');
+  }
 
-  function abrir(stop: Stop) {
-    setAtual(stop);
-    setTela('entrega');
+  function irParaFinalizar(idx: number) {
+    setAtivaIdx(idx);
+    setAba('finalizar');
+  }
+
+  function capturarGps() {
+    if (!navigator.geolocation) {
+      toast('GPS indisponível neste dispositivo.', 'error');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        toast('📍 Localização capturada.', 'success');
+      },
+      () => toast('Não foi possível obter a localização.', 'error'),
+      { enableHighAccuracy: true, timeout: 8000 },
+    );
+  }
+
+  function onFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setFotoBase64(String(reader.result));
+    reader.readAsDataURL(file);
   }
 
   return (
-    // Moldura de celular
-    <div className="min-h-screen bg-[#e7e3da] flex items-center justify-center p-4">
-      <div className="w-[390px] h-[780px] bg-[#f6f4ef] rounded-[2.5rem] shadow-2xl border-8 border-[#12100e] overflow-hidden flex flex-col relative">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 sm:p-8">
+      {/* Moldura do celular */}
+      <div className="relative w-[390px] max-w-full h-[820px] rounded-[2.5rem] bg-slate-950 border-[10px] border-slate-800 shadow-2xl shadow-black/60 overflow-hidden flex flex-col">
         {/* Notch */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-[#12100e] rounded-b-2xl z-20" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-36 h-6 bg-slate-800 rounded-b-2xl z-20" />
 
-        {loading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-[#a49b8b]" />
+        {/* Status bar */}
+        <div className="flex items-center justify-between px-6 pt-3 pb-1 text-[11px] text-slate-400 z-10">
+          <span>09:41</span>
+          <span className="flex items-center gap-1">
+            {carregando && <Loader2 className="h-3 w-3 animate-spin" />} Hetros Driver
+          </span>
+        </div>
+
+        {/* Header do app */}
+        <header className="px-5 pt-2 pb-4 bg-gradient-to-b from-slate-800/80 to-transparent">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-sky-400/80 font-semibold">Entregas de hoje</p>
+          <h1 className="text-xl font-semibold text-white truncate">{motorista}</h1>
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+              <span>{total - pendentes} de {total} entregues</span>
+              <span>{progresso}%</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden">
+              <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${progresso}%` }} />
+            </div>
           </div>
-        ) : tela === 'timeline' ? (
-          <TimelineScreen
-            rota={rota}
-            pendentes={pendentes}
-            entregues={entregues}
-            motorista={motorista}
-            onOpen={abrir}
-          />
-        ) : tela === 'entrega' && atual ? (
-          <EntregaScreen stop={atual} onBack={() => setTela('timeline')} onDeliver={() => setTela('canhoto')} />
-        ) : tela === 'canhoto' && atual ? (
-          <CanhotoScreen
-            stop={atual}
-            onBack={() => setTela('entrega')}
-            onDone={async () => {
-              setTela('timeline');
-              await carregar();
-            }}
-          />
-        ) : null}
+        </header>
+
+        {/* Conteúdo scrollável */}
+        <main className="flex-1 overflow-y-auto px-4 pb-4">
+          {aba === 'rota' && (
+            <TimelineTab
+              paradas={paradas}
+              ativaIdx={ativaIdx}
+              onIniciar={iniciarParada}
+              onFinalizar={irParaFinalizar}
+            />
+          )}
+          {aba === 'mapa' && (
+            <MapaTab parada={paradaAtiva} onFinalizar={() => irParaFinalizar(ativaIdx)} />
+          )}
+          {aba === 'finalizar' && (
+            <FinalizarTab
+              parada={paradaAtiva}
+              recebedor={recebedor}
+              setRecebedor={setRecebedor}
+              recebedorDoc={recebedorDoc}
+              setRecebedorDoc={setRecebedorDoc}
+              fotoBase64={fotoBase64}
+              onFoto={onFoto}
+              gps={gps}
+              capturarGps={capturarGps}
+              enviando={enviando}
+              onConfirmar={async (assinaturaBase64: string) => {
+                if (!recebedor.trim()) {
+                  toast('Informe o nome de quem recebeu.', 'error');
+                  return;
+                }
+                if (!assinaturaBase64) {
+                  toast('Colete a assinatura no canhoto.', 'error');
+                  return;
+                }
+                setEnviando(true);
+                try {
+                  const stopId = paradaAtiva.id;
+                  const payload = {
+                    latitude: gps?.lat ?? 0,
+                    longitude: gps?.lng ?? 0,
+                    assinaturaBase64,
+                    fotoBase64: fotoBase64 || undefined,
+                    recebedorNome: recebedor.trim(),
+                    recebedorDoc: recebedorDoc.trim() || undefined,
+                  };
+                  // Tenta persistir; em modo demo apenas marca localmente.
+                  if (!stopId.startsWith('mock') && !stopId.startsWith('s')) {
+                    await rotasApi.confirmarEntrega(stopId, payload);
+                  }
+                  setParadas((prev) =>
+                    prev.map((p, i) => (i === ativaIdx ? { ...p, status: 'DELIVERED' } : p)),
+                  );
+                  toast('✅ Entrega confirmada! Comprovante registrado.', 'success');
+                  // Reset e próxima parada
+                  setRecebedor('');
+                  setRecebedorDoc('');
+                  setFotoBase64(null);
+                  setGps(null);
+                  const prox = paradas.findIndex((p, i) => i !== ativaIdx && p.status !== 'DELIVERED');
+                  if (prox >= 0) {
+                    setAtivaIdx(prox);
+                    setAba('rota');
+                  } else {
+                    setAba('rota');
+                  }
+                } catch (e: any) {
+                  toast(e?.response?.data?.message || 'Falha ao confirmar entrega.', 'error');
+                } finally {
+                  setEnviando(false);
+                }
+              }}
+            />
+          )}
+        </main>
+
+        {/* Bottom navigation */}
+        <nav className="grid grid-cols-3 border-t border-slate-800 bg-slate-950/95 backdrop-blur">
+          <TabButton label="Rota Atual" icon={RouteIcon} active={aba === 'rota'} onClick={() => setAba('rota')} />
+          <TabButton label="Mapa" icon={MapIcon} active={aba === 'mapa'} onClick={() => setAba('mapa')} />
+          <TabButton label="Finalizar" icon={PenLine} active={aba === 'finalizar'} onClick={() => setAba('finalizar')} />
+        </nav>
       </div>
     </div>
   );
 }
 
-/* ────────────────────────── TELA 1: TIMELINE ────────────────────────── */
-function TimelineScreen({
-  rota,
-  pendentes,
-  entregues,
-  motorista,
-  onOpen,
+/* ────────────────────────── Bottom nav button ─────────────────────────────── */
+function TabButton({
+  label,
+  icon: Icon,
+  active,
+  onClick,
 }: {
-  rota: Rota | null;
-  pendentes: Stop[];
-  entregues: number;
-  motorista: string;
-  onOpen: (s: Stop) => void;
+  label: string;
+  icon: any;
+  active: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div className="flex-1 flex flex-col pt-9 overflow-hidden">
-      <header className="px-6 pt-3 pb-4">
-        <p className="text-[11px] uppercase tracking-[0.25em] text-[#a49b8b] font-semibold">Minha rota · hoje</p>
-        <h1 className="text-3xl font-light text-[#2b2925]">Olá, {motorista.split(' ')[0] || 'motorista'}</h1>
-        <div className="flex gap-6 mt-4">
-          <div>
-            <p className="text-5xl font-extralight tabular-nums text-[#2b2925]">{pendentes.length}</p>
-            <p className="text-[11px] text-[#a49b8b] uppercase tracking-wide">Restantes</p>
-          </div>
-          <div>
-            <p className="text-5xl font-extralight tabular-nums text-[#7c8471]">{entregues}</p>
-            <p className="text-[11px] text-[#a49b8b] uppercase tracking-wide">Entregues</p>
-          </div>
-        </div>
-        {rota && (
-          <p className="text-[11px] text-[#a49b8b] mt-2">Veículo {rota.placaVeiculo}</p>
-        )}
-      </header>
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center gap-1 py-3 text-[11px] font-medium transition ${
+        active ? 'text-sky-400' : 'text-slate-500 hover:text-slate-300'
+      }`}
+    >
+      <Icon className="h-5 w-5" />
+      {label}
+    </button>
+  );
+}
 
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
-        {!rota && <p className="text-sm text-[#a49b8b] italic text-center mt-10">Nenhuma rota atribuída.</p>}
-        <ol className="relative border-l-2 border-[#e3ddd0] ml-3">
-          {rota?.stops.map((s) => {
-            const done = s.status === 'DELIVERED';
-            return (
-              <li key={s.id} className="mb-5 ml-5">
-                <span
-                  className={`absolute -left-[11px] flex items-center justify-center w-5 h-5 rounded-full ${
-                    done ? 'bg-[#7c8471]' : 'bg-[#2b2925]'
-                  }`}
-                >
-                  {done ? <Check className="h-3 w-3 text-white" /> : <CircleDot className="h-3 w-3 text-white" />}
-                </span>
-                <button
-                  disabled={done}
-                  onClick={() => onOpen(s)}
-                  className={`w-full text-left rounded-2xl border px-4 py-3 transition ${
-                    done ? 'border-[#eee8dc] opacity-60' : 'border-[#e3ddd0] bg-white hover:border-[#d8cfbc]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-2xl font-light text-[#2b2925]">#{s.numeroPedido}</p>
-                    <span className="text-[10px] text-[#a49b8b]">Parada {s.ordem}</span>
+/* ────────────────────────── Aba 1: Timeline ───────────────────────────────── */
+function TimelineTab({
+  paradas,
+  ativaIdx,
+  onIniciar,
+  onFinalizar,
+}: {
+  paradas: Parada[];
+  ativaIdx: number;
+  onIniciar: (idx: number) => void;
+  onFinalizar: (idx: number) => void;
+}) {
+  return (
+    <div className="pt-2">
+      <h2 className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-3">Sequência de paradas</h2>
+      <ol className="relative">
+        {paradas.map((p, idx) => {
+          const entregue = p.status === 'DELIVERED';
+          const emRota = p.status === 'IN_TRANSIT';
+          const isLast = idx === paradas.length - 1;
+          return (
+            <li key={p.id} className="relative pl-9 pb-5">
+              {/* Linha vertical */}
+              {!isLast && <span className="absolute left-[13px] top-6 bottom-0 w-px bg-slate-700" />}
+              {/* Bolinha */}
+              <span
+                className={`absolute left-0 top-1 h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-bold ${
+                  entregue
+                    ? 'bg-emerald-500 text-white'
+                    : emRota
+                    ? 'bg-sky-500 text-white ring-4 ring-sky-500/20'
+                    : 'bg-slate-700 text-slate-300'
+                }`}
+              >
+                {entregue ? <Check className="h-4 w-4" /> : idx + 1}
+              </span>
+
+              <div
+                className={`rounded-xl border p-3 ${
+                  idx === ativaIdx && !entregue
+                    ? 'border-sky-500/50 bg-sky-500/5'
+                    : 'border-slate-800 bg-slate-800/40'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-white text-sm truncate">{p.cliente}</p>
+                  <span className="text-[10px] text-slate-500">#{p.numero}</span>
+                </div>
+                <p className="text-[12px] text-slate-400 mt-0.5 flex items-start gap-1">
+                  <MapPin className="h-3 w-3 mt-0.5 shrink-0" /> {p.endereco}
+                </p>
+                <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" /> {p.janela}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Package className="h-3 w-3" /> {p.volumes} cx
+                  </span>
+                </div>
+
+                {!entregue && (
+                  <div className="flex gap-2 mt-3">
+                    {emRota ? (
+                      <button
+                        onClick={() => onFinalizar(idx)}
+                        className="flex-1 rounded-lg bg-emerald-500 text-white text-[13px] font-semibold py-2 hover:bg-emerald-400"
+                      >
+                        Finalizar entrega
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => onIniciar(idx)}
+                        className="flex-1 rounded-lg bg-sky-500 text-white text-[13px] font-semibold py-2 hover:bg-sky-400 flex items-center justify-center gap-1.5"
+                      >
+                        <Navigation className="h-3.5 w-3.5" /> Iniciar rota
+                      </button>
+                    )}
                   </div>
-                  <p className="text-sm text-[#5a5348] truncate">{s.clienteNome}</p>
-                  <p className="text-[11px] text-[#a49b8b] truncate">{s.endereco || s.cep}</p>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
+                )}
+                {entregue && (
+                  <p className="mt-2 text-[11px] text-emerald-400 flex items-center gap-1">
+                    <Check className="h-3 w-3" /> Entregue
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
 
-/* ────────────────────────── TELA 2: ENTREGA ────────────────────────── */
-function EntregaScreen({
-  stop,
-  onBack,
-  onDeliver,
-}: {
-  stop: Stop;
-  onBack: () => void;
-  onDeliver: () => void;
-}) {
-  const destino = encodeURIComponent(stop.endereco || stop.cep || '');
+/* ────────────────────────── Aba 2: Mapa ───────────────────────────────────── */
+function MapaTab({ parada, onFinalizar }: { parada: Parada; onFinalizar: () => void }) {
+  const destino = encodeURIComponent(parada.endereco);
   const waze = `https://waze.com/ul?q=${destino}&navigate=yes`;
   const maps = `https://www.google.com/maps/dir/?api=1&destination=${destino}`;
 
   return (
-    <div className="flex-1 flex flex-col pt-9">
-      <header className="px-5 py-3 flex items-center gap-2">
-        <button onClick={onBack} className="p-2 -ml-2 rounded-full hover:bg-[#efece4]">
-          <ChevronLeft className="h-5 w-5 text-[#2b2925]" />
-        </button>
-        <span className="text-[11px] uppercase tracking-widest text-[#a49b8b] font-semibold">Entrega atual</span>
-      </header>
+    <div className="pt-2">
+      <h2 className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-3">Navegação</h2>
 
-      <div className="px-6 flex-1 flex flex-col">
-        <p className="text-6xl font-extralight text-[#2b2925] tabular-nums">#{stop.numeroPedido}</p>
-        <p className="text-lg text-[#2b2925] mt-2">{stop.clienteNome}</p>
-        <div className="flex items-start gap-2 mt-3 text-[#5a5348]">
-          <MapPin className="h-4 w-4 mt-0.5 text-[#a49b8b]" />
-          <p className="text-sm">{stop.endereco || '—'}<br />{stop.cep}</p>
+      {/* "Mapa" simulado */}
+      <div className="relative rounded-2xl overflow-hidden border border-slate-800 h-56 bg-slate-800">
+        <div
+          className="absolute inset-0 opacity-30"
+          style={{
+            backgroundImage:
+              'linear-gradient(0deg, rgba(148,163,184,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.15) 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+          }}
+        />
+        <div className="absolute left-8 bottom-10 h-3 w-3 rounded-full bg-slate-400 ring-4 ring-slate-400/20" />
+        <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+          <path
+            d="M 40 200 C 120 160, 90 90, 200 90 S 320 60, 330 40"
+            fill="none"
+            stroke="#38bdf8"
+            strokeWidth="4"
+            strokeDasharray="8 6"
+            strokeLinecap="round"
+          />
+        </svg>
+        <div className="absolute right-6 top-6 flex flex-col items-center">
+          <MapPin className="h-8 w-8 text-sky-400 drop-shadow" fill="#0ea5e9" />
         </div>
-        <div className="flex gap-6 mt-5">
-          <div>
-            <p className="text-3xl font-extralight tabular-nums">{Number(stop.pesoKg).toFixed(0)}</p>
-            <p className="text-[11px] text-[#a49b8b] uppercase">kg</p>
-          </div>
-          <div>
-            <p className="text-3xl font-extralight tabular-nums">{stop.volumes}</p>
-            <p className="text-[11px] text-[#a49b8b] uppercase">caixas</p>
-          </div>
-        </div>
+      </div>
 
-        {/* Botão GIGANTE de navegação */}
+      {/* Card destino */}
+      <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-800/40 p-4">
+        <p className="text-[11px] uppercase tracking-widest text-sky-400/80 font-semibold">Destino atual</p>
+        <p className="text-lg font-semibold text-white mt-1">{parada.cliente}</p>
+        <p className="text-[13px] text-slate-400 mt-1 flex items-start gap-1.5">
+          <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-slate-500" /> {parada.endereco}
+        </p>
+        {parada.telefone && (
+          <a
+            href={`tel:${parada.telefone.replace(/\D/g, '')}`}
+            className="text-[13px] text-slate-300 mt-2 flex items-center gap-1.5 hover:text-white"
+          >
+            <Phone className="h-4 w-4 text-slate-500" /> {parada.telefone}
+          </a>
+        )}
+      </div>
+
+      {/* Botões gigantes de navegação */}
+      <div className="mt-4 space-y-3">
         <a
           href={waze}
           target="_blank"
           rel="noreferrer"
-          className="mt-6 flex items-center justify-center gap-3 bg-[#2b2925] text-[#f6f4ef] rounded-3xl py-6 text-xl font-semibold shadow-lg active:scale-[0.98] transition"
+          className="flex items-center justify-center gap-3 w-full rounded-2xl bg-sky-500 text-white text-lg font-bold py-4 hover:bg-sky-400 shadow-lg shadow-sky-500/25"
         >
-          <Navigation className="h-7 w-7" /> Navegar (Waze)
+          <Navigation className="h-6 w-6" /> Abrir no Waze
         </a>
         <a
           href={maps}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 flex items-center justify-center gap-2 border border-[#d8cfbc] rounded-2xl py-3 text-sm text-[#5a5348]"
+          className="flex items-center justify-center gap-3 w-full rounded-2xl border border-slate-700 text-slate-200 text-base font-semibold py-3.5 hover:bg-slate-800"
         >
-          Abrir no Google Maps
+          <MapIcon className="h-5 w-5" /> Abrir no Google Maps
         </a>
-
-        <button
-          onClick={onDeliver}
-          className="mt-auto mb-6 flex items-center justify-center gap-2 bg-[#7c8471] text-white rounded-3xl py-5 text-lg font-semibold shadow-lg active:scale-[0.98] transition"
-        >
-          <Check className="h-6 w-6" /> Confirmar entrega
-        </button>
       </div>
+
+      <button
+        onClick={onFinalizar}
+        className="mt-4 w-full rounded-2xl bg-emerald-500 text-white font-semibold py-3.5 hover:bg-emerald-400"
+      >
+        Cheguei — Finalizar entrega
+      </button>
     </div>
   );
 }
 
-/* ────────────────────────── TELA 3: CANHOTO DIGITAL ────────────────────────── */
-function CanhotoScreen({
-  stop,
-  onBack,
-  onDone,
+/* ────────────────────────── Aba 3: Finalizar (Canhoto) ────────────────────── */
+function FinalizarTab({
+  parada,
+  recebedor,
+  setRecebedor,
+  recebedorDoc,
+  setRecebedorDoc,
+  fotoBase64,
+  onFoto,
+  gps,
+  capturarGps,
+  enviando,
+  onConfirmar,
 }: {
-  stop: Stop;
-  onBack: () => void;
-  onDone: () => void;
+  parada: Parada;
+  recebedor: string;
+  setRecebedor: (v: string) => void;
+  recebedorDoc: string;
+  setRecebedorDoc: (v: string) => void;
+  fotoBase64: string | null;
+  onFoto: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  gps: { lat: number; lng: number } | null;
+  capturarGps: () => void;
+  enviando: boolean;
+  onConfirmar: (assinaturaBase64: string) => void;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawing = useRef(false);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const desenhando = useRef(false);
+  const temAssinatura = useRef(false);
   const [assinou, setAssinou] = useState(false);
-  const [foto, setFoto] = useState<string>('');
-  const [recebedor, setRecebedor] = useState('');
-  const [doc, setDoc] = useState('');
-  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
-  const [gpsErro, setGpsErro] = useState('');
-  const [enviando, setEnviando] = useState(false);
 
-  // Captura de GPS real via navegador
+  // Prepara o canvas (resolução real + fundo).
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setGpsErro('GPS indisponível neste dispositivo.');
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setGpsErro('Não foi possível obter a localização. Habilite o GPS.'),
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ratio = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * ratio;
+    canvas.height = rect.height * ratio;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.scale(ratio, ratio);
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#0f172a';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, rect.width, rect.height);
   }, []);
 
-  // Desenho no canvas
   function pos(e: React.PointerEvent<HTMLCanvasElement>) {
-    const c = canvasRef.current!;
-    const r = c.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+    const canvas = canvasRef.current!;
+    const rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   }
+
   function start(e: React.PointerEvent<HTMLCanvasElement>) {
-    drawing.current = true;
-    const ctx = canvasRef.current!.getContext('2d')!;
+    e.preventDefault();
+    const ctx = canvasRef.current?.getContext('2d');
+    if (!ctx) return;
+    desenhando.current = true;
     const { x, y } = pos(e);
     ctx.beginPath();
     ctx.moveTo(x, y);
+    canvasRef.current?.setPointerCapture(e.pointerId);
   }
+
   function move(e: React.PointerEvent<HTMLCanvasElement>) {
-    if (!drawing.current) return;
-    const ctx = canvasRef.current!.getContext('2d')!;
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#2b2925';
+    if (!desenhando.current) return;
+    const ctx = canvasRef.current?.getContext('2d');
+    if (!ctx) return;
     const { x, y } = pos(e);
     ctx.lineTo(x, y);
     ctx.stroke();
-    setAssinou(true);
+    temAssinatura.current = true;
+    if (!assinou) setAssinou(true);
   }
+
   function end() {
-    drawing.current = false;
+    desenhando.current = false;
   }
+
   function limpar() {
-    const c = canvasRef.current!;
-    c.getContext('2d')!.clearRect(0, 0, c.width, c.height);
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, rect.width, rect.height);
+    temAssinatura.current = false;
     setAssinou(false);
   }
 
-  function onFoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => setFoto(String(reader.result));
-    reader.readAsDataURL(f);
-  }
-
-  async function finalizar() {
-    if (!assinou) return toast('Colete a assinatura do cliente.', 'error');
-    if (!recebedor.trim()) return toast('Informe quem recebeu.', 'error');
-    if (!gps) return toast(gpsErro || 'Aguardando GPS...', 'error');
-    setEnviando(true);
-    try {
-      const assinaturaBase64 = canvasRef.current!.toDataURL('image/png');
-      const { data } = await rotasApi.confirmarEntrega(stop.id, {
-        latitude: gps.lat,
-        longitude: gps.lng,
-        assinaturaBase64,
-        fotoBase64: foto || undefined,
-        recebedorNome: recebedor.trim(),
-        recebedorDoc: doc.trim() || undefined,
-      });
-      const st = data?.sefaz?.status;
-      toast(
-        `Entrega registrada${st && st !== 'sem_nfe' ? ` · SEFAZ: ${st}` : ''}.`,
-        'success',
-      );
-      onDone();
-    } catch (e: any) {
-      toast(e?.response?.data?.message || 'Falha ao confirmar entrega.', 'error');
-    } finally {
-      setEnviando(false);
+  function confirmar() {
+    if (!temAssinatura.current) {
+      onConfirmar('');
+      return;
     }
+    const dataUrl = canvasRef.current?.toDataURL('image/png') || '';
+    onConfirmar(dataUrl);
   }
 
   return (
-    <div className="flex-1 flex flex-col pt-9 overflow-y-auto">
-      <header className="px-5 py-3 flex items-center gap-2 sticky top-0 bg-[#f6f4ef] z-10">
-        <button onClick={onBack} className="p-2 -ml-2 rounded-full hover:bg-[#efece4]">
-          <ChevronLeft className="h-5 w-5 text-[#2b2925]" />
-        </button>
-        <span className="text-[11px] uppercase tracking-widest text-[#a49b8b] font-semibold">
-          Canhoto · #{stop.numeroPedido}
-        </span>
-      </header>
+    <div className="pt-2">
+      <h2 className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-1">Canhoto digital</h2>
+      <p className="text-[12px] text-slate-500 mb-3">
+        Pedido <span className="text-slate-300">#{parada.numero}</span> · {parada.cliente}
+      </p>
 
-      <div className="px-5 pb-6 space-y-4">
-        {/* GPS */}
-        <div className="flex items-center gap-2 text-xs">
-          <MapPin className="h-4 w-4 text-[#7c8471]" />
-          {gps ? (
-            <span className="text-[#5a5348]">
-              GPS: {gps.lat.toFixed(5)}, {gps.lng.toFixed(5)}
-            </span>
-          ) : (
-            <span className="text-rose-500">{gpsErro || 'Obtendo localização...'}</span>
-          )}
-        </div>
-
-        {/* Recebedor */}
+      {/* Recebedor */}
+      <div className="space-y-2 mb-4">
         <input
           value={recebedor}
           onChange={(e) => setRecebedor(e.target.value)}
-          placeholder="Nome de quem recebeu"
-          className="w-full bg-white border border-[#e3ddd0] rounded-xl px-4 py-3 text-sm"
+          placeholder="Nome de quem recebeu *"
+          className="w-full rounded-xl bg-slate-800 border border-slate-700 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-sky-500 outline-none"
         />
         <input
-          value={doc}
-          onChange={(e) => setDoc(e.target.value)}
-          placeholder="CPF/RG (opcional)"
-          className="w-full bg-white border border-[#e3ddd0] rounded-xl px-4 py-3 text-sm"
+          value={recebedorDoc}
+          onChange={(e) => setRecebedorDoc(e.target.value)}
+          placeholder="Documento (CPF/RG) — opcional"
+          className="w-full rounded-xl bg-slate-800 border border-slate-700 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-sky-500 outline-none"
         />
-
-        {/* Assinatura */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-[11px] uppercase tracking-widest text-[#a49b8b] font-semibold">Assinatura</label>
-            <button onClick={limpar} className="flex items-center gap-1 text-[11px] text-[#a49b8b]">
-              <Eraser className="h-3 w-3" /> limpar
-            </button>
-          </div>
-          <canvas
-            ref={canvasRef}
-            width={330}
-            height={150}
-            onPointerDown={start}
-            onPointerMove={move}
-            onPointerUp={end}
-            onPointerLeave={end}
-            className="w-full bg-white border-2 border-dashed border-[#d8cfbc] rounded-2xl touch-none"
-          />
-        </div>
-
-        {/* Foto da mercadoria */}
-        <label className="flex items-center gap-3 bg-white border border-[#e3ddd0] rounded-xl px-4 py-3 text-sm text-[#5a5348] cursor-pointer">
-          <Camera className="h-5 w-5 text-[#a49b8b]" />
-          {foto ? 'Foto anexada ✓' : 'Foto da mercadoria'}
-          <input type="file" accept="image/*" capture="environment" onChange={onFoto} className="hidden" />
-        </label>
-        {foto && <img src={foto} alt="mercadoria" className="w-full h-32 object-cover rounded-xl" />}
-
-        <button
-          onClick={finalizar}
-          disabled={enviando}
-          className="w-full flex items-center justify-center gap-2 bg-[#2b2925] text-[#f6f4ef] rounded-3xl py-5 text-lg font-semibold shadow-lg active:scale-[0.98] transition disabled:opacity-50"
-        >
-          {enviando ? <Loader2 className="h-6 w-6 animate-spin" /> : <Check className="h-6 w-6" />}
-          Finalizar e enviar à SEFAZ
-        </button>
       </div>
+
+      {/* Canvas de assinatura */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-[12px] text-slate-400 flex items-center gap-1.5">
+            <PenLine className="h-3.5 w-3.5" /> Assinatura
+          </label>
+          <button
+            onClick={limpar}
+            className="text-[12px] text-slate-400 hover:text-white flex items-center gap-1"
+          >
+            <Eraser className="h-3.5 w-3.5" /> Limpar
+          </button>
+        </div>
+        <canvas
+          ref={canvasRef}
+          onPointerDown={start}
+          onPointerMove={move}
+          onPointerUp={end}
+          onPointerLeave={end}
+          className="w-full h-40 rounded-xl bg-white touch-none border border-slate-700 cursor-crosshair"
+        />
+        {!assinou && (
+          <p className="text-[11px] text-slate-600 text-center -mt-24 pointer-events-none select-none">
+            assine aqui com o dedo ou mouse
+          </p>
+        )}
+      </div>
+
+      {/* Foto do canhoto */}
+      <div className="mb-4">
+        <label className="text-[12px] text-slate-400 flex items-center gap-1.5 mb-1.5">
+          <Camera className="h-3.5 w-3.5" /> Foto do canhoto / local
+        </label>
+        <label className="block cursor-pointer">
+          <input type="file" accept="image/*" capture="environment" onChange={onFoto} className="hidden" />
+          {fotoBase64 ? (
+            <img
+              src={fotoBase64}
+              alt="canhoto"
+              className="w-full h-40 object-cover rounded-xl border border-slate-700"
+            />
+          ) : (
+            <div className="w-full h-32 rounded-xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-500 hover:border-sky-500/60 hover:text-slate-400">
+              <Camera className="h-7 w-7 mb-1" />
+              <span className="text-[12px]">Toque para fotografar</span>
+            </div>
+          )}
+        </label>
+      </div>
+
+      {/* GPS */}
+      <button
+        onClick={capturarGps}
+        className={`w-full rounded-xl border px-3 py-2.5 text-sm flex items-center justify-center gap-2 mb-4 ${
+          gps
+            ? 'border-emerald-500/50 text-emerald-300 bg-emerald-500/5'
+            : 'border-slate-700 text-slate-300 hover:bg-slate-800'
+        }`}
+      >
+        <CircleDot className="h-4 w-4" />
+        {gps
+          ? `📍 ${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}`
+          : 'Capturar localização (GPS)'}
+      </button>
+
+      {/* Confirmar */}
+      <button
+        onClick={confirmar}
+        disabled={enviando}
+        className="w-full rounded-2xl bg-emerald-500 text-white text-base font-bold py-4 hover:bg-emerald-400 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25"
+      >
+        {enviando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
+        {enviando ? 'Enviando comprovante...' : 'Confirmar entrega'}
+      </button>
     </div>
   );
 }
