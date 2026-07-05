@@ -5,6 +5,8 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import PosicaoEstoque from './modules/estoque/pages/PosicaoEstoque';
 import ControleCarga from './modules/logistica/pages/ControleCarga';
+import TorreControle from './modules/logistica/pages/TorreControle';
+import AppMotorista from './modules/logistica/pages/AppMotorista';
 import AnaliseEstoqueFisico from './modules/estoque/pages/AnaliseEstoqueFisico';
 import PedidosVenda from './modules/logistica/pages/PedidosVenda';
 import Clientes from './modules/cadastros/pages/Clientes';
@@ -85,6 +87,8 @@ export default function App() {
             {/* Logística */}
             <Route path="logistica/pedidos" element={<PedidosVenda />} />
             <Route path="logistica/carga" element={<ControleCarga />} />
+            <Route path="logistica/torre" element={<TorreControle />} />
+            <Route path="logistica/motorista" element={<AppMotorista />} />
             <Route path="logistica/lider" element={<Lider />} />
             <Route path="logistica/operacional" element={<Operacional />} />
             <Route path="logistica/frete" element={<FreteMotoristas />} />

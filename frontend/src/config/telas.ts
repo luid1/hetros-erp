@@ -22,6 +22,8 @@ export const TELAS: TelaDef[] = [
   // Logística
   { key: '/logistica/pedidos', label: 'Pedidos de Venda', grupo: 'Logística' },
   { key: '/logistica/carga', label: 'Controle de Carga', grupo: 'Logística' },
+  { key: '/logistica/torre', label: 'Torre de Controle', grupo: 'Logística' },
+  { key: '/logistica/motorista', label: 'App do Motorista', grupo: 'Logística' },
   { key: '/logistica/lider', label: 'Líder / Separação', grupo: 'Logística' },
   { key: '/logistica/operacional', label: 'Operacional / Separação', grupo: 'Logística' },
   { key: '/logistica/frete', label: 'Frete por Motorista', grupo: 'Logística' },

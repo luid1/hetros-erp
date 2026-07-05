@@ -47,6 +47,8 @@ const navigation: NavGroup[] = [
     items: [
       { to: '/logistica/pedidos',   icon: ClipboardList, label: 'Pedidos de Venda' },
       { to: '/logistica/carga',     icon: Truck,         label: 'Controle de Carga', highlight: true },
+      { to: '/logistica/torre',     icon: MapPin,        label: 'Torre de Controle', highlight: true },
+      { to: '/logistica/motorista', icon: Truck,         label: 'App do Motorista' },
       { to: '/logistica/lider',     icon: ClipboardList, label: 'Líder / Separação' },
       { to: '/logistica/operacional', icon: PackageCheck, label: 'Operacional / Separação' },
       { to: '/logistica/frete',     icon: DollarSign,    label: 'Frete por Motorista' },

@@ -110,6 +110,27 @@ export const invoicesApi = {
   cancelar: (id: string, motivo?: string) => api.patch(`/invoices/${id}/cancelar`, { motivo }),
 };
 
+// Rotas / Logística avançada (Torre de Controle + App do Motorista)
+export const rotasApi = {
+  listar: (filialId: string, dataRota?: string) =>
+    api.get('/rotas', { params: { filialId, dataRota } }),
+  get: (id: string) => api.get(`/rotas/${id}`),
+  doMotorista: (nome: string) => api.get(`/rotas/motorista/${encodeURIComponent(nome)}`),
+  otimizar: (data: { filialId: string; dataRota: string; pedidoIds?: string[]; folgaCapacidade?: number }) =>
+    api.post('/rotas/otimizar', data),
+  confirmarEntrega: (
+    stopId: string,
+    data: {
+      latitude: number;
+      longitude: number;
+      assinaturaBase64: string;
+      fotoBase64?: string;
+      recebedorNome: string;
+      recebedorDoc?: string;
+    },
+  ) => api.post(`/rotas/stops/${stopId}/confirmar`, data),
+};
+
 // Auditoria
 export const auditoriaApi = {
   logs: (params?: object) => api.get('/auditoria', { params }),

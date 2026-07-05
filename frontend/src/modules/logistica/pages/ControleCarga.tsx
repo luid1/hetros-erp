@@ -850,7 +850,7 @@ function ModalNovaEntrega({ dataCarga, filialId, pedidosJaRoteirizados, onClose,
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-2 animate-fade-in">
       <div className="bg-white border border-gray-300 rounded-xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col">
 
         {/* Header */}
@@ -917,7 +917,7 @@ function ModalNovaEntrega({ dataCarga, filialId, pedidosJaRoteirizados, onClose,
                       const sel = selecionados.has(p.id);
                       return (
                         <tr key={p.id} onClick={() => toggleSel(p.id)}
-                          className={`border-b border-gray-100 cursor-pointer transition-colors ${sel ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                          className={`border-b border-gray-100 cursor-pointer transition-colors ${sel ? 'bg-blue-100 ring-1 ring-inset ring-blue-400' : 'hover:bg-gray-50'}`}>
                           <td className="px-2 py-1.5" onClick={e => e.stopPropagation()}>
                             <input type="checkbox" checked={sel} onChange={() => toggleSel(p.id)} className="accent-blue-600 h-3 w-3 cursor-pointer" />
                           </td>
@@ -926,7 +926,7 @@ function ModalNovaEntrega({ dataCarga, filialId, pedidosJaRoteirizados, onClose,
                             <p className="font-semibold text-gray-900 truncate max-w-[200px]">{p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '—'}</p>
                           </td>
                           <td className="px-2 py-1.5 whitespace-nowrap">{p.dataEntrega ? new Date(p.dataEntrega).toLocaleDateString('pt-BR') : '—'}</td>
-                          <td className="px-2 py-1.5 text-right font-mono font-semibold text-sky-300">{Number(p.pesoTotal || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</td>
+                          <td className="px-2 py-1.5 text-right font-mono font-semibold text-gray-800">{Number(p.pesoTotal || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</td>
                           <td className="px-2 py-1.5 text-right font-mono">{Number(p.valorTotal || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                           <td className="px-2 py-1.5">
                             <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full text-[9px] font-bold">{p.status}</span>

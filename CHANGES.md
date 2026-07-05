@@ -20,6 +20,46 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-05] — Logística Avançada: Rotas + Torre de Controle + App do Motorista + Ponte Fiscal SEFAZ
+
+### O que mudou
+- **Modelagem `Route` / `RouteStop`** (Prisma): rota com veículo/motorista/região, capacidade e
+  cubagem (snapshot da otimização); paradas com **campos de auditoria de entrega** (latitude,
+  longitude, dataHoraEntrega, linkFoto, stringAssinatura, recebedor) e retorno SEFAZ. Desacoplados
+  via FKs escalares para não impactar os 6 modelos existentes. Enums `RouteStatus`/`RouteStopStatus`.
+- **`RouteOptimizerService` (🤖 IA de roteirização)**: agrupa pedidos abertos por macro-zona de CEP,
+  ordena por peso (First-Fit Decreasing), distribui em veículos respeitando capacidade (kg + caixas)
+  e janela, sequencia paradas por proximidade e persiste tudo em **transação ACID** + `AuditLog`.
+- **`DeliveryConfirmationService` (Ponte Fiscal SEFAZ)**: grava a prova de entrega (assinatura + GPS
+  + foto) em transação; fecha a rota quando todas as paradas concluem; dispara o **Evento 110130
+  (Comprovante de Entrega da NF-e)** para a **FocusNFe (homologação)** via REST (HTTP Basic com token),
+  gravando protocolo/status de volta. Resiliente: falha fiscal não reverte a entrega.
+- **Endpoints** `/rotas` (listar/detalhe/motorista), `/rotas/otimizar` (RBAC `LOGISTICA:OPERAR`),
+  `/rotas/stops/:id/confirmar`. Módulo `RotasModule` registrado no `app.module.ts`.
+- **Frontend — Torre de Controle** (`/logistica/torre`): paleta neutra (off-white/greige) + números
+  oversized, lista de pedidos arrastáveis (drag-and-drop nativo), cards de motorista com barra de
+  ocupação de peso e botão **🤖 Otimizar Rotas com IA**.
+- **Frontend — App do Motorista** (`/logistica/motorista`, pronto p/ Capacitor): 3 telas — Timeline
+  das paradas, foco na entrega com botão gigante Waze/Maps, e **Canhoto Digital** (HTML5 Canvas de
+  assinatura + foto da mercadoria + captura de GPS real do navegador).
+- **Config .env**: `FOCUS_NFE_URL` (default homologação) e `FOCUS_NFE_TOKEN`. Sem token, o evento
+  110130 é apenas simulado (log), sem quebrar a confirmação de entrega.
+
+### Arquivos modificados
+- `backend/prisma/schema.prisma` (models `Route`/`RouteStop` + enums)
+- `backend/src/modules/rotas/{route-optimizer,delivery-confirmation,rotas}.service.ts`
+- `backend/src/modules/rotas/{rotas.controller,rotas.module}.ts`
+- `backend/src/app.module.ts`
+- `frontend/src/services/api.ts` (`rotasApi`)
+- `frontend/src/modules/logistica/pages/{TorreControle,AppMotorista}.tsx`
+- `frontend/src/App.tsx`, `frontend/src/components/layout/AppShell.tsx`, `frontend/src/config/telas.ts`
+
+### Como aplicar
+1. Pare o backend (libera a DLL do Prisma). 2. `npx prisma generate` + `npx prisma db push`.
+3. (Opcional fiscal) adicione `FOCUS_NFE_TOKEN` no `backend/.env`. 4. Suba backend + frontend.
+
+---
+
 ## [2026-07-05] — Módulo Financeiro + Fluxo de Caixa + Camada Fiscal (Invoice) + Seed de teste
 
 ### O que mudou

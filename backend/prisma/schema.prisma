@@ -1314,3 +1314,91 @@ model InvoiceAuditLog {
   @@index([invoiceId, changedAt])
   @@map("invoice_audit_logs")
 }
+
+// ─────────────────────────────────────────
+// MÓDULO F: LOGÍSTICA AVANÇADA (ROTAS + ENTREGA)
+// Route/RouteStop desacoplados via FKs escalares para não impactar
+// os modelos existentes (Pedido, Veiculo, Usuario, Romaneio).
+// ─────────────────────────────────────────
+
+enum RouteStatus {
+  PLANNED      // criada/otimizada, ainda não despachada
+  DISPATCHED   // motorista em rota
+  COMPLETED    // todas as paradas concluídas
+  CANCELED
+}
+
+enum RouteStopStatus {
+  PENDING
+  IN_TRANSIT
+  DELIVERED
+  FAILED       // insucesso de entrega (cliente ausente, recusa)
+}
+
+model Route {
+  id             String       @id @default(uuid())
+  tenantId       String
+  filialId       String
+  // Motorista: referência ao Usuario (perfil motorista). FK escalar.
+  motoristaId    String?
+  motoristaNome  String?      // denormalizado p/ exibição
+  veiculoId      String?      // FK escalar -> Veiculo
+  placaVeiculo   String?
+  dataRota       DateTime     // dia planejado da rota
+  status         RouteStatus  @default(PLANNED)
+  // Capacidade / cubagem consolidada da rota (snapshot no momento da otimização)
+  capacidadeKg   Decimal      @default(0) @db.Decimal(12, 2)
+  pesoTotalKg    Decimal      @default(0) @db.Decimal(12, 2)
+  volumesTotal   Int          @default(0)
+  regiao         String?      // cluster geográfico (ex: ZONA_SUL) derivado do CEP
+  origemOtimizacao String     @default("MANUAL") // MANUAL | IA_OPTIMIZER
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  stops          RouteStop[]
+
+  @@index([tenantId, filialId, dataRota])
+  @@index([tenantId, motoristaId, status])
+  @@map("routes")
+}
+
+model RouteStop {
+  id             String          @id @default(uuid())
+  routeId        String
+  route          Route           @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  tenantId       String
+  pedidoId       String          // FK escalar -> Pedido
+  numeroPedido   Int?
+  clienteNome    String?
+  cep            String?
+  endereco       String?
+  ordem          Int             // sequência otimizada da parada (1..n)
+  janelaInicio   DateTime?       // janela de horário de entrega
+  janelaFim      DateTime?
+  pesoKg         Decimal         @default(0) @db.Decimal(12, 2)
+  volumes        Int             @default(0)
+  status         RouteStopStatus @default(PENDING)
+
+  // ── Campos de auditoria da ENTREGA (canhoto digital) ──
+  latitude          Decimal?     @db.Decimal(10, 7)
+  longitude         Decimal?     @db.Decimal(10, 7)
+  dataHoraEntrega   DateTime?
+  linkFoto          String?      // URL/base64 da foto da mercadoria
+  stringAssinatura  String?      @db.Text // dataURL do canvas de assinatura
+  recebedorNome     String?
+  recebedorDoc      String?      // CPF/RG de quem recebeu
+  motivoFalha       String?
+
+  // Ponte fiscal: retorno do evento SEFAZ 110130 (FocusNFe)
+  sefazProtocolo    String?
+  sefazStatus       String?      // ex: "processado", "erro"
+  sefazPayload      String?      @db.Text
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([routeId, pedidoId])
+  @@index([tenantId, pedidoId])
+  @@index([routeId, ordem])
+  @@map("route_stops")
+}

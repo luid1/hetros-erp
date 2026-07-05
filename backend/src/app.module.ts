@@ -28,6 +28,7 @@ import { DreModule } from './modules/dre/dre.module';
 import { AuditoriaModule } from './modules/auditoria/auditoria.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CargaModule } from './modules/carga/carga.module';
+import { RotasModule } from './modules/rotas/rotas.module';
 import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
@@ -60,6 +61,7 @@ import { HealthController } from './health.controller';
     ContasPagarModule,
     FluxoCaixaModule,
     InvoicesModule,
+    RotasModule,
     DreModule,
     AuditoriaModule,
     DashboardModule,

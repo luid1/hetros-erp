@@ -110,21 +110,21 @@ async function main() {
 
   // ── 4. Frotas (veículos por transportadora) ────────────────────
   const veiculosDefs = [
-    { placa: 'FRZ1A23', transp: '99.999.999/0001-99', tipo: 'TRUCK', marca: 'Mercedes-Benz', modelo: 'Atego 1719', capacidadeKg: 8000, refrigerado: true, motorista: 'João Silva' },
-    { placa: 'FRZ2B34', transp: '99.999.999/0001-99', tipo: 'TRUCK', marca: 'Volkswagen', modelo: 'Delivery 11.180', capacidadeKg: 7000, refrigerado: true, motorista: 'Pedro Santos' },
-    { placa: 'RHF3C45', transp: '10.101.010/0001-10', tipo: 'VAN', marca: 'Renault', modelo: 'Master', capacidadeKg: 1500, refrigerado: false, motorista: 'Carlos Souza' },
-    { placa: 'RHF4D56', transp: '10.101.010/0001-10', tipo: 'VAN', marca: 'Fiat', modelo: 'Ducato', capacidadeKg: 1800, refrigerado: true, motorista: 'Marcos Lima' },
-    { placa: 'EXV5E67', transp: '12.121.212/0001-12', tipo: 'BITRUCK', marca: 'Scania', modelo: 'P310', capacidadeKg: 14000, refrigerado: true, motorista: 'Antônio Rocha' },
-    { placa: 'EXV6F78', transp: '12.121.212/0001-12', tipo: 'CARRETA', marca: 'Volvo', modelo: 'VM 270', capacidadeKg: 22000, refrigerado: false, motorista: 'José Pereira' },
+    { placa: 'FRZ1A23', transp: '99.999.999/0001-99', tipo: 'TRUCK', marca: 'Mercedes-Benz', modelo: 'Atego 1719', capacidadeKg: 8000, capacidadeCaixasH: 400, refrigerado: true, motorista: 'João Silva' },
+    { placa: 'FRZ2B34', transp: '99.999.999/0001-99', tipo: 'TRUCK', marca: 'Volkswagen', modelo: 'Delivery 11.180', capacidadeKg: 7000, capacidadeCaixasH: 350, refrigerado: true, motorista: 'Pedro Santos' },
+    { placa: 'RHF3C45', transp: '10.101.010/0001-10', tipo: 'VAN', marca: 'Renault', modelo: 'Master', capacidadeKg: 1500, capacidadeCaixasH: 80, refrigerado: false, motorista: 'Carlos Souza' },
+    { placa: 'RHF4D56', transp: '10.101.010/0001-10', tipo: 'VAN', marca: 'Fiat', modelo: 'Ducato', capacidadeKg: 1800, capacidadeCaixasH: 90, refrigerado: true, motorista: 'Marcos Lima' },
+    { placa: 'EXV5E67', transp: '12.121.212/0001-12', tipo: 'BITRUCK', marca: 'Scania', modelo: 'P310', capacidadeKg: 14000, capacidadeCaixasH: 700, refrigerado: true, motorista: 'Antônio Rocha' },
+    { placa: 'EXV6F78', transp: '12.121.212/0001-12', tipo: 'CARRETA', marca: 'Volvo', modelo: 'VM 270', capacidadeKg: 22000, capacidadeCaixasH: 1100, refrigerado: false, motorista: 'José Pereira' },
   ];
   for (const v of veiculosDefs) {
     await prisma.veiculo.upsert({
       where: { tenantId_placa: { tenantId: tenant.id, placa: v.placa } },
-      update: { motoristaPadrao: v.motorista },
+      update: { motoristaPadrao: v.motorista, capacidadeKg: v.capacidadeKg, capacidadeCaixasH: v.capacidadeCaixasH },
       create: {
         tenantId: tenant.id, transportadoraId: transportadoras[v.transp].id, placa: v.placa, uf: 'SP',
         tipo: v.tipo, marca: v.marca, modelo: v.modelo, anoFabricacao: 2021,
-        capacidadeKg: v.capacidadeKg, propriedade: 'TERCEIRO', motoristaPadrao: v.motorista, refrigerado: v.refrigerado,
+        capacidadeKg: v.capacidadeKg, capacidadeCaixasH: v.capacidadeCaixasH, propriedade: 'TERCEIRO', motoristaPadrao: v.motorista, refrigerado: v.refrigerado,
       },
     });
   }
@@ -162,17 +162,29 @@ async function main() {
       const subtotal = itensData.reduce((a, i) => a + i.valorTotal, 0);
       const frete = pd.status === 'RASCUNHO' ? 0 : 120;
       const valorTotal = Number(reais(subtotal + frete));
+      // Cada item é em caixas (CX); volumes = total de caixas, peso ~20 kg por caixa.
+      const volumes = itensData.reduce((a, i) => a + i.quantidade, 0);
+      const pesoTotal = volumes * 20;
 
       pedido = await prisma.pedido.create({
         data: {
           tenantId: tenant.id, filialOrigemId: filial.id, clienteId: clientes[pd.cliente].id,
           usuarioId: admin.id, numero: pd.numero, tipo: 'VENDA', status: pd.status,
           subtotal: Number(reais(subtotal)), valorFrete: frete, valorTotal,
+          pesoTotal, volumes,
           tipoFrete: 'CIF', transportadoraId: transportadoras[transpCnpjs[idx % transpCnpjs.length]].id,
           formaPagamento: 'BOLETO', condicaoPagamento: 'A_PRAZO', numeroParcelas: 1,
           dataEmissao: new Date(Date.now() - (idx + 1) * 86400000),
           itens: { create: itensData },
         },
+        include: { itens: true },
+      });
+    } else if (!Number(pedido.pesoTotal) || !pedido.volumes) {
+      // Backfill peso/volumes em pedidos já existentes (seed antigo).
+      const volumes = pedido.itens.reduce((a: number, i: any) => a + Number(i.quantidade), 0);
+      pedido = await prisma.pedido.update({
+        where: { id: pedido.id },
+        data: { volumes, pesoTotal: volumes * 20 },
         include: { itens: true },
       });
     }
