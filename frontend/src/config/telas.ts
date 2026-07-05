@@ -33,7 +33,9 @@ export const TELAS: TelaDef[] = [
   { key: '/fiscal/painel', label: 'Painel de Faturamento', grupo: 'Fiscal / DFe' },
   { key: '/fiscal/matriz', label: 'Matriz Fiscal', grupo: 'Fiscal / DFe' },
   { key: '/fiscal/cte', label: 'CT-e / MDF-e', grupo: 'Fiscal / DFe' },
+  { key: '/fiscal/gestao', label: 'Gestão Fiscal', grupo: 'Fiscal / DFe' },
   // Financeiro
+  { key: '/financeiro/fluxo-caixa', label: 'Fluxo de Caixa', grupo: 'Financeiro' },
   { key: '/financeiro/receber', label: 'Contas a Receber', grupo: 'Financeiro' },
   { key: '/financeiro/pagar', label: 'Contas a Pagar', grupo: 'Financeiro' },
   { key: '/financeiro/dre', label: 'DRE & Relatórios', grupo: 'Financeiro' },

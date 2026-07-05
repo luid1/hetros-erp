@@ -20,6 +20,43 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-05] — Módulo Financeiro + Fluxo de Caixa + Camada Fiscal (Invoice) + Seed de teste
+
+### O que mudou
+- **Módulo Financeiro completo**: Contas a Receber e Contas a Pagar (baixa transacional
+  PAGO/PARCIAL, cancelamento, parcelamento sem drift de centavos), listeners idempotentes
+  (`nfe.emitida` → ContaReceber; `estoque.entrada_compra` → ContaPagar) e trilha imutável
+  `HistoricoFinanceiro` (usuário + timestamp + estados anterior/novo + valores).
+- **Fluxo de Caixa consolidado** (`/fluxo-caixa`): entradas pagas − saídas pagas por competência
+  (dia/mês) com saldo acumulado corrente + KPIs.
+- **Camada Fiscal — Rodada 3** (`Invoice` / `InvoiceTax` / `InvoiceAuditLog`): geração de nota a
+  partir do **pedido de venda real** (herda `valorTotal` e cliente do pedido, bloqueia duplicidade
+  e pedido cancelado), impostos calculados **em centavos** (alíquota em pontos-base), transições
+  DRAFT → ISSUED / ERRONEOUS / CANCELED com **audit log imutável**. Multi-tenant.
+- **RBAC**: baixas financeiras exigem `FINANCEIRO:OPERAR`; operações fiscais exigem `FISCAL:OPERAR`.
+- **Frontend**: telas `Fluxo de Caixa`, `Contas a Receber`, `Contas a Pagar` e `Gestão Fiscal`
+  (KPIs com skeleton, filtros, modal de emissão com composição de impostos ao vivo, ações gated).
+- **Seed de teste** (`prisma/seed-teste.ts`, script `npm run prisma:seed:teste`): popula 5 clientes,
+  3 fornecedores, 3 transportadoras, 6 veículos (frotas), 6 pedidos de venda com itens, NF-es e
+  notas fiscais (Invoices) — idempotente.
+
+### Arquivos
+- `backend/prisma/schema.prisma` (Invoice/InvoiceTax/InvoiceAuditLog + HistoricoFinanceiro)
+- `backend/prisma/seed-teste.ts`, `backend/package.json`
+- `backend/src/modules/{contas-receber,contas-pagar,fluxo-caixa,invoices}/*`
+- `backend/src/common/{utils/money.util.ts,guards/permissoes.guard.ts,decorators/permissoes.decorator.ts}`
+- `backend/src/app.module.ts`
+- `frontend/src/modules/financeiro/pages/{FluxoCaixa,ContasReceber,ContasPagar}.tsx`
+- `frontend/src/modules/fiscal/pages/GestaoFiscal.tsx`
+- `frontend/src/{services/api.ts,App.tsx,config/telas.ts,components/layout/AppShell.tsx}`
+
+### Verificado
+- Backend `tsc --noEmit` exit 0; frontend `tsc --noEmit` exit 0.
+- Pendente rodar na máquina (com o dev server parado): `npx prisma db push` e
+  `npm run prisma:seed && npm run prisma:seed:teste`.
+
+---
+
 ## [2026-07-03] — Aba Rentabilidade (cliente → produto) real e funcional
 
 ### O que mudou

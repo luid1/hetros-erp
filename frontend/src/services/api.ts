@@ -74,10 +74,40 @@ export const produtosApi = {
 
 // Financeiro
 export const financeiroApi = {
+  // Contas a Receber
   receber: (params?: object) => api.get('/contas-receber', { params }),
-  pagar: (params?: object) => api.get('/contas-pagar', { params }),
+  receberResumo: (params?: object) => api.get('/contas-receber/resumo', { params }),
+  receberDetalhe: (id: string) => api.get(`/contas-receber/${id}`),
+  criarReceber: (data: object) => api.post('/contas-receber', data),
   baixarReceber: (id: string, data: object) => api.patch(`/contas-receber/${id}/baixar`, data),
+  cancelarReceber: (id: string, motivo?: string) =>
+    api.patch(`/contas-receber/${id}/cancelar`, { motivo }),
+  // Contas a Pagar
+  pagar: (params?: object) => api.get('/contas-pagar', { params }),
+  pagarResumo: (params?: object) => api.get('/contas-pagar/resumo', { params }),
+  pagarDetalhe: (id: string) => api.get(`/contas-pagar/${id}`),
+  criarPagar: (data: object) => api.post('/contas-pagar', data),
+  baixarPagar: (id: string, data: object) => api.patch(`/contas-pagar/${id}/baixar`, data),
+  cancelarPagar: (id: string, motivo?: string) =>
+    api.patch(`/contas-pagar/${id}/cancelar`, { motivo }),
+  // Relatórios
   dre: (params?: object) => api.get('/dre', { params }),
+};
+
+// Fluxo de Caixa (consolidado realizado)
+export const fluxoCaixaApi = {
+  consolidado: (params?: object) => api.get('/fluxo-caixa', { params }),
+};
+
+// Notas Fiscais (Invoices — camada fiscal Rodada 3)
+export const invoicesApi = {
+  list: (params?: object) => api.get('/invoices', { params }),
+  resumo: (params?: object) => api.get('/invoices/resumo', { params }),
+  get: (id: string) => api.get(`/invoices/${id}`),
+  gerar: (data: object) => api.post('/invoices', data),
+  transmitir: (id: string) => api.patch(`/invoices/${id}/transmitir`),
+  marcarErro: (id: string, motivo?: string) => api.patch(`/invoices/${id}/erro`, { motivo }),
+  cancelar: (id: string, motivo?: string) => api.patch(`/invoices/${id}/cancelar`, { motivo }),
 };
 
 // Auditoria

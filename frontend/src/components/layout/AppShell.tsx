@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Package, Warehouse, FileText,
   DollarSign, Truck, ClipboardList, BarChart3, Settings,
   ChevronLeft, ChevronRight, LogOut, Building2, AlertTriangle,
-  Receipt, ShieldCheck, Menu, X, MapPin, PackageCheck, ShoppingCart, Coins,
+  Receipt, ShieldCheck, Menu, X, MapPin, PackageCheck, ShoppingCart, Coins, Landmark,
 } from 'lucide-react';
 
 interface NavItem { to: string; icon: React.ElementType; label: string; badge?: string; badgeColor?: string; highlight?: boolean }
@@ -62,11 +62,13 @@ const navigation: NavGroup[] = [
       { to: '/fiscal/painel', icon: BarChart3, label: 'Painel de Faturamento' },
       { to: '/fiscal/matriz', icon: FileText,  label: 'Matriz Fiscal' },
       { to: '/fiscal/cte',    icon: FileText,  label: 'CT-e / MDF-e' },
+      { to: '/fiscal/gestao', icon: Receipt,   label: 'Gestão Fiscal' },
     ],
   },
   {
     group: 'E · Financeiro',
     items: [
+      { to: '/financeiro/fluxo-caixa', icon: Landmark,   label: 'Fluxo de Caixa' },
       { to: '/financeiro/receber', icon: DollarSign, label: 'Contas a Receber' },
       { to: '/financeiro/pagar',   icon: DollarSign, label: 'Contas a Pagar' },
       { to: '/financeiro/dre',     icon: BarChart3,  label: 'DRE & Relatórios' },

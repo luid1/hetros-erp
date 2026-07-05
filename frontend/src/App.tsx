@@ -14,6 +14,9 @@ import FreteMotoristas from './modules/logistica/pages/FreteMotoristas';
 import FrotasVeiculos from './modules/logistica/pages/FrotasVeiculos';
 import Romaneios from './modules/logistica/pages/Romaneios';
 import Custos from './modules/financeiro/pages/Custos';
+import ContasReceber from './modules/financeiro/pages/ContasReceber';
+import ContasPagar from './modules/financeiro/pages/ContasPagar';
+import FluxoCaixa from './modules/financeiro/pages/FluxoCaixa';
 import UsuariosAcessos from './modules/gerencial/pages/UsuariosAcessos';
 import Produtos from './modules/cadastros/pages/Produtos';
 import Fornecedores from './modules/cadastros/pages/Fornecedores';
@@ -29,6 +32,7 @@ import NotasEmitidas from './modules/fiscal/pages/NotasEmitidas';
 import MatrizFiscal from './modules/fiscal/pages/MatrizFiscal';
 import PainelFaturamento from './modules/fiscal/pages/PainelFaturamento';
 import CteMdfe from './modules/fiscal/pages/CteMdfe';
+import GestaoFiscal from './modules/fiscal/pages/GestaoFiscal';
 
 const Placeholder = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center h-64">
@@ -93,10 +97,12 @@ export default function App() {
             <Route path="fiscal/painel" element={<PainelFaturamento />} />
             <Route path="fiscal/matriz" element={<MatrizFiscal />} />
             <Route path="fiscal/cte" element={<CteMdfe />} />
+            <Route path="fiscal/gestao" element={<GestaoFiscal />} />
 
             {/* Financeiro */}
-            <Route path="financeiro/receber" element={<Placeholder title="Contas a Receber" />} />
-            <Route path="financeiro/pagar" element={<Placeholder title="Contas a Pagar" />} />
+            <Route path="financeiro/fluxo-caixa" element={<FluxoCaixa />} />
+            <Route path="financeiro/receber" element={<ContasReceber />} />
+            <Route path="financeiro/pagar" element={<ContasPagar />} />
             <Route path="financeiro/dre" element={<Placeholder title="DRE & Relatórios" />} />
             <Route path="financeiro/custos" element={<Custos />} />
 
