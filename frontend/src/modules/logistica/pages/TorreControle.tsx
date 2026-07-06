@@ -11,6 +11,17 @@ import {
   User,
   Weight,
   Boxes,
+  Radar,
+  X,
+  Clock,
+  AlertTriangle,
+  PackageOpen,
+  CheckCircle2,
+  Loader2,
+  Star,
+  Plus,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { rotasApi, pedidosApi } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -73,11 +84,46 @@ const MOCK_PEDIDOS: PedidoAberto[] = [
   { id: 'mp-7', numero: 2007, clienteNome: 'Feira Leste', cidade: 'Limeira', cep: '13480-000', regiao: 'LESTE', pesoKg: 1120, volumes: 56 },
 ];
 
-const MOCK_MOTORISTAS: Motorista[] = [
+// Elenco completo de motoristas disponíveis para roteirização manual.
+const ROSTER_MOTORISTAS: Motorista[] = [
   { id: 'mm-1', motoristaNome: 'Carlos Andrade', placaVeiculo: 'FQR-2A18', regiao: 'CENTRO', capacidadeKg: 4000, origemOtimizacao: 'MANUAL', stops: [] },
   { id: 'mm-2', motoristaNome: 'Roberto Lima', placaVeiculo: 'GHT-7B92', regiao: 'OESTE', capacidadeKg: 8000, origemOtimizacao: 'MANUAL', stops: [] },
   { id: 'mm-3', motoristaNome: 'Anderson Souza', placaVeiculo: 'JKL-3C55', regiao: 'NORTE', capacidadeKg: 6000, origemOtimizacao: 'MANUAL', stops: [] },
+  { id: 'mm-4', motoristaNome: 'Marcos Pereira', placaVeiculo: 'PLK-9D71', regiao: 'LESTE', capacidadeKg: 5000, origemOtimizacao: 'MANUAL', stops: [] },
+  { id: 'mm-5', motoristaNome: 'Fernando Rocha', placaVeiculo: 'RTV-4E33', regiao: 'SUL', capacidadeKg: 7000, origemOtimizacao: 'MANUAL', stops: [] },
+  { id: 'mm-6', motoristaNome: 'Juliano Costa', placaVeiculo: 'BNM-1F08', regiao: 'CENTRO', capacidadeKg: 3500, origemOtimizacao: 'MANUAL', stops: [] },
+  { id: 'mm-7', motoristaNome: 'Rafael Nunes', placaVeiculo: 'XCV-6G22', regiao: 'OESTE', capacidadeKg: 9000, origemOtimizacao: 'MANUAL', stops: [] },
+  { id: 'mm-8', motoristaNome: 'Diego Martins', placaVeiculo: 'QAZ-2H90', regiao: 'NORTE', capacidadeKg: 4500, origemOtimizacao: 'MANUAL', stops: [] },
 ];
+
+// Compat: primeiros 3 servem de fallback quando não há API.
+const MOCK_MOTORISTAS: Motorista[] = ROSTER_MOTORISTAS.slice(0, 3);
+
+/* ──────────────────── Motoristas frequentes (favoritos) ────────────────────── */
+
+const FAV_KEY = 'torre.motoristas.frequentes';
+
+function carregarFavoritos(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FAV_KEY);
+    if (raw) return new Set<string>(JSON.parse(raw));
+  } catch {
+    /* ignore */
+  }
+  return new Set(['mm-1', 'mm-2', 'mm-3']);
+}
+
+function salvarFavoritos(s: Set<string>) {
+  try {
+    localStorage.setItem(FAV_KEY, JSON.stringify([...s]));
+  } catch {
+    /* ignore */
+  }
+}
+
+function clonarMotorista(m: Motorista): Motorista {
+  return JSON.parse(JSON.stringify(m));
+}
 
 /* ────────────────────────── Normalizadores da API ─────────────────────────── */
 
@@ -165,13 +211,61 @@ export default function TorreControle() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const snapshot = useRef<{ pedidos: PedidoAberto[]; motoristas: Motorista[] } | null>(null);
 
+  // Mapa de frotas (telemetria live)
+  const [mapaAberto, setMapaAberto] = useState(false);
+
+  // Motoristas frequentes (favoritos) + "ver mais"
+  const [favoritos, setFavoritos] = useState<Set<string>>(carregarFavoritos);
+  const [verMais, setVerMais] = useState(false);
+
+  // Garante que os motoristas favoritos apareçam sempre como alvos de arraste,
+  // mesclados com as rotas carregadas (sem duplicar por nome).
+  function mesclarFrequentes(base: Motorista[], favs: Set<string>): Motorista[] {
+    const nomes = new Set(base.map((m) => m.motoristaNome.toLowerCase()));
+    const frequentes = ROSTER_MOTORISTAS.filter(
+      (r) => favs.has(r.id) && !nomes.has(r.motoristaNome.toLowerCase()),
+    ).map(clonarMotorista);
+    return [...base, ...frequentes];
+  }
+
+  function alternarFavorito(id: string) {
+    setFavoritos((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      salvarFavoritos(next);
+      return next;
+    });
+  }
+
+  // Adiciona um motorista do elenco como alvo de arraste (via "ver mais").
+  function adicionarMotorista(r: Motorista) {
+    setMotoristas((prev) =>
+      prev.some((m) => m.motoristaNome.toLowerCase() === r.motoristaNome.toLowerCase())
+        ? prev
+        : [...prev, clonarMotorista(r)],
+    );
+  }
+
+  // Motoristas do elenco que ainda não estão na lista ativa.
+  const motoristasDisponiveis = useMemo(
+    () => {
+      const ativos = new Set(motoristas.map((m) => m.motoristaNome.toLowerCase()));
+      return ROSTER_MOTORISTAS.filter((r) => !ativos.has(r.motoristaNome.toLowerCase()));
+    },
+    [motoristas],
+  );
+
   async function carregar() {
     if (!filialId) {
       // Sem filial: entra em modo demonstração para a tela nunca ficar vazia.
       setPedidos(MOCK_PEDIDOS);
-      setMotoristas(MOCK_MOTORISTAS);
-      setUsandoMock(true);
-      resetSnapshot(MOCK_PEDIDOS, MOCK_MOTORISTAS);
+      {
+        const frequentes = mesclarFrequentes([], favoritos);
+        setMotoristas(frequentes);
+        setUsandoMock(true);
+        resetSnapshot(MOCK_PEDIDOS, frequentes);
+      }
       return;
     }
     setLoading(true);
@@ -195,17 +289,21 @@ export default function TorreControle() {
         setUsandoMock(true);
         resetSnapshot(MOCK_PEDIDOS, MOCK_MOTORISTAS);
       } else {
+        const comFrequentes = mesclarFrequentes(mots, favoritos);
         setPedidos(abertos);
-        setMotoristas(mots);
+        setMotoristas(comFrequentes);
         setUsandoMock(false);
-        resetSnapshot(abertos, mots);
+        resetSnapshot(abertos, comFrequentes);
       }
     } catch {
       // Falhou a API: mantém a tela usável em modo demonstração.
       setPedidos(MOCK_PEDIDOS);
-      setMotoristas(MOCK_MOTORISTAS);
-      setUsandoMock(true);
-      resetSnapshot(MOCK_PEDIDOS, MOCK_MOTORISTAS);
+      {
+        const frequentes = mesclarFrequentes([], favoritos);
+        setMotoristas(frequentes);
+        setUsandoMock(true);
+        resetSnapshot(MOCK_PEDIDOS, frequentes);
+      }
       toast('API indisponível — exibindo dados de demonstração.', 'info');
     } finally {
       setLoading(false);
@@ -354,6 +452,12 @@ export default function TorreControle() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar
           </button>
           <button
+            onClick={() => setMapaAberto(true)}
+            className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm hover:bg-slate-700 hover:border-emerald-500/50"
+          >
+            <Radar className="h-4 w-4 text-emerald-400" /> Ver Mapa de Frotas
+          </button>
+          <button
             onClick={otimizarIA}
             disabled={otimizando || pedidos.length === 0}
             className="flex items-center gap-2 bg-sky-500 text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-sky-400 disabled:opacity-40 shadow-lg shadow-sky-500/20"
@@ -420,16 +524,27 @@ export default function TorreControle() {
 
         {/* ── Motoristas / Rotas (drop targets) ── */}
         <section className="space-y-4 max-h-[72vh] overflow-y-auto pr-1">
+          <h2 className="text-xs uppercase tracking-widest text-slate-400 font-semibold flex items-center gap-2">
+            <Truck className="h-3.5 w-3.5" /> Motoristas frequentes
+            <span className="ml-auto text-slate-500 normal-case tracking-normal flex items-center gap-1">
+              <Star className="h-3 w-3 text-amber-400 fill-amber-400" /> marque os frequentes
+            </span>
+          </h2>
+
           {motoristas.length === 0 && (
-            <div className="bg-slate-800/30 rounded-2xl border border-dashed border-slate-700 p-10 text-center text-slate-500">
+            <div className="bg-slate-800/30 rounded-2xl border border-dashed border-slate-700 p-8 text-center text-slate-500">
               <Truck className="h-8 w-8 mx-auto mb-2 opacity-40" />
-              Nenhum motorista/rota. Use <strong className="text-slate-300">Otimizar com IA</strong> ou arraste um pedido.
+              Nenhum motorista na lista. Adicione em{' '}
+              <strong className="text-slate-300">Ver mais motoristas</strong> abaixo.
             </div>
           )}
+
           {motoristas.map((m) => (
             <MotoristaCard
               key={m.id}
               motorista={m}
+              favorito={favoritos.has(m.id)}
+              onToggleFavorito={() => alternarFavorito(m.id)}
               isOver={overRotaId === m.id}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -443,6 +558,62 @@ export default function TorreControle() {
               onRemoveStop={(s) => removerStop(m.id, s)}
             />
           ))}
+
+          {/* ── Ver mais motoristas ── */}
+          <div className="rounded-2xl border border-slate-700 bg-slate-800/30">
+            <button
+              onClick={() => setVerMais((v) => !v)}
+              className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-slate-300 hover:text-white"
+            >
+              {verMais ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              Ver mais motoristas
+              <span className="ml-auto text-xs text-slate-500">
+                {motoristasDisponiveis.length} disponíveis
+              </span>
+            </button>
+
+            {verMais && (
+              <div className="px-3 pb-3 space-y-2">
+                {motoristasDisponiveis.length === 0 && (
+                  <p className="text-xs text-slate-500 italic py-3 text-center">
+                    Todos os motoristas já estão na lista.
+                  </p>
+                )}
+                {motoristasDisponiveis.map((r) => (
+                  <div
+                    key={r.id}
+                    className="flex items-center gap-3 rounded-xl border border-slate-700/70 bg-slate-800/40 px-3 py-2.5"
+                  >
+                    <button
+                      onClick={() => alternarFavorito(r.id)}
+                      title={favoritos.has(r.id) ? 'Remover dos frequentes' : 'Marcar como frequente'}
+                      className="shrink-0"
+                    >
+                      <Star
+                        className={`h-4 w-4 transition ${
+                          favoritos.has(r.id)
+                            ? 'text-amber-400 fill-amber-400'
+                            : 'text-slate-600 hover:text-amber-400'
+                        }`}
+                      />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-slate-100 truncate">{r.motoristaNome}</p>
+                      <p className="text-[11px] text-slate-500">
+                        {r.placaVeiculo} · {r.regiao} · {kg(r.capacidadeKg)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => adicionarMotorista(r)}
+                      className="shrink-0 flex items-center gap-1 rounded-lg bg-sky-500/15 border border-sky-500/40 text-sky-300 px-2.5 py-1.5 text-xs font-medium hover:bg-sky-500/25"
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Adicionar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
       </div>
 
@@ -470,6 +641,9 @@ export default function TorreControle() {
           </div>
         </div>
       )}
+
+      {/* ── Modal: Mapa de Frotas (telemetria live) ── */}
+      {mapaAberto && <MapaFrotas motoristas={motoristas} onClose={() => setMapaAberto(false)} />}
     </div>
   );
 }
@@ -494,6 +668,8 @@ function Kpi({ label, value, suffix, accent }: { label: string; value: number; s
 
 function MotoristaCard({
   motorista,
+  favorito,
+  onToggleFavorito,
   isOver,
   onDragOver,
   onDragLeave,
@@ -501,6 +677,8 @@ function MotoristaCard({
   onRemoveStop,
 }: {
   motorista: Motorista;
+  favorito: boolean;
+  onToggleFavorito: () => void;
   isOver: boolean;
   onDragOver: (e: React.DragEvent) => void;
   onDragLeave: () => void;
@@ -529,8 +707,26 @@ function MotoristaCard({
           <div className="h-9 w-9 rounded-full bg-slate-700 flex items-center justify-center">
             <User className="h-4 w-4 text-emerald-400" />
           </div>
+          <button
+            onClick={onToggleFavorito}
+            title={favorito ? 'Remover dos frequentes' : 'Marcar como frequente'}
+            className="shrink-0"
+          >
+            <Star
+              className={`h-4 w-4 transition ${
+                favorito ? 'text-amber-400 fill-amber-400' : 'text-slate-600 hover:text-amber-400'
+              }`}
+            />
+          </button>
           <div>
-            <p className="font-medium leading-tight text-white">{motorista.motoristaNome}</p>
+            <p className="font-medium leading-tight text-white flex items-center gap-1.5">
+              {motorista.motoristaNome}
+              {favorito && (
+                <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-300 border border-amber-400/30">
+                  Frequente
+                </span>
+              )}
+            </p>
             <p className="text-[11px] text-slate-400">
               {motorista.placaVeiculo} · {motorista.regiao}
               {motorista.origemOtimizacao === 'IA_OPTIMIZER' && ' · 🤖 IA'}
@@ -589,6 +785,448 @@ function MotoristaCard({
           ))}
         </ol>
       )}
+    </div>
+  );
+}
+
+/* ────────────────────────── Mapa de Frotas (Live Tracking) ─────────────────── */
+
+type StatusFrota = 'EM_ROTA' | 'ATRASADO' | 'DESCARREGANDO' | 'RETORNANDO';
+
+interface StopFrota {
+  ordem: number;
+  numeroPedido: number;
+  clienteNome: string;
+  pesoKg: number;
+  status: string;
+}
+
+interface Veiculo {
+  id: string;
+  nome: string;
+  placa: string;
+  regiao: string;
+  status: StatusFrota;
+  detalhe: string;
+  entregasFeitas: number;
+  entregasTotal: number;
+  lat: number;
+  lng: number;
+  capacidadeKg: number;
+  pesoTotalKg: number;
+  stops: StopFrota[];
+}
+
+/* Coordenadas reais aproximadas por zona de São Paulo (para o mapa Leaflet). */
+const BASE_COORD: [number, number] = [-23.5478, -46.6389]; // CD Matriz — Centro/SP
+const REGIAO_COORD: Record<string, [number, number]> = {
+  CENTRO: [-23.5505, -46.6333],
+  OESTE: [-23.567, -46.692],
+  NORTE: [-23.51, -46.62],
+  LESTE: [-23.54, -46.53],
+  SUL: [-23.63, -46.64],
+};
+function coordDaRegiao(regiao: string, i: number): [number, number] {
+  const base = REGIAO_COORD[regiao] || BASE_COORD;
+  return [base[0] + ((i % 3) - 1) * 0.014, base[1] + ((i % 4) - 1.5) * 0.015];
+}
+
+/* Cores hex por status (para os marcadores desenhados no Leaflet). */
+const STATUS_HEX: Record<StatusFrota, string> = {
+  EM_ROTA: '#38bdf8',
+  ATRASADO: '#fb7185',
+  DESCARREGANDO: '#fbbf24',
+  RETORNANDO: '#34d399',
+};
+
+/* Carrega o Leaflet via CDN sob demanda — sem adicionar dependência ao projeto. */
+let leafletPromise: Promise<any> | null = null;
+function carregarLeaflet(): Promise<any> {
+  const w = window as any;
+  if (w.L) return Promise.resolve(w.L);
+  if (leafletPromise) return leafletPromise;
+  leafletPromise = new Promise((resolve, reject) => {
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.async = true;
+    s.onload = () => resolve((window as any).L);
+    s.onerror = () => reject(new Error('Falha ao carregar Leaflet'));
+    document.head.appendChild(s);
+  });
+  return leafletPromise;
+}
+
+/* Marcador do veículo desenhado como divIcon (bolha colorida + nome). */
+function veiculoDivIcon(L: any, v: Veiculo, ativo: boolean) {
+  const cor = STATUS_HEX[v.status];
+  const size = ativo ? 26 : 20;
+  const html = `
+    <div style="transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center">
+      <div style="width:${size}px;height:${size}px;border-radius:9999px;background:${cor};
+        border:2px solid ${ativo ? '#ffffff' : 'rgba(15,23,42,.6)'};
+        box-shadow:0 0 0 ${ativo ? '7px' : '0px'} ${cor}33;transition:all .2s"></div>
+      <span style="margin-top:3px;font-size:10px;line-height:1;padding:2px 6px;border-radius:5px;
+        background:${ativo ? '#ffffff' : 'rgba(15,23,42,.85)'};color:${ativo ? '#0f172a' : '#e2e8f0'};
+        white-space:nowrap;font-weight:${ativo ? 700 : 400}">${v.nome.split(' ')[0]}</span>
+    </div>`;
+  return L.divIcon({ html, className: '', iconSize: [0, 0] });
+}
+
+/* Marcador do CD/base. */
+function baseDivIcon(L: any) {
+  const html = `
+    <div style="transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center">
+      <div style="width:26px;height:26px;border-radius:6px;background:#475569;border:2px solid #cbd5e1;
+        display:flex;align-items:center;justify-content:center;color:#f1f5f9;font-size:13px">🏭</div>
+      <span style="margin-top:3px;font-size:10px;padding:2px 6px;border-radius:5px;background:rgba(15,23,42,.85);
+        color:#e2e8f0;white-space:nowrap">CD Matriz</span>
+    </div>`;
+  return L.divIcon({ html, className: '', iconSize: [0, 0] });
+}
+
+const STATUS_META: Record<StatusFrota, { label: string; cor: string; dot: string; icon: any }> = {
+  EM_ROTA: { label: 'Em rota', cor: 'text-sky-300', dot: 'bg-sky-400', icon: Truck },
+  ATRASADO: { label: 'Atrasado', cor: 'text-rose-300', dot: 'bg-rose-400', icon: AlertTriangle },
+  DESCARREGANDO: { label: 'Descarregando', cor: 'text-amber-300', dot: 'bg-amber-400', icon: PackageOpen },
+  RETORNANDO: { label: 'Retornando à base', cor: 'text-emerald-300', dot: 'bg-emerald-400', icon: CheckCircle2 },
+};
+
+/* Deriva frota "ao vivo" a partir dos motoristas; complementa com mocks se vazio. */
+function derivarFrota(motoristas: Motorista[]): Veiculo[] {
+  const base: Veiculo[] = motoristas
+    .filter((m) => m.stops.length > 0)
+    .map((m, i) => {
+      const feitas = m.stops.filter((s) => s.status === 'DELIVERED').length;
+      const statusPool: StatusFrota[] = ['EM_ROTA', 'ATRASADO', 'DESCARREGANDO', 'RETORNANDO'];
+      const status = statusPool[i % statusPool.length];
+      const prox = m.stops.find((s) => s.status !== 'DELIVERED');
+      const detalhe =
+        status === 'ATRASADO'
+          ? `Em rota p/ ${prox?.clienteNome || 'cliente'} — atrasado 10 min`
+          : status === 'DESCARREGANDO'
+          ? `Descarregando em ${prox?.clienteNome || 'cliente'}`
+          : status === 'RETORNANDO'
+          ? 'Todas entregues — voltando à base'
+          : `Em rota p/ ${prox?.clienteNome || 'cliente'}`;
+      const [lat, lng] = coordDaRegiao(m.regiao, i);
+      return {
+        id: m.id,
+        nome: m.motoristaNome,
+        placa: m.placaVeiculo,
+        regiao: m.regiao,
+        status,
+        detalhe,
+        entregasFeitas: feitas,
+        entregasTotal: m.stops.length,
+        lat,
+        lng,
+        capacidadeKg: m.capacidadeKg,
+        pesoTotalKg: m.stops.reduce((s, x) => s + x.pesoKg, 0),
+        stops: m.stops.map((s) => ({
+          ordem: s.ordem,
+          numeroPedido: s.numeroPedido,
+          clienteNome: s.clienteNome,
+          pesoKg: s.pesoKg,
+          status: s.status,
+        })),
+      };
+    });
+
+  if (base.length > 0) return base;
+
+  // Frota de demonstração (com rotas detalhadas)
+  const mock = (
+    id: string,
+    nome: string,
+    placa: string,
+    regiao: string,
+    status: StatusFrota,
+    detalhe: string,
+    cap: number,
+    stops: StopFrota[],
+    idx: number,
+  ): Veiculo => {
+    const [lat, lng] = coordDaRegiao(regiao, idx);
+    return {
+      id,
+      nome,
+      placa,
+      regiao,
+      status,
+      detalhe,
+      entregasFeitas: stops.filter((s) => s.status === 'DELIVERED').length,
+      entregasTotal: stops.length,
+      lat,
+      lng,
+      capacidadeKg: cap,
+      pesoTotalKg: stops.reduce((s, x) => s + x.pesoKg, 0),
+      stops,
+    };
+  };
+
+  return [
+    mock('v1', 'João Silva', 'FRZ1A23', 'CENTRO', 'ATRASADO', 'Em rota p/ Empório Norte — atrasado 10 min', 8000, [
+      { ordem: 1, numeroPedido: 2001, clienteNome: 'Bom Preço', pesoKg: 560, status: 'DELIVERED' },
+      { ordem: 2, numeroPedido: 2002, clienteNome: 'Hortifruti Central', pesoKg: 1560, status: 'DELIVERED' },
+      { ordem: 3, numeroPedido: 2006, clienteNome: 'Empório Norte', pesoKg: 900, status: 'IN_TRANSIT' },
+      { ordem: 4, numeroPedido: 2011, clienteNome: 'Padaria Aurora', pesoKg: 720, status: 'PENDING' },
+    ], 0),
+    mock('v2', 'Pedro Santos', 'FRZ2B34', 'OESTE', 'EM_ROTA', 'Em rota p/ Atacadão Sul', 6000, [
+      { ordem: 1, numeroPedido: 2003, clienteNome: 'Mercado do Zé', pesoKg: 1360, status: 'DELIVERED' },
+      { ordem: 2, numeroPedido: 2004, clienteNome: 'Sabor & Cia', pesoKg: 1080, status: 'IN_TRANSIT' },
+      { ordem: 3, numeroPedido: 2015, clienteNome: 'Atacadão Sul', pesoKg: 1520, status: 'PENDING' },
+    ], 1),
+    mock('v3', 'Antônio Rocha', 'EXV5E67', 'NORTE', 'DESCARREGANDO', 'Descarregando em Bom Preço', 13300, [
+      { ordem: 1, numeroPedido: 2001, clienteNome: 'Bom Preço', pesoKg: 560, status: 'IN_TRANSIT' },
+      { ordem: 2, numeroPedido: 2002, clienteNome: 'Hortifruti Central', pesoKg: 1560, status: 'PENDING' },
+    ], 2),
+    mock('v4', 'José Pereira', 'EXV6F78', 'LESTE', 'RETORNANDO', 'Todas entregues — voltando à base', 6000, [
+      { ordem: 1, numeroPedido: 2007, clienteNome: 'Feira Leste', pesoKg: 1120, status: 'DELIVERED' },
+      { ordem: 2, numeroPedido: 2008, clienteNome: 'Atacadão Sul', pesoKg: 980, status: 'DELIVERED' },
+      { ordem: 3, numeroPedido: 2012, clienteNome: 'Mercado Boa Vista', pesoKg: 640, status: 'DELIVERED' },
+    ], 3),
+  ];
+}
+
+function MapaFrotas({ motoristas, onClose }: { motoristas: Motorista[]; onClose: () => void }) {
+  const [frota] = useState<Veiculo[]>(() => derivarFrota(motoristas));
+  const [selecionado, setSelecionado] = useState<string>(frota[0]?.id || '');
+  const [estadoMapa, setEstadoMapa] = useState<'carregando' | 'ok' | 'erro'>('carregando');
+  const mapEl = useRef<HTMLDivElement | null>(null);
+  const mapInst = useRef<any>(null);
+  const markers = useRef<Record<string, any>>({});
+
+  // Fecha no ESC.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  // Inicializa o mapa real (Leaflet via CDN) + marcadores dos veículos.
+  useEffect(() => {
+    let cancel = false;
+    setEstadoMapa('carregando');
+    carregarLeaflet()
+      .then((L) => {
+        if (cancel || !mapEl.current) return;
+        if (mapInst.current) {
+          mapInst.current.remove();
+          mapInst.current = null;
+        }
+        const map = L.map(mapEl.current, { zoomControl: true, attributionControl: false }).setView(
+          [-23.55, -46.63],
+          12,
+        );
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          subdomains: 'abcd',
+          maxZoom: 19,
+        }).addTo(map);
+        L.marker(BASE_COORD, { icon: baseDivIcon(L), zIndexOffset: 500 }).addTo(map);
+        frota.forEach((v) => {
+          const mk = L.marker([v.lat, v.lng], { icon: veiculoDivIcon(L, v, v.id === selecionado) }).addTo(map);
+          mk.on('click', () => setSelecionado(v.id));
+          markers.current[v.id] = mk;
+        });
+        mapInst.current = map;
+        setEstadoMapa('ok');
+        setTimeout(() => {
+          try {
+            map.invalidateSize();
+          } catch {
+            /* noop */
+          }
+        }, 250);
+      })
+      .catch(() => {
+        if (!cancel) setEstadoMapa('erro');
+      });
+    return () => {
+      cancel = true;
+      if (mapInst.current) {
+        mapInst.current.remove();
+        mapInst.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Recolore os marcadores e voa até o veículo selecionado.
+  useEffect(() => {
+    const L = (window as any).L;
+    if (!L || !mapInst.current) return;
+    frota.forEach((v) => {
+      const mk = markers.current[v.id];
+      if (mk) mk.setIcon(veiculoDivIcon(L, v, v.id === selecionado));
+    });
+    const v = frota.find((x) => x.id === selecionado);
+    if (v) mapInst.current.flyTo([v.lat, v.lng], 13, { duration: 0.6 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selecionado]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-6xl h-[82vh] rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden flex flex-col">
+        {/* Header do modal */}
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-700">
+          <div className="flex items-center gap-2">
+            <Radar className="h-5 w-5 text-emerald-400" />
+            <h2 className="text-lg font-semibold text-white">Mapa de Frotas — Live Tracking</h2>
+            <span className="ml-2 flex items-center gap-1.5 text-[11px] text-emerald-400">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" /> {frota.length} veículos na rua
+            </span>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white rounded-lg p-1.5 hover:bg-slate-800">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_340px] min-h-0">
+          {/* Mapa real (Leaflet via CDN) */}
+          <div className="relative bg-slate-800 min-h-[300px]">
+            <div ref={mapEl} className="absolute inset-0 z-0" />
+
+            {estadoMapa !== 'ok' && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-800 text-slate-400">
+                {estadoMapa === 'carregando' ? (
+                  <>
+                    <Loader2 className="h-7 w-7 animate-spin mb-2 text-sky-400" />
+                    <p className="text-sm">Carregando mapa…</p>
+                  </>
+                ) : (
+                  <div className="text-center px-6">
+                    <MapPin className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">Sem conexão para carregar o mapa.</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Verifique a internet — os motoristas continuam na lista ao lado.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* legenda */}
+            <div className="absolute bottom-3 left-3 z-[500] flex flex-wrap gap-3 bg-slate-900/85 rounded-lg px-3 py-2 pointer-events-none">
+              {(Object.keys(STATUS_META) as StatusFrota[]).map((s) => (
+                <span key={s} className="flex items-center gap-1.5 text-[10px] text-slate-300">
+                  <span className={`h-2 w-2 rounded-full ${STATUS_META[s].dot}`} /> {STATUS_META[s].label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Lista lateral de motoristas na rua */}
+          <aside className="border-t lg:border-t-0 lg:border-l border-slate-700 bg-slate-900 overflow-y-auto">
+            <div className="px-4 py-3 border-b border-slate-800">
+              <p className="text-[11px] uppercase tracking-widest text-slate-500 font-semibold">Motoristas na rua</p>
+            </div>
+            <div className="divide-y divide-slate-800">
+              {frota.map((v) => {
+                const meta = STATUS_META[v.status];
+                const Icon = meta.icon;
+                const ativo = v.id === selecionado;
+                const pct = v.entregasTotal ? Math.round((v.entregasFeitas / v.entregasTotal) * 100) : 0;
+                const ocup = v.capacidadeKg ? Math.min(100, Math.round((v.pesoTotalKg / v.capacidadeKg) * 100)) : 0;
+                return (
+                  <div key={v.id} className={ativo ? 'bg-slate-800/70' : 'hover:bg-slate-800/40'}>
+                    <button onClick={() => setSelecionado(v.id)} className="w-full text-left px-4 py-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${meta.dot}`} />
+                          <p className="font-medium text-white truncate">{v.nome}</p>
+                        </div>
+                        <span className="text-[10px] text-slate-500 shrink-0">{v.placa}</span>
+                      </div>
+                      <p className={`text-[12px] mt-1 flex items-center gap-1.5 ${meta.cor}`}>
+                        <Icon className="h-3.5 w-3.5 shrink-0" /> {v.detalhe}
+                      </p>
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="h-1.5 flex-1 rounded-full bg-slate-700 overflow-hidden">
+                          <div className={`h-full ${meta.dot}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-[10px] text-slate-500 shrink-0 flex items-center gap-1">
+                          <Clock className="h-3 w-3" /> {v.entregasFeitas}/{v.entregasTotal}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Detalhes da rota — expandido ao selecionar o motorista */}
+                    {ativo && (
+                      <div className="px-4 pb-4 pt-1 border-t border-slate-800/70 animate-in fade-in">
+                        <div className="grid grid-cols-3 gap-2 my-3">
+                          <MiniStat label="Região" valor={v.regiao} />
+                          <MiniStat label="Paradas" valor={String(v.entregasTotal)} />
+                          <MiniStat label="Ocupação" valor={`${ocup}%`} />
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1">
+                          <span className="flex items-center gap-1">
+                            <Weight className="h-3 w-3" /> Carga
+                          </span>
+                          <span>
+                            {kg(v.pesoTotalKg)} / {kg(v.capacidadeKg)}
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden mb-3">
+                          <div className={`h-full ${meta.dot}`} style={{ width: `${ocup}%` }} />
+                        </div>
+
+                        <p className="text-[11px] uppercase tracking-widest text-slate-500 font-semibold mb-2">
+                          Paradas da rota
+                        </p>
+                        <ol className="space-y-1.5">
+                          {v.stops.map((s) => {
+                            const entregue = s.status === 'DELIVERED';
+                            const emRota = s.status === 'IN_TRANSIT';
+                            return (
+                              <li key={`${v.id}-${s.ordem}`} className="flex items-center gap-2 text-[13px]">
+                                <span
+                                  className={`h-5 w-5 rounded-full text-[10px] flex items-center justify-center font-semibold shrink-0 ${
+                                    entregue
+                                      ? 'bg-emerald-500 text-white'
+                                      : emRota
+                                      ? 'bg-sky-500 text-white'
+                                      : 'bg-slate-700 text-slate-300'
+                                  }`}
+                                >
+                                  {entregue ? <CheckCircle2 className="h-3 w-3" /> : s.ordem}
+                                </span>
+                                <MapPin className="h-3 w-3 text-slate-500 shrink-0" />
+                                <span className="truncate flex-1 text-slate-200">
+                                  #{s.numeroPedido} · {s.clienteNome}
+                                </span>
+                                <span className="text-[11px] text-slate-500 shrink-0">{kg(s.pesoKg)}</span>
+                                {entregue && <span className="text-[10px] text-emerald-400 shrink-0">ok</span>}
+                                {emRota && <span className="text-[10px] text-sky-400 shrink-0">agora</span>}
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, valor }: { label: string; valor: string }) {
+  return (
+    <div className="rounded-lg bg-slate-900/60 border border-slate-700 px-2 py-1.5 text-center">
+      <p className="text-[9px] uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-sm font-semibold text-slate-100 truncate">{valor}</p>
     </div>
   );
 }
