@@ -20,6 +20,31 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-06] — App de Compras conectado ao ERP + Custos & Margem (regra KG, edição inline, Relatório do Cliente)
+
+### O que mudou
+- **App de Compras (`AppComprador`) conectado ao banco real do ERP**: removido todo o mock. Agora
+  consome `/compras` (listar/criar/aprovar/cancelar), `/estoque/:filial/a-comprar` (reposição
+  abaixo do mínimo), `/produtos` (filtrados para **FLV** — frutas, legumes e verduras) e
+  `/fornecedores`. OCs criadas no app aparecem no sistema e vice-versa.
+- **Fluxo de papéis corrigido**: o comprador **aprova** OCs mas **não dá entrada no estoque**
+  (responsabilidade do time de Recebimento) — aba de recebimento/geofencing removida. Restam 2
+  abas: **Aprovações** (header de orçamento mensal + OCs pendentes/resolvidas) e **Reposição**
+  (lista compacta de produtos em estado crítico, ordenada por nível de estoque, com atalho
+  "Comprar" que pré-preenche a Nova OC).
+- **Custos & Margem (`/financeiro/custos`)**: motor de conversão `normalizeToKg` (KG/G/CX/UN →
+  custos e preços sempre por **KG**), células com **edição inline** por clique (foco azul,
+  commit em Enter/blur, recálculo instantâneo) e nova aba **Relatório do Cliente** — documento
+  branco elegante (logo, seleção de cliente, visão Diária/Semanal/Mensal, filtro de datas,
+  totalizadores e "Imprimir / Salvar PDF" via `window.print()` com `@media print`).
+
+### Arquivos modificados
+- `frontend/src/modules/compras/pages/AppComprador.tsx`
+- `frontend/src/modules/financeiro/pages/Custos.tsx`
+- `frontend/src/services/api.ts`
+
+---
+
 ## [2026-07-06] — Módulo Financeiro (DRE), App de Compras e ordem livre de entregas
 
 ### O que mudou

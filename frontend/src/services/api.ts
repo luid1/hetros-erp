@@ -72,6 +72,19 @@ export const produtosApi = {
   buscarPorBarras: (codigo: string) => api.get('/produtos/barras/' + codigo),
 };
 
+// Compras (Ordens de Compra) + Fornecedores + sugestão de reposição
+export const comprasApi = {
+  list: (params?: object) => api.get('/compras', { params }),
+  get: (id: string) => api.get(`/compras/${id}`),
+  create: (data: object) => api.post('/compras', data),
+  updateStatus: (id: string, status: string) => api.patch(`/compras/${id}/status`, { status }),
+  aComprar: (filialId: string) => api.get(`/estoque/${filialId}/a-comprar`),
+};
+
+export const fornecedoresApi = {
+  list: (params?: object) => api.get('/fornecedores', { params }),
+};
+
 // Financeiro
 export const financeiroApi = {
   // Contas a Receber
