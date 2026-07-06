@@ -36,6 +36,7 @@ const navigation: NavGroup[] = [
       { to: '/wms/posicao',       icon: Warehouse,      label: 'Posição de Estoque' },
       { to: '/wms/pereciveis',    icon: AlertTriangle,  label: 'Perecíveis / FLV', badge: '!', badgeColor: 'bg-red-500' },
       { to: '/wms/compras',       icon: ShoppingCart,   label: 'Ordens de Compra' },
+      { to: '/compras/app',       icon: ShoppingCart,   label: 'App de Compras', highlight: true },
       { to: '/wms/entradas',      icon: ClipboardList,  label: 'Entradas (XML NF-e)' },
       { to: '/wms/movimentacoes', icon: BarChart3,      label: 'Movimentações' },
       { to: '/wms/inventario',    icon: ClipboardList,  label: 'Inventário' },

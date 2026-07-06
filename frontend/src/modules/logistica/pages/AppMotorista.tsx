@@ -341,6 +341,17 @@ export default function AppMotorista() {
     setAba('finalizar');
   }
 
+  // Permite escolher livremente qualquer cliente como "entrega atual" — a ordem não é
+  // obrigatória; o motorista pode pular uma parada e voltar nela depois.
+  function selecionarParada(idx: number) {
+    setAtivaIdx(idx);
+    setParadas((prev) =>
+      prev.map((p, i) =>
+        i === idx && p.status === 'PENDING' ? { ...p, status: 'IN_TRANSIT' } : p,
+      ),
+    );
+  }
+
   async function confirmarEntrega(payload: {
     recebedorNome: string;
     recebedorDoc?: string;
@@ -426,12 +437,21 @@ export default function AppMotorista() {
             <TimelineTab paradas={paradas} ativaIdx={ativaIdx} onIniciar={iniciarParada} onFinalizar={irParaFinalizar} />
           )}
           {aba === 'mapa' && (
-            <MapaTab paradaAtiva={paradaAtiva} paradas={paradas} pos={pos} onFinalizar={() => irParaFinalizar(ativaIdx)} />
+            <MapaTab
+              paradaAtiva={paradaAtiva}
+              paradas={paradas}
+              pos={pos}
+              onFinalizar={() => irParaFinalizar(ativaIdx)}
+              onSelecionar={selecionarParada}
+              onFinalizarParada={irParaFinalizar}
+            />
           )}
           {aba === 'finalizar' && (
             <WizardFinalizar
               key={`${paradaAtiva.id}:${paradaAtiva.nfes.length}`}
               parada={paradaAtiva}
+              paradas={paradas}
+              onTrocarCliente={selecionarParada}
               onConfirmar={confirmarEntrega}
             />
           )}
@@ -710,11 +730,15 @@ function MapaTab({
   paradas,
   pos,
   onFinalizar,
+  onSelecionar,
+  onFinalizarParada,
 }: {
   paradaAtiva: Parada;
   paradas: Parada[];
   pos: { lat: number; lng: number; acc: number } | null;
   onFinalizar: () => void;
+  onSelecionar: (idx: number) => void;
+  onFinalizarParada: (idx: number) => void;
 }) {
   const destino = encodeURIComponent(paradaAtiva.endereco);
   const waze = `https://waze.com/ul?q=${destino}&navigate=yes`;
@@ -804,32 +828,54 @@ function MapaTab({
         </div>
       </section>
 
-      {/* ── Programação do Dia ── */}
+      {/* ── Programação do Dia (ordem livre) ── */}
       <section>
-        <h2 className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-2 flex items-center justify-between">
+        <h2 className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-1 flex items-center justify-between">
           Programação do Dia <span className="text-slate-600 normal-case tracking-normal">{programacao.length} restante(s)</span>
         </h2>
+        <p className="text-[11px] text-slate-500 mb-2">
+          Toque em um cliente para entregá-lo agora — você pode seguir em qualquer ordem e voltar depois.
+        </p>
         {programacao.length === 0 ? (
           <p className="text-[13px] text-slate-500 italic py-4 text-center">Sem outras paradas pendentes. 🎉</p>
         ) : (
           <div className="space-y-2">
-            {programacao.map((p, i) => (
-              <div key={p.id} className="rounded-xl border border-slate-800 bg-slate-800/30 px-3 py-2.5 flex items-center gap-3">
-                <span className="h-7 w-7 rounded-full bg-slate-700 text-slate-300 text-[11px] font-semibold flex items-center justify-center shrink-0">
-                  {i + 2}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-white truncate">{p.cliente}</p>
-                  <p className="text-[11px] text-slate-500 truncate">{p.endereco}</p>
+            {programacao.map((p) => {
+              const idx = paradas.findIndex((x) => x.id === p.id);
+              return (
+                <div
+                  key={p.id}
+                  className="rounded-xl border border-slate-800 bg-slate-800/30 px-3 py-2.5 flex items-center gap-3 hover:border-sky-500/50 hover:bg-slate-800/60 transition"
+                >
+                  <button
+                    onClick={() => onSelecionar(idx)}
+                    className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                    title="Definir como entrega atual"
+                  >
+                    <span className="h-7 w-7 rounded-full bg-slate-700 text-slate-300 flex items-center justify-center shrink-0">
+                      <MapPin className="h-3.5 w-3.5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-white truncate">{p.cliente}</p>
+                      <p className="text-[11px] text-slate-500 truncate">{p.endereco}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[11px] text-sky-400/80 flex items-center gap-1 justify-end">
+                        <Timer className="h-3 w-3" /> {p.etaPrevisto}
+                      </p>
+                      <p className="text-[10px] text-slate-500">{p.janela}</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => onFinalizarParada(idx)}
+                    className="shrink-0 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 px-2.5 py-1.5 text-[11px] font-semibold hover:bg-emerald-500/25"
+                    title="Finalizar a entrega deste cliente"
+                  >
+                    Finalizar
+                  </button>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-[11px] text-sky-400/80 flex items-center gap-1 justify-end">
-                    <Timer className="h-3 w-3" /> {p.etaPrevisto}
-                  </p>
-                  <p className="text-[10px] text-slate-500">{p.janela}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -840,9 +886,13 @@ function MapaTab({
 /* ────────────────────────── Aba 3: Wizard de finalização ───────────────────── */
 function WizardFinalizar({
   parada,
+  paradas,
+  onTrocarCliente,
   onConfirmar,
 }: {
   parada: Parada;
+  paradas: Parada[];
+  onTrocarCliente: (idx: number) => void;
   onConfirmar: (p: {
     recebedorNome: string;
     recebedorDoc?: string;
@@ -852,6 +902,8 @@ function WizardFinalizar({
     numeroNfe?: string;
   }) => Promise<void>;
 }) {
+  // Clientes ainda não entregues — permite trocar livremente qual finalizar agora.
+  const clientesPendentes = paradas.filter((p) => p.status !== 'DELIVERED');
   const [passo, setPasso] = useState<1 | 2 | 3>(1);
   const [recebedor, setRecebedor] = useState('');
   const [cpf, setCpf] = useState('');
@@ -882,6 +934,37 @@ function WizardFinalizar({
           </div>
         ))}
       </div>
+
+      {/* Seletor de cliente — troque livremente qual entrega finalizar */}
+      {clientesPendentes.length > 1 && (
+        <div className="mb-3">
+          <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold mb-2 flex items-center gap-1.5">
+            <User className="h-3.5 w-3.5" /> Cliente a finalizar ({clientesPendentes.length} pendentes)
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            {clientesPendentes.map((p) => {
+              const idx = paradas.findIndex((x) => x.id === p.id);
+              const ativo = p.id === parada.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => onTrocarCliente(idx)}
+                  className={`shrink-0 rounded-xl border px-3 py-2 text-left transition ${
+                    ativo
+                      ? 'border-sky-500 bg-sky-500/15 text-white'
+                      : 'border-slate-700 bg-slate-800/40 text-slate-300 hover:border-slate-600'
+                  }`}
+                >
+                  <p className="text-[13px] font-medium truncate max-w-[140px]">{p.cliente}</p>
+                  <p className="text-[10px] text-slate-500">
+                    #{p.numero} · {p.nfes.length} NF-e
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <p className="text-[12px] text-slate-500 mb-3">
         Pedido <span className="text-slate-300">#{parada.numero}</span> · {parada.cliente}

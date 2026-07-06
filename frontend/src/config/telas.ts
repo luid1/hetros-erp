@@ -19,6 +19,7 @@ export const TELAS: TelaDef[] = [
   { key: '/wms/movimentacoes', label: 'Movimentações', grupo: 'Estoque / WMS' },
   { key: '/wms/inventario', label: 'Inventário', grupo: 'Estoque / WMS' },
   { key: '/wms/analise-estoque', label: 'Análise Estoque Físico', grupo: 'Estoque / WMS' },
+  { key: '/compras/app', label: 'App de Compras', grupo: 'Estoque / WMS' },
   // Logística
   { key: '/logistica/pedidos', label: 'Pedidos de Venda', grupo: 'Logística' },
   { key: '/logistica/carga', label: 'Controle de Carga', grupo: 'Logística' },

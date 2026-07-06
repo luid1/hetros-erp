@@ -29,6 +29,8 @@ import Entradas from './modules/estoque/pages/Entradas';
 import Movimentacoes from './modules/estoque/pages/Movimentacoes';
 import Inventario from './modules/estoque/pages/Inventario';
 import Compras from './modules/estoque/pages/Compras';
+import AppComprador from './modules/compras/pages/AppComprador';
+import FinancialHub from './modules/financeiro/pages/FinancialHub';
 import Faturamento from './modules/fiscal/pages/Faturamento';
 import NotasEmitidas from './modules/fiscal/pages/NotasEmitidas';
 import MatrizFiscal from './modules/fiscal/pages/MatrizFiscal';
@@ -82,6 +84,7 @@ export default function App() {
             <Route path="wms/movimentacoes" element={<Movimentacoes />} />
             <Route path="wms/inventario" element={<Inventario />} />
             <Route path="wms/compras" element={<Compras />} />
+            <Route path="compras/app" element={<AppComprador />} />
             <Route path="wms/analise-estoque" element={<AnaliseEstoqueFisico />} />
 
             {/* Logística */}
@@ -107,7 +110,7 @@ export default function App() {
             <Route path="financeiro/fluxo-caixa" element={<FluxoCaixa />} />
             <Route path="financeiro/receber" element={<ContasReceber />} />
             <Route path="financeiro/pagar" element={<ContasPagar />} />
-            <Route path="financeiro/dre" element={<Placeholder title="DRE & Relatórios" />} />
+            <Route path="financeiro/dre" element={<FinancialHub />} />
             <Route path="financeiro/custos" element={<Custos />} />
 
             {/* Gerencial */}

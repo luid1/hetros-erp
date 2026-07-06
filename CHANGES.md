@@ -20,6 +20,32 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-06] — Módulo Financeiro (DRE), App de Compras e ordem livre de entregas
+
+### O que mudou
+- **Módulo Financeiro e Controladoria (`FinancialHub`, `/financeiro/dre`)**: hub com 4 abas —
+  (1) **Dashboard DRE & Caixa** com KPIs oversized (Receita Bruta → Impostos → Receita Líquida →
+  CMV → Despesas Operacionais → Lucro Líquido) e painéis de Contas a Receber/Pagar; (2)
+  **Rentabilidade por Cliente** (grid denso com sticky header/coluna, colunas de valor líquido,
+  CMV, frete, custos operacionais, resultado e margem % com cor semântica, linha totalizadora);
+  (3) **Rentabilidade por Produto** (produtos agrícolas, preço/custo médio, lucro bruto, margem %,
+  totalizador); (4) **Gestão de Títulos** (receitas + despesas, tags PAGO/PENDENTE/ATRASADO,
+  ações Baixar Título / Ver Detalhes em drawer). Paleta off-white, cores semânticas emerald/rose.
+- **App de Compras e Abastecimento (`AppComprador`, `/compras/app`)**: simulação de smartphone com
+  3 abas — Dashboard & CIs (orçamento R$45.000, aprovação por swipe/botão com dedução em tempo real),
+  Estoque & Nova CI (busca + FAB com formulário), Recebimento com **geofencing** (200m do CD).
+- **App do Motorista — ordem livre de entregas**: motorista pode escolher qualquer cliente para
+  entregar em qualquer ordem, pular uma parada e voltar depois; seletor de cliente no wizard de
+  finalização e cartões clicáveis na Programação do Dia.
+
+### Arquivos modificados
+- `frontend/src/modules/financeiro/pages/FinancialHub.tsx` (novo)
+- `frontend/src/modules/compras/pages/AppComprador.tsx` (novo)
+- `frontend/src/modules/logistica/pages/AppMotorista.tsx`
+- `frontend/src/App.tsx`, `frontend/src/components/layout/AppShell.tsx`, `frontend/src/config/telas.ts`
+
+---
+
 ## [2026-07-05] — Logística Avançada: Rotas + Torre de Controle + App do Motorista + Ponte Fiscal SEFAZ
 
 ### O que mudou
