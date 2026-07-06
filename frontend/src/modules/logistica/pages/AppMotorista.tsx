@@ -51,12 +51,19 @@ interface Parada {
   volumes: number;
   telefone?: string;
   etaPrevisto: string;
-  // NF-e vinculada ao pedido — dá origem ao canhoto que será assinado.
-  numeroNfe?: string;
-  numeroCanhoto?: string;
-  chaveNfe?: string;
+  // NF-e(s) vinculada(s) ao pedido/cliente — cada uma gera um canhoto a assinar.
+  // Um mesmo cliente pode ter mais de uma NF-e na mesma parada.
+  nfes: NfeInfo[];
   lat?: number;
   lng?: number;
+}
+
+interface NfeInfo {
+  id: string;
+  numero: string;
+  canhoto: string;
+  chave?: string;
+  valor?: number;
 }
 
 /* ── Paradas de demonstração (fallback quando não há rota real) ── */
@@ -73,9 +80,22 @@ const PARADAS_MOCK: Parada[] = [
     volumes: 62,
     telefone: '(11) 3000-0001',
     etaPrevisto: '08:40',
-    numeroNfe: '000012845',
-    numeroCanhoto: '000012845',
-    chaveNfe: '3524 0100 0000 0000 0001 5500 1000 0012 8451 2345 6789',
+    nfes: [
+      {
+        id: 'nfe-2845',
+        numero: '000012845',
+        canhoto: '000012845',
+        chave: '3524 0100 0000 0000 0001 5500 1000 0012 8451 2345 6789',
+        valor: 8420.5,
+      },
+      {
+        id: 'nfe-2848',
+        numero: '000012848',
+        canhoto: '000012848',
+        chave: '3524 0100 0000 0000 0001 5500 1000 0012 8481 2345 6792',
+        valor: 3110.0,
+      },
+    ],
     lat: -23.5613,
     lng: -46.6565,
   },
@@ -91,9 +111,15 @@ const PARADAS_MOCK: Parada[] = [
     volumes: 60,
     telefone: '(11) 3000-0002',
     etaPrevisto: '10:25',
-    numeroNfe: '000012846',
-    numeroCanhoto: '000012846',
-    chaveNfe: '3524 0100 0000 0000 0001 5500 1000 0012 8461 2345 6790',
+    nfes: [
+      {
+        id: 'nfe-2846',
+        numero: '000012846',
+        canhoto: '000012846',
+        chave: '3524 0100 0000 0000 0001 5500 1000 0012 8461 2345 6790',
+        valor: 5640.9,
+      },
+    ],
     lat: -23.5320,
     lng: -46.6290,
   },
@@ -109,9 +135,15 @@ const PARADAS_MOCK: Parada[] = [
     volumes: 68,
     telefone: '(11) 3000-0003',
     etaPrevisto: '13:35',
-    numeroNfe: '000012847',
-    numeroCanhoto: '000012847',
-    chaveNfe: '3524 0100 0000 0000 0001 5500 1000 0012 8471 2345 6791',
+    nfes: [
+      {
+        id: 'nfe-2847',
+        numero: '000012847',
+        canhoto: '000012847',
+        chave: '3524 0100 0000 0000 0001 5500 1000 0012 8471 2345 6791',
+        valor: 7290.0,
+      },
+    ],
     lat: -23.5670,
     lng: -46.6920,
   },
@@ -239,31 +271,43 @@ export default function AppMotorista() {
               pesoKg: Number(s.pesoKg || 0),
               volumes: Number(s.volumes || 0),
               etaPrevisto: s.janelaInicio || addMinutos('08:00', 40 + i * 90),
+              nfes: [],
               lat: s.latitude ?? undefined,
               lng: s.longitude ?? undefined,
             }),
           ),
         );
 
-        // Puxa as NF-e da filial e vincula por pedido → canhoto a assinar.
+        // Puxa as NF-e da filial e vincula por pedido → canhoto(s) a assinar.
+        // Um cliente/pedido pode ter mais de uma NF-e; coletamos todas.
         if (filialId) {
           try {
             const { data: nfeData } = await nfeApi.list(filialId);
             const notas = nfeData?.items || nfeData || [];
-            const porPedido = new Map<string, any>();
-            const porNumeroPedido = new Map<number, any>();
+            const porPedido = new Map<string, any[]>();
+            const porNumeroPedido = new Map<number, any[]>();
             notas.forEach((n: any) => {
-              if (n.pedidoId) porPedido.set(String(n.pedidoId), n);
-              if (n.numeroPedido != null) porNumeroPedido.set(Number(n.numeroPedido), n);
+              if (n.pedidoId) {
+                const k = String(n.pedidoId);
+                (porPedido.get(k) || porPedido.set(k, []).get(k)!).push(n);
+              }
+              if (n.numeroPedido != null) {
+                const k = Number(n.numeroPedido);
+                (porNumeroPedido.get(k) || porNumeroPedido.set(k, []).get(k)!).push(n);
+              }
             });
             stops.forEach((st) => {
-              const nf = porPedido.get(String(st.pedidoId)) || porNumeroPedido.get(st.numero);
-              if (nf) {
+              const encontradas = porPedido.get(String(st.pedidoId)) || porNumeroPedido.get(st.numero) || [];
+              st.nfes = encontradas.map((nf: any) => {
                 const num = String(nf.numero ?? nf.numeroNfe ?? '');
-                st.numeroNfe = num || undefined;
-                st.numeroCanhoto = num || undefined;
-                st.chaveNfe = nf.chaveAcesso || nf.chave || undefined;
-              }
+                return {
+                  id: String(nf.id ?? num),
+                  numero: num,
+                  canhoto: num,
+                  chave: nf.chaveAcesso || nf.chave || undefined,
+                  valor: nf.valorTotal != null ? Number(nf.valorTotal) : undefined,
+                };
+              });
             });
           } catch {
             /* sem NF-e vinculada — segue sem canhoto */
@@ -302,24 +346,41 @@ export default function AppMotorista() {
     recebedorDoc?: string;
     fotoBase64?: string;
     assinaturaBase64: string;
+    nfeId?: string;
+    numeroNfe?: string;
   }) {
     const stopId = paradaAtiva.id;
-    const corpo = {
+    const corpo: any = {
       latitude: pos?.lat ?? 0,
       longitude: pos?.lng ?? 0,
       assinaturaBase64: payload.assinaturaBase64,
       fotoBase64: payload.fotoBase64,
       recebedorNome: payload.recebedorNome,
       recebedorDoc: payload.recebedorDoc,
+      nfeId: payload.nfeId,
     };
     if (!stopId.startsWith('mock') && !stopId.startsWith('s')) {
       await rotasApi.confirmarEntrega(stopId, corpo);
     }
-    setParadas((prev) => prev.map((p, i) => (i === ativaIdx ? { ...p, status: 'DELIVERED' } : p)));
-    toast('✅ Entrega confirmada! Comprovante registrado.', 'success');
-    const prox = paradas.findIndex((p, i) => i !== ativaIdx && p.status !== 'DELIVERED');
-    setAtivaIdx(prox >= 0 ? prox : ativaIdx);
-    setAba('rota');
+
+    // Remove só a NF-e finalizada; a parada só é concluída quando não sobra NF-e.
+    setParadas((prev) =>
+      prev.map((p, i) => {
+        if (i !== ativaIdx) return p;
+        const restantes = payload.nfeId ? p.nfes.filter((n) => n.id !== payload.nfeId) : [];
+        return { ...p, nfes: restantes, status: restantes.length === 0 ? 'DELIVERED' : p.status };
+      }),
+    );
+
+    const paradaConcluida = !payload.nfeId || paradaAtiva.nfes.filter((n) => n.id !== payload.nfeId).length === 0;
+    if (paradaConcluida) {
+      toast('✅ Entrega confirmada! Comprovante registrado.', 'success');
+      const prox = paradas.findIndex((p, i) => i !== ativaIdx && p.status !== 'DELIVERED');
+      setAtivaIdx(prox >= 0 ? prox : ativaIdx);
+      setAba('rota');
+    } else {
+      toast(`✅ NF-e ${payload.numeroNfe} finalizada. Assine a próxima NF-e deste cliente.`, 'success');
+    }
   }
 
   /* ── Moldura do celular ── */
@@ -368,7 +429,11 @@ export default function AppMotorista() {
             <MapaTab paradaAtiva={paradaAtiva} paradas={paradas} pos={pos} onFinalizar={() => irParaFinalizar(ativaIdx)} />
           )}
           {aba === 'finalizar' && (
-            <WizardFinalizar key={paradaAtiva.id} parada={paradaAtiva} onConfirmar={confirmarEntrega} />
+            <WizardFinalizar
+              key={`${paradaAtiva.id}:${paradaAtiva.nfes.length}`}
+              parada={paradaAtiva}
+              onConfirmar={confirmarEntrega}
+            />
           )}
         </main>
 
@@ -595,7 +660,7 @@ function MapaEntregas({
       L.marker([lat, lng], { icon })
         .addTo(layer.current)
         .bindPopup(
-          `<b>#${p.numero}</b> — ${p.cliente}<br/>${p.endereco}${p.numeroNfe ? `<br/>NF-e ${p.numeroNfe}` : ''}`,
+          `<b>#${p.numero}</b> — ${p.cliente}<br/>${p.endereco}${p.nfes.length ? `<br/>${p.nfes.length} NF-e(s): ${p.nfes.map((n) => n.numero).join(', ')}` : ''}`,
         );
     });
 
@@ -778,13 +843,23 @@ function WizardFinalizar({
   onConfirmar,
 }: {
   parada: Parada;
-  onConfirmar: (p: { recebedorNome: string; recebedorDoc?: string; fotoBase64?: string; assinaturaBase64: string }) => Promise<void>;
+  onConfirmar: (p: {
+    recebedorNome: string;
+    recebedorDoc?: string;
+    fotoBase64?: string;
+    assinaturaBase64: string;
+    nfeId?: string;
+    numeroNfe?: string;
+  }) => Promise<void>;
 }) {
   const [passo, setPasso] = useState<1 | 2 | 3>(1);
   const [recebedor, setRecebedor] = useState('');
   const [cpf, setCpf] = useState('');
   const [fotoBase64, setFotoBase64] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  // NF-e pré-selecionada (a primeira já vem marcada ao clicar em "Cheguei").
+  const [nfeSelId, setNfeSelId] = useState<string>(parada.nfes[0]?.id || '');
+  const nfeSel = parada.nfes.find((n) => n.id === nfeSelId) || parada.nfes[0];
 
   function onFoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -812,23 +887,55 @@ function WizardFinalizar({
         Pedido <span className="text-slate-300">#{parada.numero}</span> · {parada.cliente}
       </p>
 
-      {/* NF-e vinculada → origem do canhoto a assinar */}
-      {parada.numeroNfe ? (
-        <div className="mb-4 rounded-xl border border-sky-500/30 bg-sky-500/5 px-3 py-2.5">
-          <div className="flex items-center gap-2 text-sky-300">
-            <FileText className="h-4 w-4" />
-            <span className="text-sm font-semibold">NF-e Nº {parada.numeroNfe}</span>
-            <span className="ml-auto flex items-center gap-1 text-[12px] text-amber-300">
-              <Hash className="h-3.5 w-3.5" /> Canhoto {parada.numeroCanhoto}
-            </span>
-          </div>
-          {parada.chaveNfe && (
-            <p className="text-[10px] text-slate-500 mt-1 break-all">Chave: {parada.chaveNfe}</p>
-          )}
-        </div>
-      ) : (
+      {/* NF-e(s) do cliente → escolha qual finalizar (a 1ª já vem selecionada) */}
+      {parada.nfes.length === 0 ? (
         <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 text-[12px] text-amber-300 flex items-center gap-2">
           <FileText className="h-4 w-4" /> Pedido sem NF-e vinculada — canhoto será gerado sem número fiscal.
+        </div>
+      ) : (
+        <div className="mb-4">
+          <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold mb-2 flex items-center gap-1.5">
+            <FileText className="h-3.5 w-3.5" />
+            {parada.nfes.length > 1 ? `Escolha a NF-e (${parada.nfes.length} para este cliente)` : 'NF-e do cliente'}
+          </p>
+          <div className="space-y-2">
+            {parada.nfes.map((nf) => {
+              const ativo = nf.id === nfeSelId;
+              return (
+                <button
+                  key={nf.id}
+                  onClick={() => setNfeSelId(nf.id)}
+                  className={`w-full text-left rounded-xl border px-3 py-2.5 transition ${
+                    ativo
+                      ? 'border-sky-500/70 bg-sky-500/10 ring-1 ring-sky-500/40'
+                      : 'border-slate-700 bg-slate-800/40 hover:border-slate-500'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-4 w-4 rounded-full border-2 shrink-0 ${
+                        ativo ? 'border-sky-400 bg-sky-400' : 'border-slate-600'
+                      }`}
+                    />
+                    <span className={`text-sm font-semibold ${ativo ? 'text-sky-200' : 'text-slate-200'}`}>
+                      NF-e Nº {nf.numero}
+                    </span>
+                    <span className="ml-auto flex items-center gap-1 text-[12px] text-amber-300">
+                      <Hash className="h-3.5 w-3.5" /> Canhoto {nf.canhoto}
+                    </span>
+                  </div>
+                  {typeof nf.valor === 'number' && (
+                    <p className="text-[11px] text-slate-400 mt-1 pl-6">
+                      Valor: {nf.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                  )}
+                  {ativo && nf.chave && (
+                    <p className="text-[10px] text-slate-500 mt-1 pl-6 break-all">Chave: {nf.chave}</p>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -929,8 +1036,8 @@ function WizardFinalizar({
       {passo === 3 && (
         <PassoAssinatura
           enviando={enviando}
-          numeroCanhoto={parada.numeroCanhoto}
-          numeroNfe={parada.numeroNfe}
+          numeroCanhoto={nfeSel?.canhoto}
+          numeroNfe={nfeSel?.numero}
           onVoltar={() => setPasso(2)}
           onConfirmar={async (assinaturaBase64) => {
             setEnviando(true);
@@ -940,6 +1047,8 @@ function WizardFinalizar({
                 recebedorDoc: cpf.trim() || undefined,
                 fotoBase64: fotoBase64 || undefined,
                 assinaturaBase64,
+                nfeId: nfeSel?.id,
+                numeroNfe: nfeSel?.numero,
               });
             } finally {
               setEnviando(false);

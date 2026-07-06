@@ -218,6 +218,9 @@ export default function TorreControle() {
   const [favoritos, setFavoritos] = useState<Set<string>>(carregarFavoritos);
   const [verMais, setVerMais] = useState(false);
 
+  // Painel lateral de telemetria por motorista
+  const [selectedDriverId, setSelectedDriverId] = useState<string | null>(null);
+
   // Garante que os motoristas favoritos apareçam sempre como alvos de arraste,
   // mesclados com as rotas carregadas (sem duplicar por nome).
   function mesclarFrequentes(base: Motorista[], favs: Set<string>): Motorista[] {
@@ -254,6 +257,12 @@ export default function TorreControle() {
       return ROSTER_MOTORISTAS.filter((r) => !ativos.has(r.motoristaNome.toLowerCase()));
     },
     [motoristas],
+  );
+
+  // Motorista aberto no painel lateral — re-derivado do array para refletir add/remove de paradas.
+  const selectedDriver = useMemo(
+    () => (selectedDriverId ? motoristas.find((m) => m.id === selectedDriverId) ?? null : null),
+    [selectedDriverId, motoristas],
   );
 
   async function carregar() {
@@ -555,7 +564,7 @@ export default function TorreControle() {
                 e.preventDefault();
                 onDropNaRota(m.id);
               }}
-              onRemoveStop={(s) => removerStop(m.id, s)}
+              onOpen={() => setSelectedDriverId(m.id)}
             />
           ))}
 
@@ -644,6 +653,15 @@ export default function TorreControle() {
 
       {/* ── Modal: Mapa de Frotas (telemetria live) ── */}
       {mapaAberto && <MapaFrotas motoristas={motoristas} onClose={() => setMapaAberto(false)} />}
+
+      {/* ── Painel lateral: telemetria por motorista ── */}
+      {selectedDriver && (
+        <DriverDrawer
+          motorista={selectedDriver}
+          onClose={() => setSelectedDriverId(null)}
+          onRemoveStop={(s) => removerStop(selectedDriver.id, s)}
+        />
+      )}
     </div>
   );
 }
@@ -674,7 +692,7 @@ function MotoristaCard({
   onDragOver,
   onDragLeave,
   onDrop,
-  onRemoveStop,
+  onOpen,
 }: {
   motorista: Motorista;
   favorito: boolean;
@@ -683,108 +701,351 @@ function MotoristaCard({
   onDragOver: (e: React.DragEvent) => void;
   onDragLeave: () => void;
   onDrop: (e: React.DragEvent) => void;
-  onRemoveStop: (s: Stop) => void;
+  onOpen: () => void;
 }) {
   const peso = pesoDaRota(motorista);
-  const vols = volumesDaRota(motorista);
   const pct = ocupacao(motorista);
   const pctBar = Math.min(pct, 100);
   const barra = pct > 100 ? 'bg-rose-500' : pct >= 90 ? 'bg-amber-400' : 'bg-emerald-500';
 
   return (
-    <div
+    <button
+      type="button"
+      onClick={onOpen}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={`rounded-2xl border p-4 transition ${
+      className={`w-full text-left rounded-2xl border px-3.5 py-3 transition group ${
         isOver
           ? 'border-sky-400 bg-sky-500/10 ring-2 ring-sky-400/40 scale-[1.01]'
-          : 'border-slate-700 bg-slate-800/50'
+          : 'border-slate-700 bg-slate-800/50 hover:border-slate-600 hover:bg-slate-800'
       }`}
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-full bg-slate-700 flex items-center justify-center">
-            <User className="h-4 w-4 text-emerald-400" />
-          </div>
-          <button
-            onClick={onToggleFavorito}
-            title={favorito ? 'Remover dos frequentes' : 'Marcar como frequente'}
-            className="shrink-0"
-          >
-            <Star
-              className={`h-4 w-4 transition ${
-                favorito ? 'text-amber-400 fill-amber-400' : 'text-slate-600 hover:text-amber-400'
-              }`}
-            />
-          </button>
-          <div>
-            <p className="font-medium leading-tight text-white flex items-center gap-1.5">
-              {motorista.motoristaNome}
-              {favorito && (
-                <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-300 border border-amber-400/30">
-                  Frequente
-                </span>
-              )}
-            </p>
-            <p className="text-[11px] text-slate-400">
-              {motorista.placaVeiculo} · {motorista.regiao}
-              {motorista.origemOtimizacao === 'IA_OPTIMIZER' && ' · 🤖 IA'}
-            </p>
-          </div>
+      <div className="flex items-center gap-3">
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorito();
+          }}
+          title={favorito ? 'Remover dos frequentes' : 'Marcar como frequente'}
+          className="shrink-0 cursor-pointer"
+        >
+          <Star
+            className={`h-4 w-4 transition ${
+              favorito ? 'text-amber-400 fill-amber-400' : 'text-slate-600 hover:text-amber-400'
+            }`}
+          />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <p className="font-medium leading-tight text-white flex items-center gap-1.5 truncate">
+            <span className="truncate">{motorista.motoristaNome}</span>
+            {favorito && (
+              <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-400/15 text-amber-300 border border-amber-400/30 shrink-0">
+                Frequente
+              </span>
+            )}
+          </p>
+          <p className="text-[11px] text-slate-400 truncate">
+            {motorista.placaVeiculo} · {motorista.regiao}
+            {motorista.origemOtimizacao === 'IA_OPTIMIZER' && ' · 🤖 IA'}
+          </p>
         </div>
-        <p className={`text-3xl font-extralight tabular-nums ${pct > 100 ? 'text-rose-400' : 'text-white'}`}>{pct}%</p>
+
+        <div className="shrink-0 text-right">
+          <p className={`text-lg font-light tabular-nums leading-none ${pct > 100 ? 'text-rose-400' : 'text-white'}`}>
+            {pct}%
+          </p>
+          <p className="text-[10px] text-slate-500 mt-0.5">{motorista.stops.length} parada(s)</p>
+        </div>
       </div>
 
-      {/* Barra de ocupação de peso */}
-      <div className="h-2.5 rounded-full bg-slate-700 overflow-hidden mb-1.5">
+      {/* Barra de ocupação fina */}
+      <div className="h-1.5 rounded-full bg-slate-700 overflow-hidden mt-2.5">
         <div className={`h-full ${barra} transition-all duration-500`} style={{ width: `${pctBar}%` }} />
       </div>
-      <div className="flex items-center gap-4 text-[11px] text-slate-400 mb-3">
+      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1.5">
         <span className="flex items-center gap-1">
           <Weight className="h-3 w-3" /> {kg(peso)} / {kg(motorista.capacidadeKg)}
         </span>
-        <span className="flex items-center gap-1">
-          <Boxes className="h-3 w-3" /> {num(vols)} cx
+        <span className="text-slate-500 flex items-center gap-1">
+          detalhes <ChevronDown className="h-3 w-3 -rotate-90 opacity-60 group-hover:opacity-100" />
         </span>
-        <span className="ml-auto text-slate-500">{motorista.stops.length} parada(s)</span>
       </div>
+    </button>
+  );
+}
 
-      {/* Paradas */}
-      {motorista.stops.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-600 py-6 text-center text-[13px] text-slate-500">
-          Solte um pedido aqui
+/* ────────────────────────── Painel lateral: telemetria por motorista ───────── */
+
+function haversine(a: [number, number], b: [number, number]): number {
+  const R = 6371; // km
+  const dLat = ((b[0] - a[0]) * Math.PI) / 180;
+  const dLng = ((b[1] - a[1]) * Math.PI) / 180;
+  const lat1 = (a[0] * Math.PI) / 180;
+  const lat2 = (b[0] * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function DriverDrawer({
+  motorista,
+  onClose,
+  onRemoveStop,
+}: {
+  motorista: Motorista;
+  onClose: () => void;
+  onRemoveStop: (s: Stop) => void;
+}) {
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const mapObj = useRef<any>(null);
+  const layerRef = useRef<any>(null);
+  const [mapErro, setMapErro] = useState(false);
+  const [mapPronto, setMapPronto] = useState(false);
+
+  const pct = ocupacao(motorista);
+  const peso = pesoDaRota(motorista);
+  const vols = volumesDaRota(motorista);
+  const statusLabel = pct > 100 ? 'Excedido' : pct >= 90 ? 'Cheio' : 'Leve';
+  const statusClass =
+    pct > 100
+      ? 'bg-rose-500/15 text-rose-300 border-rose-500/40'
+      : pct >= 90
+        ? 'bg-amber-400/15 text-amber-300 border-amber-400/40'
+        : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40';
+
+  const stopsOrdenados = useMemo(
+    () => [...motorista.stops].sort((a, b) => a.ordem - b.ordem),
+    [motorista.stops],
+  );
+
+  // Coordenadas de cada parada (derivadas da região, como no Mapa de Frotas).
+  const coords = useMemo<[number, number][]>(
+    () => stopsOrdenados.map((_, i) => coordDaRegiao(motorista.regiao, i)),
+    [stopsOrdenados, motorista.regiao],
+  );
+
+  // Métricas
+  const distanciaKm = useMemo(() => {
+    const pontos: [number, number][] = [BASE_COORD, ...coords];
+    let total = 0;
+    for (let i = 1; i < pontos.length; i++) total += haversine(pontos[i - 1], pontos[i]);
+    return total;
+  }, [coords]);
+  const etaMin = stopsOrdenados.length * 18; // ~18 min por parada
+  const transito = pct > 100 ? 'Intenso' : pct >= 90 ? 'Moderado' : 'Livre';
+
+  // Fecha com ESC
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  // Inicializa o mapa Leaflet
+  useEffect(() => {
+    let cancelado = false;
+    carregarLeaflet()
+      .then((L: any) => {
+        if (cancelado || !mapRef.current) return;
+        if (!mapObj.current) {
+          mapObj.current = L.map(mapRef.current, {
+            zoomControl: false,
+            attributionControl: false,
+          }).setView(BASE_COORD, 11);
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+          }).addTo(mapObj.current);
+        }
+        setMapPronto(true);
+      })
+      .catch(() => !cancelado && setMapErro(true));
+    return () => {
+      cancelado = true;
+      if (mapObj.current) {
+        mapObj.current.remove();
+        mapObj.current = null;
+      }
+    };
+  }, []);
+
+  // Desenha paradas + rota sempre que mudar
+  useEffect(() => {
+    if (!mapPronto || !mapObj.current) return;
+    carregarLeaflet().then((L: any) => {
+      if (!mapObj.current) return;
+      if (layerRef.current) {
+        mapObj.current.removeLayer(layerRef.current);
+        layerRef.current = null;
+      }
+      const grupo = L.layerGroup();
+      // Base
+      L.marker(BASE_COORD, { icon: baseDivIcon(L) }).addTo(grupo);
+      // Paradas numeradas
+      coords.forEach((c, i) => {
+        const html = `<div style="transform:translate(-50%,-50%);width:22px;height:22px;border-radius:9999px;background:#38bdf8;border:2px solid #0f172a;box-shadow:0 0 0 4px #38bdf833;display:flex;align-items:center;justify-content:center;color:#0f172a;font-size:11px;font-weight:700">${i + 1}</div>`;
+        L.marker(c, { icon: L.divIcon({ html, className: '', iconSize: [0, 0] }) })
+          .bindPopup(`#${stopsOrdenados[i].numeroPedido} · ${stopsOrdenados[i].clienteNome}`)
+          .addTo(grupo);
+      });
+      // Polyline tracejada base → paradas
+      if (coords.length > 0) {
+        L.polyline([BASE_COORD, ...coords], {
+          color: '#38bdf8',
+          weight: 2,
+          opacity: 0.7,
+          dashArray: '6 8',
+        }).addTo(grupo);
+      }
+      grupo.addTo(mapObj.current);
+      layerRef.current = grupo;
+      const todos: [number, number][] = [BASE_COORD, ...coords];
+      if (todos.length > 1) mapObj.current.fitBounds(todos, { padding: [40, 40] });
+      setTimeout(() => mapObj.current && mapObj.current.invalidateSize(), 60);
+    });
+  }, [mapPronto, coords, stopsOrdenados]);
+
+  return (
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute right-0 top-0 h-full w-full max-w-[46%] min-w-[420px] bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col animate-[slideIn_.2s_ease-out]">
+        {/* A) Header */}
+        <div className="shrink-0 border-b border-slate-700 px-6 py-4 flex items-start justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <div className="h-9 w-9 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
+                <User className="h-4 w-4 text-emerald-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg font-medium text-white truncate">{motorista.motoristaNome}</p>
+                <p className="text-[11px] text-slate-400 truncate">
+                  {motorista.placaVeiculo} · {motorista.regiao}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${statusClass}`}>
+              {statusLabel} · {pct}%
+            </span>
+            <button onClick={onClose} className="text-slate-400 hover:text-white" title="Fechar">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
-      ) : (
-        <ol className="space-y-1">
-          {motorista.stops.map((s) => (
-            <li
-              key={s.pedidoId}
-              className="group flex items-center gap-2 text-sm text-slate-200 rounded-lg px-2 py-1.5 hover:bg-slate-700/40"
-            >
-              <span className="h-5 w-5 rounded-full bg-slate-700 text-[10px] flex items-center justify-center font-semibold text-slate-200 shrink-0">
-                {s.ordem}
-              </span>
-              <MapPin className="h-3 w-3 text-slate-500 shrink-0" />
-              <span className="truncate flex-1">
-                #{s.numeroPedido} · {s.clienteNome}
-              </span>
-              <span className="text-[11px] text-slate-500 shrink-0">{kg(s.pesoKg)}</span>
-              {s.status === 'DELIVERED' ? (
-                <span className="text-[10px] text-emerald-400 shrink-0">entregue</span>
-              ) : (
-                <button
-                  onClick={() => onRemoveStop(s)}
-                  className="text-[11px] text-rose-400/70 opacity-0 group-hover:opacity-100 hover:text-rose-300 shrink-0"
-                  title="Remover da rota"
-                >
-                  remover
-                </button>
-              )}
-            </li>
-          ))}
-        </ol>
-      )}
+
+        <div className="flex-1 overflow-y-auto">
+          {/* B) Mapa */}
+          <div className="relative h-64 bg-slate-800 border-b border-slate-700">
+            <div ref={mapRef} className="absolute inset-0" />
+            {!mapPronto && !mapErro && (
+              <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Carregando mapa…
+              </div>
+            )}
+            {mapErro && (
+              <div className="absolute inset-0 flex items-center justify-center text-rose-300 text-sm gap-2">
+                <AlertTriangle className="h-4 w-4" /> Falha ao carregar o mapa
+              </div>
+            )}
+          </div>
+
+          {/* C) Métricas */}
+          <div className="grid grid-cols-3 gap-3 px-6 py-4">
+            <div className="rounded-xl border border-slate-700 bg-slate-800/50 px-3 py-3">
+              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Distância</p>
+              <p className="text-xl font-light text-white tabular-nums mt-0.5">
+                {distanciaKm.toFixed(1)}<span className="text-xs text-slate-500 ml-1">km</span>
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-700 bg-slate-800/50 px-3 py-3">
+              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">ETA</p>
+              <p className="text-xl font-light text-white tabular-nums mt-0.5">
+                {Math.floor(etaMin / 60)}<span className="text-xs text-slate-500 mx-1">h</span>
+                {etaMin % 60}<span className="text-xs text-slate-500 ml-1">min</span>
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-700 bg-slate-800/50 px-3 py-3">
+              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-semibold">Trânsito</p>
+              <p
+                className={`text-xl font-light tabular-nums mt-0.5 ${
+                  transito === 'Intenso' ? 'text-rose-400' : transito === 'Moderado' ? 'text-amber-300' : 'text-emerald-400'
+                }`}
+              >
+                {transito}
+              </p>
+            </div>
+          </div>
+
+          {/* Resumo de carga */}
+          <div className="px-6 flex items-center gap-4 text-[12px] text-slate-400">
+            <span className="flex items-center gap-1">
+              <Weight className="h-3.5 w-3.5" /> {kg(peso)} / {kg(motorista.capacidadeKg)}
+            </span>
+            <span className="flex items-center gap-1">
+              <Boxes className="h-3.5 w-3.5" /> {num(vols)} cx
+            </span>
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3.5 w-3.5" /> {stopsOrdenados.length} parada(s)
+            </span>
+          </div>
+
+          {/* D) Timeline de paradas */}
+          <div className="px-6 py-4">
+            <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-3 flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5" /> Roteiro da rota
+            </h3>
+            {stopsOrdenados.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-600 py-8 text-center text-[13px] text-slate-500">
+                <PackageOpen className="h-6 w-6 mx-auto mb-2 opacity-40" />
+                Nenhuma parada. Arraste pedidos para este motorista.
+              </div>
+            ) : (
+              <ol className="relative border-l border-slate-700 ml-2 space-y-3">
+                {stopsOrdenados.map((s) => (
+                  <li key={s.pedidoId} className="ml-4 group">
+                    <span className="absolute -left-[9px] mt-1 h-4 w-4 rounded-full bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-[9px] font-semibold text-slate-200">
+                      {s.ordem}
+                    </span>
+                    <div className="rounded-xl border border-slate-700 bg-slate-800/50 px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm text-white truncate">
+                          #{s.numeroPedido} · {s.clienteNome}
+                        </p>
+                        {s.status === 'DELIVERED' ? (
+                          <span className="text-[10px] text-emerald-400 shrink-0 flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" /> entregue
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => onRemoveStop(s)}
+                            className="text-[11px] text-rose-400/70 opacity-0 group-hover:opacity-100 hover:text-rose-300 shrink-0"
+                            title="Remover da rota"
+                          >
+                            remover
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1">
+                        {s.cidade && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" /> {s.cidade}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Weight className="h-3 w-3" /> {kg(s.pesoKg)}
+                        </span>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
