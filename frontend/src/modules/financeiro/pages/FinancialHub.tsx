@@ -210,7 +210,38 @@ export default function FinancialHub() {
   const [aba, setAba] = useState<AbaFin>('dashboard');
 
   return (
-    <div className="min-h-full bg-[#FAFAFA] -m-4 sm:-m-6 p-4 sm:p-6">
+    <div className="fin-dark min-h-full bg-[#0B0F17] -m-4 sm:-m-6 p-4 sm:p-6 lg:p-8">
+      {/* Tema dark alinhado ao site — paleta espacial com contraste reforçado */}
+      <style>{`
+        .fin-dark { color: #e2e8f0; }
+        /* Superfícies (card mais claro que o canvas p/ separar por contraste, não por sombra) */
+        .fin-dark .bg-white { background-color: #141b27 !important; }
+        .fin-dark .bg-slate-50 { background-color: #0d1420 !important; }
+        .fin-dark .bg-neutral-50 { background-color: #1a2333 !important; }
+        .fin-dark .bg-neutral-100 { background-color: #1e2838 !important; }
+        .fin-dark .bg-neutral-200 { background-color: #273246 !important; }
+        .fin-dark .hover\\:bg-neutral-50:hover { background-color: #1e2838 !important; }
+        .fin-dark .hover\\:bg-neutral-50\\/70:hover { background-color: #1a2333 !important; }
+        /* Bordas de cristal */
+        .fin-dark .border-neutral-200 { border-color: rgba(255,255,255,0.09) !important; }
+        .fin-dark .border-neutral-100 { border-color: rgba(255,255,255,0.05) !important; }
+        .fin-dark .divide-neutral-100 > * + * { border-color: rgba(255,255,255,0.05) !important; }
+        /* Textos com contraste reforçado */
+        .fin-dark .text-slate-900 { color: #f8fafc !important; }
+        .fin-dark .text-slate-800 { color: #e8eef6 !important; }
+        .fin-dark .text-slate-700 { color: #cbd5e1 !important; }
+        .fin-dark .text-slate-600 { color: #aeb9c9 !important; }
+        .fin-dark .text-neutral-500 { color: #94a3b8 !important; }
+        .fin-dark .text-neutral-400 { color: #8290a3 !important; }
+        /* Inputs */
+        .fin-dark input:not([type="checkbox"]):not([type="radio"]),
+        .fin-dark select,
+        .fin-dark textarea { background-color: #1a2333 !important; color: #e8eef6 !important; border-color: rgba(255,255,255,0.1) !important; }
+        .fin-dark input::placeholder,
+        .fin-dark textarea::placeholder { color: #64748b !important; }
+      `}</style>
+
+      <div className="max-w-[1400px] mx-auto">
       {/* Cabeçalho */}
       <header className="mb-5">
         <div className="flex items-center gap-2 text-neutral-400 text-[12px] uppercase tracking-[0.16em] font-semibold">
@@ -246,6 +277,7 @@ export default function FinancialHub() {
       {aba === 'clientes' && <RentabilidadeClientes />}
       {aba === 'produtos' && <RentabilidadeProdutos />}
       {aba === 'titulos' && <GestaoTitulos />}
+      </div>
     </div>
   );
 }
@@ -305,24 +337,34 @@ function DashboardDRE() {
       {/* Cascata DRE + painéis de caixa */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* DRE detalhada */}
-        <section className="xl:col-span-1 rounded-2xl border border-neutral-200 bg-white p-5">
-          <h2 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Scale className="h-4 w-4 text-neutral-400" /> Demonstrativo de Resultados
+        <section className="xl:col-span-1 rounded-2xl border border-neutral-200 bg-white p-6">
+          <h2 className="text-[11px] font-semibold text-neutral-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+            <Scale className="h-3.5 w-3.5 text-neutral-400" /> Demonstrativo de Resultados
           </h2>
-          <div className="space-y-1">
-            {DRE_MES.map((l) => (
+          <div>
+            {DRE_MES.map((l, i) => (
               <div
                 key={l.chave}
-                className={`flex items-center justify-between rounded-lg px-3 py-2 ${
-                  l.tipo === 'resultado'
-                    ? 'bg-neutral-50 font-semibold text-slate-900'
-                    : 'text-slate-600'
+                className={`flex items-center justify-between gap-4 py-4 ${
+                  i < DRE_MES.length - 1 ? 'border-b border-neutral-100' : ''
                 }`}
               >
-                <span className={`text-[13px] ${l.destaque ? 'font-semibold' : ''}`}>{l.label}</span>
                 <span
-                  className={`text-[13px] tabular-nums font-medium ${
-                    l.valor < 0 ? 'text-rose-600' : l.tipo === 'resultado' ? 'text-emerald-700' : 'text-slate-800'
+                  className={`text-[13.5px] leading-snug ${
+                    l.tipo === 'resultado' ? 'font-semibold text-slate-900' : 'font-normal text-slate-600'
+                  }`}
+                >
+                  {l.label}
+                </span>
+                <span
+                  className={`text-[15px] tabular-nums shrink-0 ${
+                    l.tipo === 'resultado'
+                      ? l.valor < 0
+                        ? 'font-semibold text-rose-500'
+                        : 'font-semibold text-emerald-600'
+                      : l.valor < 0
+                        ? 'font-medium text-rose-500'
+                        : 'font-medium text-slate-800'
                   }`}
                 >
                   {brl(l.valor)}
@@ -437,12 +479,12 @@ function KpiGigante({
   tom: 'neutro' | 'deducao' | 'lucro';
 }) {
   const cor =
-    tom === 'lucro' ? 'text-emerald-700' : tom === 'deducao' ? 'text-rose-600' : 'text-slate-900';
-  const ring = tom === 'lucro' ? 'ring-1 ring-emerald-100 bg-emerald-50/40' : 'border border-neutral-200 bg-white';
+    tom === 'lucro' ? 'text-emerald-600' : tom === 'deducao' ? 'text-rose-500' : 'text-slate-900';
+  const ring = tom === 'lucro' ? 'ring-1 ring-emerald-500/25 bg-emerald-500/10' : 'border border-neutral-200 bg-white';
   return (
     <div className={`rounded-2xl p-5 ${ring}`}>
       <div className="flex items-center justify-between">
-        <p className="text-[12px] uppercase tracking-wider font-semibold text-neutral-500">{label}</p>
+        <p className="text-[11px] uppercase tracking-widest font-semibold text-neutral-500">{label}</p>
         <span
           className={`h-8 w-8 rounded-lg flex items-center justify-center ${
             tom === 'lucro' ? 'bg-emerald-100 text-emerald-700' : tom === 'deducao' ? 'bg-rose-50 text-rose-500' : 'bg-neutral-100 text-neutral-500'
@@ -918,7 +960,7 @@ function DetalheTitulo({ titulo, onClose, onBaixar }: { titulo: Titulo; onClose:
           <TagStatus status={titulo.status} />
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          <div className="rounded-2xl bg-[#FAFAFA] border border-neutral-200 p-5">
+          <div className="rounded-2xl bg-white/[0.04] border border-neutral-200 p-5">
             <p className="text-[12px] uppercase tracking-wider font-semibold text-neutral-500">Valor do título</p>
             <p className={`text-4xl font-semibold tabular-nums mt-1 ${titulo.natureza === 'RECEITA' ? 'text-emerald-700' : 'text-slate-900'}`}>
               {brl(titulo.valor)}

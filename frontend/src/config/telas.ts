@@ -31,13 +31,13 @@ export const TELAS: TelaDef[] = [
   { key: '/logistica/romaneios', label: 'Romaneios', grupo: 'Logística' },
   { key: '/logistica/frotas', label: 'Frotas & Veículos', grupo: 'Logística' },
   // Fiscal
-  { key: '/fiscal/nfe', label: 'NF-e Emitidas', grupo: 'Fiscal / DFe' },
   { key: '/fiscal/emitir', label: 'Faturamento', grupo: 'Fiscal / DFe' },
   { key: '/fiscal/painel', label: 'Painel de Faturamento', grupo: 'Fiscal / DFe' },
   { key: '/fiscal/matriz', label: 'Matriz Fiscal', grupo: 'Fiscal / DFe' },
   { key: '/fiscal/cte', label: 'CT-e / MDF-e', grupo: 'Fiscal / DFe' },
   { key: '/fiscal/gestao', label: 'Gestão Fiscal', grupo: 'Fiscal / DFe' },
   // Financeiro
+  { key: '/financeiro/controladoria', label: 'Controladoria (Financeiro)', grupo: 'Financeiro' },
   { key: '/financeiro/fluxo-caixa', label: 'Fluxo de Caixa', grupo: 'Financeiro' },
   { key: '/financeiro/receber', label: 'Contas a Receber', grupo: 'Financeiro' },
   { key: '/financeiro/pagar', label: 'Contas a Pagar', grupo: 'Financeiro' },

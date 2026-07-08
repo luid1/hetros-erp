@@ -81,7 +81,7 @@ export class CargaService {
           include: {
             pedido: {
               select: {
-                id: true, numero: true, pesoTotal: true, valorTotal: true, periodo: true,
+                id: true, numero: true, tipo: true, pesoTotal: true, valorTotal: true, periodo: true,
                 cliente: { select: { razaoSocial: true, nomeFantasia: true } },
               },
             },
@@ -108,6 +108,7 @@ export class CargaService {
       entregas: (r.itens || []).map((i: any) => ({
         pedidoId: i.pedidoId,
         numero: i.pedido?.numero,
+        tipo: i.pedido?.tipo || 'VENDA',
         ordem: i.ordemEntrega,
         cliente: i.pedido?.cliente?.nomeFantasia || i.pedido?.cliente?.razaoSocial || '—',
         peso: Number(i.pedido?.pesoTotal || 0),
@@ -160,32 +161,43 @@ export class CargaService {
       _sum: { pesoTotal: true },
     });
 
-    const romaneio = await this.prisma.romaneio.create({
-      data: {
-        tenantId,
-        filialId: dto.filialId,
-        numero,
-        status: 'ABERTO',
-        motorista: dto.motorista,
-        codigoCondutor: dto.codigoCondutor,
-        foneCondutor: dto.foneCondutor,
-        placaVeiculo: dto.placaVeiculo,
-        modeloVeiculo: dto.modeloVeiculo,
-        tipoVeiculo: dto.tipoVeiculo,
-        refrigerado: dto.refrigerado || false,
-        periodo: dto.periodo,
-        regiaoRota: dto.regiaoRota,
-        autorizacaoCarga: autorizacao,
-        pesoTotalKg: pesoTotal._sum.pesoTotal || 0,
-        valorFrete: dto.valorFrete ? Number(dto.valorFrete) : 0,
-        dataMovimento: dto.dataMovimento ? new Date(dto.dataMovimento) : new Date(),
-        // ancora no meio-dia local para não escorregar de dia por fuso
-        dataEntrega: dto.dataEntrega ? new Date(`${dto.dataEntrega.split('T')[0]}T12:00:00`) : undefined,
-        itens: {
-          create: dto.pedidoIds.map((pedidoId, idx) => ({ pedidoId, ordemEntrega: idx + 1 })),
+    const romaneio = await this.prisma.$transaction(async (tx) => {
+      const criado = await tx.romaneio.create({
+        data: {
+          tenantId,
+          filialId: dto.filialId,
+          numero,
+          status: 'ABERTO',
+          motorista: dto.motorista,
+          codigoCondutor: dto.codigoCondutor,
+          foneCondutor: dto.foneCondutor,
+          placaVeiculo: dto.placaVeiculo,
+          modeloVeiculo: dto.modeloVeiculo,
+          tipoVeiculo: dto.tipoVeiculo,
+          refrigerado: dto.refrigerado || false,
+          periodo: dto.periodo,
+          regiaoRota: dto.regiaoRota,
+          autorizacaoCarga: autorizacao,
+          pesoTotalKg: pesoTotal._sum.pesoTotal || 0,
+          valorFrete: dto.valorFrete ? Number(dto.valorFrete) : 0,
+          dataMovimento: dto.dataMovimento ? new Date(dto.dataMovimento) : new Date(),
+          // ancora no meio-dia local para não escorregar de dia por fuso
+          dataEntrega: dto.dataEntrega ? new Date(`${dto.dataEntrega.split('T')[0]}T12:00:00`) : undefined,
+          itens: {
+            create: dto.pedidoIds.map((pedidoId, idx) => ({ pedidoId, ordemEntrega: idx + 1 })),
+          },
         },
-      },
-      include: { itens: true },
+        include: { itens: true },
+      });
+
+      // Roteirizou → pedidos entram automaticamente na fila de SEPARAÇÃO.
+      // (Só promove os que ainda estão CONFIRMADO; não rebaixa SEPARADO/FATURADO.)
+      await tx.pedido.updateMany({
+        where: { id: { in: dto.pedidoIds }, tenantId, status: 'CONFIRMADO' },
+        data: { status: 'EM_SEPARACAO' },
+      });
+
+      return criado;
     });
 
     return romaneio;
@@ -211,26 +223,43 @@ export class CargaService {
     });
     if (!r) throw new NotFoundException('Romaneio não encontrado.');
 
+    const hhmm = (d: any) => (d ? new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
+    const pesoTotal = r.itens.reduce((s, i: any) => s + Number(i.pedido?.pesoTotal || 0), 0);
+
     return {
       id: r.id,
       idEntrega: r.numero,
       cd: r.filial?.nome || 'Hetros',
+      empresa: `${r.filial?.codigo || ''}${r.filial?.codigo ? '-' : ''}${r.filial?.nome || 'Hetros'}`,
+      // Rótulo da faixa: "35349 - DTC8J29 - HR - GILSON NASCIMENTO DE CARVALHO"
+      rotaLabel: [r.numero, r.placaVeiculo, r.regiaoRota, r.motorista].filter(Boolean).join(' - '),
       motorista: r.motorista,
       codigoCondutor: r.codigoCondutor,
       foneCondutor: r.foneCondutor,
       placaVeiculo: r.placaVeiculo,
       modeloVeiculo: r.modeloVeiculo,
       dataMovimento: r.dataMovimento,
+      dataCarga: r.dataMovimento || r.dataEntrega,
       dataEntrega: r.dataEntrega,
       regiaoRota: r.regiaoRota,
       autorizacaoCarga: r.autorizacaoCarga,
       qtdEntregas: r.itens.length,
+      pesoTotalKg: Number(r.pesoTotalKg || pesoTotal),
       unidades: r.itens.map((i: any) => {
-        const end: any = i.pedido?.cliente?.enderecoJson || {};
+        const ped: any = i.pedido || {};
+        const cli: any = ped.cliente || {};
+        const end: any = cli.enderecoJson || {};
         return {
-          unidade: i.pedido?.cliente?.nomeFantasia || i.pedido?.cliente?.razaoSocial || '—',
-          endereco: [end.rua, end.numero].filter(Boolean).join(', '),
-          bairro: end.bairro || '',
+          bilhete: ped.numero ?? i.ordemEntrega,
+          horaDe: hhmm(ped.janelaInicio),
+          horaAte: hhmm(ped.janelaFim),
+          familia: ped.familia || '',
+          nomeCliente: cli.nomeFantasia || cli.razaoSocial || '—',
+          endereco: [end.rua, end.numero, end.complemento].filter(Boolean).join(', '),
+          bairroCidadeUf: [end.bairro, [end.cidade, end.uf].filter(Boolean).join(' - ')].filter(Boolean).join(' - '),
+          tpFatura: ped.tipoFaturamento || 'NFE PADRAO',
+          idVenda: ped.numero ?? '',
+          pesoKg: Number(ped.pesoTotal || 0),
           ordem: i.ordemEntrega,
         };
       }),

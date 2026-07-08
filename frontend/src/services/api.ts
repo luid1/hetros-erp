@@ -53,6 +53,8 @@ export const pedidosApi = {
   get: (id: string) => api.get(`/pedidos/${id}`),
   create: (data: object) => api.post('/pedidos', data),
   updateStatus: (id: string, status: string) => api.patch(`/pedidos/${id}/status`, { status }),
+  confirmar: (id: string) => api.patch(`/pedidos/${id}/confirmar`),
+  reposicao: (id: string, data: object) => api.post(`/pedidos/${id}/reposicao`, data),
 };
 
 // Clientes
@@ -77,8 +79,10 @@ export const comprasApi = {
   list: (params?: object) => api.get('/compras', { params }),
   get: (id: string) => api.get(`/compras/${id}`),
   create: (data: object) => api.post('/compras', data),
+  update: (id: string, data: object) => api.put(`/compras/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/compras/${id}/status`, { status }),
   aComprar: (filialId: string) => api.get(`/estoque/${filialId}/a-comprar`),
+  historicoProduto: (produtoId: string) => api.get(`/compras/produto/${produtoId}/historico`),
 };
 
 export const fornecedoresApi = {

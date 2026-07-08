@@ -67,6 +67,42 @@ export class ComprasService {
     return oc;
   }
 
+  /**
+   * Histórico de compras de um produto: as últimas OCs que incluíram esse produto,
+   * com fornecedor, data, quantidade, preço e status. Alimenta o painel "quem pediu
+   * das últimas vezes" no App do Comprador.
+   */
+  async historicoProduto(tenantId: string, produtoId: string) {
+    const itens = await this.prisma.itemOrdemCompra.findMany({
+      where: { produtoId, ordem: { tenantId } },
+      include: {
+        ordem: {
+          select: {
+            id: true,
+            numero: true,
+            status: true,
+            dataEmissao: true,
+            fornecedor: { select: { razaoSocial: true, nomeFantasia: true } },
+          },
+        },
+      },
+      orderBy: { ordem: { dataEmissao: 'desc' } },
+      take: 12,
+    });
+
+    return itens.map((it) => ({
+      ordemId: it.ordem.id,
+      numero: it.ordem.numero,
+      status: it.ordem.status,
+      data: it.ordem.dataEmissao,
+      fornecedor: it.ordem.fornecedor?.nomeFantasia || it.ordem.fornecedor?.razaoSocial || 'Fornecedor',
+      quantidade: Number(it.quantidade),
+      unidade: it.unidade,
+      precoUnitario: Number(it.precoUnitario),
+      subtotal: Number(it.subtotal),
+    }));
+  }
+
   // ── CREATE ──
   async create(tenantId: string, dto: any) {
     if (!dto.fornecedorId) throw new BadRequestException('Selecione o fornecedor.');

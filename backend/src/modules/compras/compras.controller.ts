@@ -20,6 +20,12 @@ export class ComprasController {
     return this.service.findAll(tenantId, { status, fornecedorId, search });
   }
 
+  @Get('produto/:produtoId/historico')
+  @ApiOperation({ summary: 'Histórico de compras de um produto (últimas OCs que o incluíram)' })
+  historicoProduto(@CurrentTenant() tenantId: string, @Param('produtoId') produtoId: string) {
+    return this.service.historicoProduto(tenantId, produtoId);
+  }
+
   @Get(':id')
   findOne(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.service.findOne(tenantId, id);

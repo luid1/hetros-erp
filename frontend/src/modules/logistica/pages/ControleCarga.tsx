@@ -267,52 +267,103 @@ export default function ControleCarga() {
   const imprimirCapaRota = async (romaneioId: string) => {
     try {
       const { data: c } = await api.get(`/carga/romaneio/${romaneioId}/capa`);
+      const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const dt = (d: any) => d ? new Date(d).toLocaleDateString('pt-BR') : '';
-      const linhas = c.unidades.map((u: any) => `
+      const agora = new Date();
+      const carimbo = `${agora.toLocaleDateString('pt-BR')} - ${agora.toLocaleTimeString('pt-BR')}`;
+      const peso3 = (v: number) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+      const linhas = c.unidades.map((u: any) => {
+        const janela = [u.horaDe, u.horaAte].filter(Boolean).join(' - ');
+        return `
         <tr>
-          <td>${u.unidade}</td><td></td><td></td>
-          <td style="text-align:center">${u.endereco}</td>
-          <td style="text-align:center">${u.bairro}</td>
-          <td></td><td></td><td></td><td></td><td></td>
-        </tr>`).join('');
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Capa de Rota ${c.idEntrega}</title>
+          <td class="c1"><span class="bilhete">${esc(u.bilhete)}</span><br/><span class="hora">${esc(janela)}</span></td>
+          <td class="c2"><span class="fam">${esc(u.familia)}</span><br/><span class="cli">${esc(u.nomeCliente)}</span></td>
+          <td class="c3"><span class="end">${esc(u.endereco)}</span><br/><span class="bai">${esc(u.bairroCidadeUf)}</span></td>
+          <td class="c4">${esc(u.tpFatura)}</td>
+          <td class="c5">${esc(u.idVenda)}</td>
+          <td class="cx"></td><td class="cx"></td><td class="cx assin"></td>
+        </tr>`;
+      }).join('');
+
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Capa de Rota ${esc(c.idEntrega)}</title>
 <style>
-body{font-family:Arial;font-size:11px;margin:14px;color:#000}
-.box{border:2px solid #000}
-.hd{display:flex;align-items:center;border-bottom:2px solid #000;padding:6px}
-.hd h1{flex:1;text-align:center;font-size:22px;margin:0;letter-spacing:1px}
-.logo{font-weight:bold;color:#2e7d32;font-size:18px}
-.info{padding:4px 8px;border-bottom:1px solid #000;font-size:11px}
-.info div{display:inline-block;margin-right:24px}
-table{width:100%;border-collapse:collapse}
-th,td{border:1px solid #000;padding:2px 4px;font-size:10px}
-th{background:#eee;text-align:center}
-.foot{display:flex;justify-content:space-between;font-weight:bold;padding:4px 8px;border-top:1px solid #000}
-@media print{button{display:none}}
+  * { box-sizing: border-box; }
+  html, body { background: #fff; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; margin: 10px; color: #000; }
+  .toolbar { margin-bottom: 8px; }
+  .toolbar button { padding: 6px 14px; font-size: 12px; cursor: pointer; }
+  .box { border: 2px solid #000; background: #fff; }
+  /* Cabeçalho */
+  .hd { display: flex; align-items: center; border-bottom: 2px solid #000; padding: 6px 10px; }
+  .hd .logo { width: 120px; display: flex; align-items: center; gap: 6px; font-weight: bold; color: #2e7d32; font-size: 14px; }
+  .hd .logo img { height: 34px; width: 34px; object-fit: contain; }
+  .hd .mid { flex: 1; text-align: center; }
+  .hd .mid h1 { margin: 0; font-size: 26px; font-weight: bold; letter-spacing: 1px; }
+  .hd .mid .sub { font-size: 11px; margin-top: 2px; }
+  .hd .rgt { width: 120px; }
+  /* Faixa da rota */
+  .rota { display: flex; align-items: center; justify-content: space-between; background: #d9d9d9; border-bottom: 2px solid #000; padding: 4px 10px; }
+  .rota .id { font-size: 15px; font-weight: bold; }
+  .rota .aut { font-size: 16px; font-weight: bold; }
+  /* Tabela */
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  thead th { border: 1px solid #000; background: #efefef; font-size: 10px; padding: 2px 4px; vertical-align: middle; }
+  tbody td { border-left: 1px solid #000; border-right: 1px solid #000; border-bottom: 1px solid #888; padding: 3px 5px; font-size: 10px; vertical-align: top; }
+  .c1 { width: 8%; } .c2 { width: 26%; } .c3 { width: 30%; } .c4 { width: 9%; } .c5 { width: 8%; }
+  .cx { width: 6%; } .assin { width: 11%; }
+  .bilhete { font-weight: bold; font-size: 12px; }
+  .hora { color: #000; }
+  .fam { color: #444; font-size: 9px; }
+  .cli { font-weight: bold; }
+  .end { }
+  .bai { color: #333; }
+  .c4, .c5 { text-align: left; }
+  /* Rodapé interno */
+  .foot { display: flex; justify-content: space-between; font-weight: bold; padding: 5px 10px; border-top: 2px solid #000; font-size: 11px; }
+  /* Rodapé externo */
+  .pfoot { text-align: center; font-size: 9px; color: #333; margin-top: 6px; }
+  @media print { .toolbar { display: none; } body { margin: 0; } }
+  @page { size: A4 landscape; margin: 8mm; }
 </style></head><body>
-<button onclick="window.print()" style="margin-bottom:8px;padding:6px 12px">🖨️ Imprimir</button>
+<div class="toolbar"><button onclick="window.print()">🖨️ Imprimir</button></div>
 <div class="box">
-  <div class="hd"><span class="logo" style="display:inline-flex;align-items:center;gap:6px"><img src="/logo-hetros-icone.png" style="height:22px;width:22px;object-fit:contain" />HETROS</span><h1>CAPA DE ROTA</h1><span>Pág. 1</span></div>
-  <div class="info">
-    <div><b>Id Entrega:</b> ${c.idEntrega}</div><div><b>CD:</b> ${c.cd}</div>
-    <div><b>Veículo:</b> ${c.placaVeiculo || ''} ${c.modeloVeiculo ? '- ' + c.modeloVeiculo : ''}</div>
-    <div><b>Dt.Movimento:</b> ${dt(c.dataMovimento)}</div>
-    <div><b>Fone Condutor:</b> ${c.foneCondutor || ''}</div>
+  <div class="hd">
+    <div class="logo"><img src="/logo-hetros-icone.png" onerror="this.style.display='none'" />HETROS</div>
+    <div class="mid">
+      <h1>CAPA DE ROTA</h1>
+      <div class="sub">Data Carga: ${dt(c.dataCarga)}</div>
+      <div class="sub">Empresa: ${esc(c.empresa)}</div>
+    </div>
+    <div class="rgt"></div>
   </div>
-  <div class="info">
-    <div><b>Condutor:</b> ${c.codigoCondutor ? c.codigoCondutor + ' - ' : ''}${c.motorista || ''}</div>
-    <div><b>Dt.Entrega:</b> ${dt(c.dataEntrega)}</div>
-    <div><b>Rota:</b> ${c.regiaoRota || ''}</div>
+  <div class="rota">
+    <span class="id">Id: ${esc(c.rotaLabel)}</span>
+    <span class="aut">${esc(c.autorizacaoCarga || '')}</span>
   </div>
   <table>
-    <thead><tr>
-      <th>UNIDADE</th><th>Hora De</th><th>Hora Até</th><th>ENDEREÇO</th><th>BAIRRO</th>
-      <th>ROTA</th><th>Hora Entrada</th><th>Hora Saída</th><th>Caixas Saída</th><th>Caixas Retorno</th>
-    </tr></thead>
+    <thead>
+      <tr>
+        <th rowspan="2">N°.Bilhete/<br/>Hr.Entrega</th>
+        <th rowspan="2">Família/<br/>Nome do Cliente</th>
+        <th rowspan="2">Endereço de Entrega</th>
+        <th rowspan="2">Tp Fatura</th>
+        <th rowspan="2">Id Venda</th>
+        <th colspan="3">Caixas</th>
+      </tr>
+      <tr>
+        <th>Saídas</th><th>Entradas</th><th>Assinatura</th>
+      </tr>
+    </thead>
     <tbody>${linhas}</tbody>
   </table>
-  <div class="foot"><span>QTDE DE ENTREGAS: ${c.qtdEntregas}</span><span>Autorização de Carga: ${c.autorizacaoCarga || ''}</span></div>
+  <div class="foot">
+    <span>ENTREGAS: ${esc(c.qtdEntregas)}</span>
+    <span>PESO TOTAL: ${peso3(c.pesoTotalKg)}</span>
+    <span>Autorização de Carga: ${esc(c.autorizacaoCarga || '')}</span>
+  </div>
 </div>
+<div class="pfoot">${esc(c.cd || 'Hetros')} · Impresso em: ${carimbo} · CapaRota</div>
 </body></html>`;
       const w = window.open('', '_blank');
       if (w) { w.document.write(html); w.document.close(); }
@@ -325,43 +376,101 @@ th{background:#eee;text-align:center}
   const imprimirEspelho = async (pedidoId: string) => {
     try {
       const { data: p } = await api.get(`/pedidos/${pedidoId}`);
-      const end: any = p.cliente?.enderecoJson || {};
-      const itensHtml = (p.itens || []).map((it: any) => `
-        <tr>
-          <td>${it.produto?.codigo || ''}</td>
-          <td>${it.descricao}</td>
-          <td style="text-align:right">${Number(it.quantidade).toLocaleString('pt-BR', { minimumFractionDigits: 3 })}</td>
-          <td>${it.unidade}</td>
-          <td></td>
+      const esc = (s: any) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const cli: any = p.cliente || {};
+      const end: any = cli.enderecoJson || {};
+      const agora = new Date();
+      const carimbo = `${agora.toLocaleDateString('pt-BR')} - ${agora.toLocaleTimeString('pt-BR')}`;
+      const qtd3 = (v: any) => Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+      const nomeCli = (cli.nomeFantasia || cli.razaoSocial || '').toUpperCase();
+      const codCli = cli.codigo ? `${String(cli.codigo).padStart(6, '0')} - ` : '';
+      const linhaEnd = [end.rua, end.numero, end.complemento].filter(Boolean).join(', ').toUpperCase();
+      const linhaCep = [end.cep, end.bairro, [end.cidade, end.uf].filter(Boolean).join('-')].filter(Boolean).join(', ').toUpperCase();
+
+      const itensHtml = (p.itens || []).map((it: any, i: number) => `
+        <tr class="${i % 2 ? 'odd' : 'even'}">
+          <td class="cod">${esc(it.produto?.codigo || '')}</td>
+          <td class="desc">${esc((it.descricao || '').toUpperCase())}</td>
+          <td class="qtd">${qtd3(it.quantidade)}</td>
+          <td class="un">${esc(it.unidade || '')}</td>
+          <td class="obs">${esc((it.observacoes || '').toUpperCase())}</td>
         </tr>`).join('');
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Espelho Pedido ${p.numero}</title>
+
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Espelho Pedido ${esc(p.numero)}</title>
 <style>
-body{font-family:Arial;font-size:12px;margin:18px;color:#000}
-.center{text-align:center}
-h2{margin:2px 0}
-table{width:100%;border-collapse:collapse;margin-top:10px}
-th,td{padding:3px 6px;font-size:11px;border-bottom:1px solid #ccc;text-align:left}
-th{border-bottom:2px solid #000}
-.cab{border-bottom:2px solid #000;padding-bottom:6px}
-.linha{display:flex;justify-content:space-between;border-top:2px solid #000;border-bottom:1px solid #000;padding:3px 0;font-weight:bold;margin-top:6px}
-@media print{button{display:none}}
+  * { box-sizing: border-box; }
+  html, body { background: #fff; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; margin: 14px; color: #000; }
+  .toolbar { margin-bottom: 8px; }
+  .toolbar button { padding: 6px 14px; font-size: 12px; cursor: pointer; }
+  .page { border: 1px solid #999; padding: 14px 18px; background: #fff; }
+  /* Cabeçalho */
+  .top { position: relative; }
+  .top .emis { position: absolute; top: 0; right: 0; text-align: right; font-size: 9px; line-height: 1.5; }
+  .head { display: flex; align-items: flex-start; justify-content: center; gap: 12px; text-align: center; }
+  .head img { height: 46px; width: 46px; object-fit: contain; margin-top: 2px; }
+  .head .co { }
+  .head .co .nm { font-size: 15px; font-weight: bold; }
+  .head .co .ad { font-size: 11px; line-height: 1.45; }
+  hr.thick { border: none; border-top: 2px solid #000; margin: 8px 0; }
+  /* Bloco do cliente */
+  .cli { text-align: center; }
+  .cli .nm { font-size: 13px; font-weight: bold; }
+  .cli .ad { font-size: 11px; line-height: 1.45; }
+  /* Linha de pedido */
+  .ped { display: flex; justify-content: space-between; font-weight: bold; font-size: 11px; padding: 3px 0; }
+  .ped .l { display: flex; gap: 26px; }
+  /* Tabela */
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-size: 11px; font-weight: bold; border-bottom: 2px solid #000; padding: 3px 6px; }
+  thead th.qtd { text-align: right; }
+  tbody td { padding: 3px 6px; font-size: 11px; }
+  tbody tr.odd { background: #f2f2f2; }
+  td.cod { font-weight: bold; white-space: nowrap; width: 70px; }
+  td.qtd { text-align: right; white-space: nowrap; width: 80px; }
+  td.un { width: 40px; }
+  td.obs { width: 130px; }
+  .pfoot { text-align: center; font-size: 9px; color: #333; margin-top: 14px; }
+  @media print { .toolbar { display: none; } body { margin: 0; } .page { border: none; } }
+  @page { size: A4; margin: 10mm; }
 </style></head><body>
-<button onclick="window.print()" style="margin-bottom:8px;padding:6px 12px">🖨️ Imprimir</button>
-<div class="cab center">
-  <div class="logo" style="font-weight:bold;font-size:16px;display:flex;align-items:center;justify-content:center;gap:8px"><img src="/logo-hetros.png" style="height:34px;object-fit:contain" /></div>
-  <div>AV DOUTOR GASTAO VIDIGAL, SN - PAV HFC BOX 19 · 05316-900 - VILA LEOPOLDINA · SAO PAULO-SP</div>
+<div class="toolbar"><button onclick="window.print()">🖨️ Imprimir</button></div>
+<div class="page">
+  <div class="top">
+    <div class="emis">Data Emissão: ${agora.toLocaleDateString('pt-BR')}<br/>Página: 1</div>
+    <div class="head">
+      <img src="/logo-hetros-icone.png" onerror="this.style.display='none'" />
+      <div class="co">
+        <div class="nm">HETROS IMP. E EXP. LTDA</div>
+        <div class="ad">AV DOUTOR GASTAO VIDIGAL, SN - PAV HFC BOX 19</div>
+        <div class="ad">05316-900 - VILA LEOPOLDINA</div>
+        <div class="ad">SAO PAULO-SP</div>
+      </div>
+    </div>
+  </div>
+  <hr class="thick" />
+  <div class="cli">
+    <div class="nm">${esc(codCli)}${esc(nomeCli)}</div>
+    ${linhaEnd ? `<div class="ad">${esc(linhaEnd)}</div>` : ''}
+    ${linhaCep ? `<div class="ad">${esc(linhaCep)}</div>` : ''}
+  </div>
+  <hr class="thick" />
+  <div class="ped">
+    <div class="l">
+      <span>Pedido: ${String(p.numero ?? '').padStart(8, '0')} - 000001</span>
+      <span>Venda: ${p.dataEntrega ? new Date(p.dataEntrega).toLocaleDateString('pt-BR') : ''}</span>
+      <span>NFe: 0</span>
+      <span>Referência:</span>
+    </div>
+    <span>Itens: ${String((p.itens || []).length).padStart(3, '0')}</span>
+  </div>
+  <table>
+    <thead><tr><th>Produto</th><th>Descrição</th><th class="qtd">Qtde</th><th>UN</th><th>Obs</th></tr></thead>
+    <tbody>${itensHtml}</tbody>
+  </table>
+  <div class="pfoot">Impresso em: ${carimbo}</div>
 </div>
-<h2 class="center">${(p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '').toUpperCase()}</h2>
-<p class="center">${[end.rua, end.numero].filter(Boolean).join(', ')} · ${end.bairro || ''} · ${end.cidade || ''}-${end.uf || ''}</p>
-<div class="linha">
-  <span>Pedido: ${String(p.numero).padStart(8, '0')}</span>
-  <span>Venda: ${p.dataEntrega ? new Date(p.dataEntrega).toLocaleDateString('pt-BR') : ''}</span>
-  <span>Itens: ${String((p.itens || []).length).padStart(3, '0')}</span>
-</div>
-<table>
-  <thead><tr><th>Produto</th><th>Descrição</th><th>Qtde</th><th>UN</th><th>Obs</th></tr></thead>
-  <tbody>${itensHtml}</tbody>
-</table>
 </body></html>`;
       const w = window.open('', '_blank');
       if (w) { w.document.write(html); w.document.close(); }

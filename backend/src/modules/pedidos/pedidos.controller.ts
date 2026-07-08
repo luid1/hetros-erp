@@ -47,6 +47,18 @@ export class PedidosController {
     return this.service.confirmar(tenantId, id);
   }
 
+  @Post(':id/reposicao')
+  @ApiOperation({ summary: 'Gera uma reposição (grátis) a partir deste pedido' })
+  reposicao(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string, @Body() dto: any) {
+    return this.service.criarReposicao(tenantId, user.id, id, dto);
+  }
+
+  @Patch(':id/reposicao/concluir')
+  @ApiOperation({ summary: 'Conclui a reposição: baixa de estoque (perda) + lança a perda no financeiro' })
+  concluirReposicao(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string) {
+    return this.service.concluirReposicao(tenantId, user.id, id);
+  }
+
   @Patch(':id/cancelar')
   @ApiOperation({ summary: 'Cancelar pedido' })
   cancelar(@CurrentTenant() tenantId: string, @Param('id') id: string) {

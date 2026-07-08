@@ -19,6 +19,7 @@ import Custos from './modules/financeiro/pages/Custos';
 import ContasReceber from './modules/financeiro/pages/ContasReceber';
 import ContasPagar from './modules/financeiro/pages/ContasPagar';
 import FluxoCaixa from './modules/financeiro/pages/FluxoCaixa';
+import ControladoriaHub from './modules/financeiro/pages/ControladoriaHub';
 import UsuariosAcessos from './modules/gerencial/pages/UsuariosAcessos';
 import Produtos from './modules/cadastros/pages/Produtos';
 import Fornecedores from './modules/cadastros/pages/Fornecedores';
@@ -110,6 +111,7 @@ export default function App() {
             <Route path="financeiro/fluxo-caixa" element={<FluxoCaixa />} />
             <Route path="financeiro/receber" element={<ContasReceber />} />
             <Route path="financeiro/pagar" element={<ContasPagar />} />
+            <Route path="financeiro/controladoria" element={<ControladoriaHub />} />
             <Route path="financeiro/dre" element={<FinancialHub />} />
             <Route path="financeiro/custos" element={<Custos />} />
 

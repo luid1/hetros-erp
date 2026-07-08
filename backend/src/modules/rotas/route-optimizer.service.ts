@@ -266,6 +266,17 @@ export class RouteOptimizerService {
           },
         });
       }
+
+      // Roteirizou (IA) → pedidos entram na fila de SEPARAÇÃO automaticamente.
+      // Só promove os que ainda estão CONFIRMADO (não rebaixa SEPARADO/FATURADO).
+      const todosPedidoIds = bins.flatMap((b) => b.paradas.map((p) => p.id));
+      if (todosPedidoIds.length) {
+        await tx.pedido.updateMany({
+          where: { id: { in: todosPedidoIds }, tenantId, status: 'CONFIRMADO' },
+          data: { status: 'EM_SEPARACAO' },
+        });
+      }
+
       return resultado;
     });
 

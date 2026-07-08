@@ -2,10 +2,11 @@ import { toast, confirmDialog, promptDialog } from '../../../components/ui/feedb
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ClipboardList, Plus, Search, X, Check, Trash2, Pencil,
-  Package, Truck, FileText, ShoppingCart, AlertTriangle, Save, CreditCard, MapPin, Lock, Unlock,
+  Package, Truck, FileText, ShoppingCart, AlertTriangle, Save, CreditCard, MapPin, Lock, Unlock, Repeat, Loader2,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
+import { imprimirComprovanteReposicao } from '../impressos';
 
 const R$ = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 // Senha para liberar descontos no pedido (trocar aqui conforme política da empresa)
@@ -60,6 +61,7 @@ export default function PedidosVenda() {
   const [dataFiltro, setDataFiltro] = useState(hojeISO());
   const [modalAberto, setModalAberto] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [reposId, setReposId] = useState<string | null>(null);
   const [aComprar, setAComprar] = useState<any[]>([]);
 
   const carregarPedidos = useCallback(() => {
@@ -113,6 +115,17 @@ export default function PedidosVenda() {
     if (!await confirmDialog('Cancelar este pedido?')) return;
     await api.patch(`/pedidos/${id}/cancelar`);
     carregarPedidos();
+  };
+
+  const handleConcluirReposicao = async (id: string) => {
+    if (!await confirmDialog('Concluir a reposição? Isso dá baixa no estoque e lança a perda no financeiro.', { tone: 'danger', okLabel: 'Concluir (baixa + perda)' })) return;
+    try {
+      const r = await api.patch(`/pedidos/${id}/reposicao/concluir`);
+      toast(`✅ Reposição concluída. Perda lançada: ${R$(Number(r.data?.custoPerda || 0))}.`);
+      carregarPedidos();
+    } catch (e: any) {
+      toast(e.response?.data?.message || 'Não foi possível concluir a reposição.');
+    }
   };
 
   const abrirNovo = () => { setEditId(null); setModalAberto(true); };
@@ -239,6 +252,41 @@ export default function PedidosVenda() {
                           </button>
                         </>
                       )}
+                      {!['RASCUNHO', 'CANCELADO', 'DEVOLVIDO'].includes(p.status) && p.tipo !== 'REPOSICAO' && (
+                        <button
+                          onClick={() => setReposId(p.id)}
+                          className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded font-semibold hover:bg-amber-100"
+                          title="Gerar reposição (grátis) deste pedido"
+                        >
+                          <Repeat className="h-3 w-3 inline" /> Reposição
+                        </button>
+                      )}
+                      {p.tipo === 'REPOSICAO' && (
+                        <>
+                          <span className="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded font-bold">
+                            REPOSIÇÃO
+                          </span>
+                          <button
+                            onClick={() => imprimirComprovanteReposicao(p.id).catch(() => toast('Não foi possível gerar o comprovante.'))}
+                            className="text-[10px] bg-white text-gray-700 border border-gray-300 px-2 py-0.5 rounded font-semibold hover:bg-gray-50"
+                            title="Imprimir Comprovante de Reposição"
+                          >
+                            <FileText className="h-3 w-3 inline" /> Comprovante
+                          </button>
+                          {!['ENTREGUE', 'CANCELADO'].includes(p.status) && (
+                            <button
+                              onClick={() => handleConcluirReposicao(p.id)}
+                              className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-semibold hover:bg-emerald-100"
+                              title="Concluir: baixa no estoque + lança a perda"
+                            >
+                              <Check className="h-3 w-3 inline" /> Concluir
+                            </button>
+                          )}
+                          {p.status === 'ENTREGUE' && (
+                            <span className="text-[10px] text-emerald-600 font-semibold">✓ concluída</span>
+                          )}
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -261,6 +309,149 @@ export default function PedidosVenda() {
           onSalvo={() => { setModalAberto(false); carregarPedidos(); }}
         />
       )}
+
+      {reposId && (
+        <ModalReposicao
+          pedidoId={reposId}
+          onClose={() => setReposId(null)}
+          onGerado={() => { setReposId(null); carregarPedidos(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────
+// MODAL — Gerar Reposição (grátis) a partir de um pedido
+// ─────────────────────────────────────────────────────────
+const MOTIVOS_REPOS = [
+  { v: 'PRODUTO_AVARIADO', l: 'Produto avariado' },
+  { v: 'FALTA', l: 'Faltou na entrega' },
+  { v: 'TROCA', l: 'Troca' },
+  { v: 'QUALIDADE', l: 'Qualidade abaixo' },
+  { v: 'OUTRO', l: 'Outro' },
+];
+
+function ModalReposicao({ pedidoId, onClose, onGerado }: { pedidoId: string; onClose: () => void; onGerado: () => void }) {
+  const [pedido, setPedido] = useState<any>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [linhas, setLinhas] = useState<{ produtoId: string; descricao: string; unidade: string; max: number; qtd: string; on: boolean }[]>([]);
+  const [motivo, setMotivo] = useState('PRODUTO_AVARIADO');
+  const [obs, setObs] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    let vivo = true;
+    setCarregando(true);
+    api.get(`/pedidos/${pedidoId}`)
+      .then((r) => {
+        if (!vivo) return;
+        setPedido(r.data);
+        setLinhas((r.data.itens || []).map((it: any) => ({
+          produtoId: it.produtoId,
+          descricao: it.produto?.descricao || it.descricao,
+          unidade: it.unidade,
+          max: Number(it.quantidade),
+          qtd: String(Number(it.quantidade)),
+          on: false,
+        })));
+      })
+      .catch(() => setErro('Não foi possível carregar o pedido.'))
+      .finally(() => { if (vivo) setCarregando(false); });
+    return () => { vivo = false; };
+  }, [pedidoId]);
+
+  const set = (i: number, patch: Partial<typeof linhas[number]>) =>
+    setLinhas((p) => p.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+
+  const selecionados = linhas.filter((l) => l.on && Number(l.qtd) > 0);
+
+  const gerar = async () => {
+    if (selecionados.length === 0) { setErro('Marque ao menos um item para repor.'); return; }
+    setSalvando(true); setErro('');
+    try {
+      await api.post(`/pedidos/${pedidoId}/reposicao`, {
+        motivo,
+        observacoes: obs || undefined,
+        itens: selecionados.map((l) => ({ produtoId: l.produtoId, descricao: l.descricao, unidade: l.unidade, quantidade: Number(l.qtd) })),
+      });
+      toast('✅ Reposição gerada e enviada para o fluxo (separação).', 'success');
+      onGerado();
+    } catch (e: any) {
+      setErro(e?.response?.data?.message || 'Falha ao gerar a reposição.');
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const nomeCli = pedido?.cliente?.nomeFantasia || pedido?.cliente?.razaoSocial || '—';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Repeat className="h-5 w-5 text-amber-600" /> Gerar Reposição</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{pedido ? `Pedido #${pedido.numero} · ${nomeCli}` : 'Carregando…'} · grátis (só comprovante)</p>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center hover:bg-gray-200"><X className="h-4 w-4 text-gray-600" /></button>
+        </div>
+
+        {carregando ? (
+          <div className="py-16 text-center text-gray-400"><Loader2 className="h-7 w-7 mx-auto animate-spin mb-2" /> Carregando itens…</div>
+        ) : (
+          <div className="px-5 py-4 space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Motivo</label>
+              <select value={motivo} onChange={(e) => setMotivo(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+                {MOTIVOS_REPOS.map((m) => <option key={m.v} value={m.v}>{m.l}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Itens a repor</p>
+              <div className="space-y-1.5">
+                {linhas.map((l, i) => (
+                  <div key={l.produtoId} className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${l.on ? 'border-amber-300 bg-amber-50/60' : 'border-gray-200'}`}>
+                    <input type="checkbox" checked={l.on} onChange={(e) => set(i, { on: e.target.checked })} className="h-4 w-4 accent-amber-600" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-medium text-gray-800 truncate">{l.descricao}</p>
+                      <p className="text-[11px] text-gray-400">entregue: {l.max} {l.unidade}</p>
+                    </div>
+                    <input
+                      inputMode="decimal"
+                      value={l.qtd}
+                      disabled={!l.on}
+                      onChange={(e) => set(i, { qtd: e.target.value.replace(/[^\d.,]/g, '').replace(',', '.') })}
+                      className="w-20 rounded-lg border border-gray-200 px-2 py-1.5 text-sm text-right disabled:bg-gray-50 disabled:text-gray-300"
+                    />
+                    <span className="text-[11px] text-gray-400 w-8">{l.unidade}</span>
+                  </div>
+                ))}
+                {linhas.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Este pedido não tem itens.</p>}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Observação (opcional)</label>
+              <textarea value={obs} onChange={(e) => setObs(e.target.value)} rows={2} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm resize-none" placeholder="Ex.: cliente reclamou de 3 caixas de tomate avariadas" />
+            </div>
+
+            {erro && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{erro}</p>}
+
+            <button
+              disabled={salvando || selecionados.length === 0}
+              onClick={gerar}
+              className="w-full rounded-xl bg-amber-600 text-white py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-amber-700"
+            >
+              {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Repeat className="h-4 w-4" />}
+              {salvando ? 'Gerando…' : `Gerar reposição (${selecionados.length} ${selecionados.length === 1 ? 'item' : 'itens'})`}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -20,6 +20,62 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-08] — Reposição, impressos fiéis, fluxo despacho→separação, Gestão Fiscal unificada, módulos IA/Reforma
+
+### O que mudou
+
+**Logística — fluxo despacho → separação (correção do elo que faltava)**
+- **Roteirizar agora empurra pra separação** independente de onde: ao criar Romaneio (Controle de Carga)
+  e ao Otimizar com IA (Torre), os pedidos `CONFIRMADO` passam a `EM_SEPARACAO` automaticamente.
+- **Torre de Controle — "Salvar Roteirização" agora persiste de verdade**: cria um Romaneio por motorista
+  com paradas (`POST /carga/romaneio`) e move os pedidos pra separação (antes era só um "salvar visual").
+- **Torre carrega os romaneios do dia** como rotas de motorista (com paradas) — some a inconsistência de
+  "0 paradas" depois de salvar; o modo demonstração só entra em erro real de API / sem filial (não mais por "vazio").
+
+**Impressos fiéis (módulo compartilhado `impressos.ts`)**
+- **Espelho** (picking) e **Capa de Rota** com layout fiel ao modelo NewOxxy (cabeçalho Hetros, zebra,
+  colunas exatas). Backend da Capa enriquecido (bilhete, cliente, endereço, id venda, peso, empresa, rótulo da rota).
+- **Botões na Torre** (painel do motorista): Capa de Rota (oficial via romaneio), Rota no Maps, e por parada
+  **Maps · Waze · Espelho** — sem API paga, só deep links.
+- **Comprovante de Reposição** (documento interno) com título, motivo, itens e assinatura do recebedor.
+
+**Reposição (grátis = perda) — fluxo completo**
+- Novo `tipo=REPOSICAO` no Pedido + `pedidoOrigemId`/`motivoReposicao`. Gerada **a partir de um pedido**
+  (`POST /pedidos/:id/reposicao`), R$ 0, já `CONFIRMADO` (entra no fluxo normal). Selo REPOSIÇÃO + botão Comprovante.
+- **Concluir** (`PATCH /pedidos/:id/reposicao/concluir`): baixa de estoque como **PERDA** + lança o custo como
+  **despesa/perda** no financeiro (`LancamentoFinanceiro` DEBITO) — sem Contas a Receber. Marca ENTREGUE.
+
+**Fiscal — Gestão Fiscal unificada**
+- Gestão Fiscal passou a **ler as NF-e reais** (tabela `NFe`, mesma fonte do faturamento) em vez da camada
+  Invoice vazia. KPIs + lista + detalhe da nota com **DANFE, Carta de Correção (CC-e), Devolução, Cancelar, Emitir**.
+- **"NF-e Emitidas" removida do menu** (virou redundante) — Gestão Fiscal é o lar fiscal único.
+
+**Financeiro (UI)**
+- **DRE / FinancialHub** alinhado ao tema dark do site, com contraste reforçado e conteúdo centralizado.
+- Novo **Módulo Financeiro & Controladoria** (`ControladoriaHub`, `/financeiro/controladoria`): 3 abas
+  (Fluxo de Caixa · Contas a Receber · Contas a Pagar) em estilo claro premium, com escape do tema dark global.
+
+**App de Compras (`AppComprador`)**
+- Aba **Reposição** redesenhada: lista compacta, segmento **"Últimas CIs"**, painel do produto com **histórico
+  de compras** (endpoint `GET /compras/produto/:id/historico`) e transição de abrir/fechar.
+- **Editar CI** (`PUT /compras/:id`) e **cancelar CI**; app escapa do tema dark (visual iOS claro).
+
+**Módulos novos (backend)**
+- **Fiscal Reforma (IBS/CBS)** — `/fiscal-reforma`: calcular-venda, faturar (NF-e simulada + 3 lançamentos:
+  receita + provisão IBS + provisão CBS), devolver (estorno) e auditoria. Campos IBS/CBS no schema.
+- **Interpretador de pedidos por texto/WhatsApp (IA)** — `POST /pedidos/interpretar-whatsapp`: extrai itens
+  via Claude (SDK Anthropic, JSON estruturado) e casa com o cadastro de produtos; **fallback local** sem API key.
+
+### Arquivos modificados
+- Backend: `prisma/schema.prisma`, `app.module.ts`, `carga/carga.service.ts`, `rotas/route-optimizer.service.ts`,
+  `compras/compras.{controller,service}.ts`, `pedidos/pedidos.{controller,service,module}.ts`,
+  `modules/fiscal-reforma/*` (novo), `modules/interpretador/*` (novo).
+- Frontend: `services/api.ts`, `config/telas.ts`, `App.tsx`, `modules/logistica/impressos.ts` (novo),
+  `logistica/pages/{TorreControle,ControleCarga,PedidosVenda}.tsx`, `fiscal/pages/GestaoFiscal.tsx`,
+  `compras/pages/AppComprador.tsx`, `financeiro/pages/{FinancialHub,ControladoriaHub}.tsx`.
+
+---
+
 ## [2026-07-06] — App de Compras conectado ao ERP + Custos & Margem (regra KG, edição inline, Relatório do Cliente)
 
 ### O que mudou

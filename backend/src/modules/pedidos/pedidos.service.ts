@@ -1,5 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EstoqueService } from '../estoque/estoque.service';
+import { TipoMovimentacao } from '@prisma/client';
 
 interface ItemDto {
   produtoId: string;
@@ -36,7 +38,8 @@ interface PedidoDto {
 
 @Injectable()
 export class PedidosService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(PedidosService.name);
+  constructor(private prisma: PrismaService, private estoque: EstoqueService) {}
 
   // ── Resolve desconto do item em R$ ──
   private descontoEmReais(item: ItemDto): number {
@@ -309,6 +312,128 @@ export class PedidosService {
       where: { id },
       data: { status: status as any },
     });
+  }
+
+  /**
+   * Gera uma REPOSIÇÃO (grátis) a partir de um pedido de origem. Copia cliente e
+   * endereço, cria um novo pedido tipo=REPOSICAO já CONFIRMADO (entra no fluxo de
+   * separação → carga → entrega). Sem valor (não gera Contas a Receber / NF-e);
+   * a saída física sai como comprovante de reposição.
+   */
+  async criarReposicao(
+    tenantId: string,
+    usuarioId: string,
+    pedidoOrigemId: string,
+    dto: { itens?: { produtoId: string; descricao?: string; unidade?: string; quantidade: number }[]; motivo?: string; observacoes?: string },
+  ) {
+    const origem = await this.findOne(tenantId, pedidoOrigemId);
+    if (!Array.isArray(dto?.itens) || dto.itens.length === 0) {
+      throw new BadRequestException('Selecione ao menos um item para repor.');
+    }
+
+    const ultimo = await this.prisma.pedido.findFirst({
+      where: { tenantId, filialOrigemId: origem.filialOrigemId },
+      orderBy: { numero: 'desc' },
+      select: { numero: true },
+    });
+    const numero = (ultimo?.numero || 0) + 1;
+
+    const itensData = dto.itens
+      .filter((i) => i.produtoId && Number(i.quantidade) > 0)
+      .map((i) => {
+        const orig: any = origem.itens.find((it: any) => it.produtoId === i.produtoId);
+        return {
+          produtoId: i.produtoId,
+          descricao: i.descricao || orig?.descricao || orig?.produto?.descricao || 'Item',
+          unidade: i.unidade || orig?.unidade || 'UN',
+          quantidade: Number(i.quantidade),
+          precoUnitario: 0, // reposição é grátis
+          valorTotal: 0,
+        };
+      });
+    if (itensData.length === 0) throw new BadRequestException('Nenhum item válido para repor.');
+
+    return this.prisma.pedido.create({
+      data: {
+        tenantId,
+        filialOrigemId: origem.filialOrigemId,
+        clienteId: origem.clienteId,
+        usuarioId,
+        numero,
+        tipo: 'REPOSICAO',
+        status: 'CONFIRMADO', // já entra no fluxo de separação/carga
+        pedidoOrigemId: origem.id,
+        motivoReposicao: dto.motivo || null,
+        observacoes: dto.observacoes || `Reposição do pedido #${origem.numero}`,
+        observacoesNf: `REPOSICAO · Ref. pedido #${origem.numero}`,
+        periodo: origem.periodo,
+        regiao: origem.regiao,
+        enderecoEntregaJson: origem.enderecoEntregaJson as any,
+        dataEntrega: new Date(`${new Date().toISOString().split('T')[0]}T12:00:00`),
+        subtotal: 0,
+        valorTotal: 0,
+        itens: { create: itensData },
+      },
+      include: {
+        itens: true,
+        cliente: { select: { razaoSocial: true, nomeFantasia: true } },
+      },
+    });
+  }
+
+  /**
+   * Conclui uma REPOSIÇÃO: dá baixa no estoque (tipo PERDA) e lança o custo como
+   * despesa/perda no financeiro (sem Contas a Receber — reposição é grátis).
+   * Marca o pedido como ENTREGUE.
+   */
+  async concluirReposicao(tenantId: string, usuarioId: string, pedidoId: string) {
+    const pedido = await this.prisma.pedido.findFirst({
+      where: { id: pedidoId, tenantId },
+      include: { itens: { include: { produto: { select: { precoCompra: true, descricao: true } } } } },
+    });
+    if (!pedido) throw new NotFoundException('Pedido não encontrado.');
+    if (pedido.tipo !== 'REPOSICAO') throw new BadRequestException('Este pedido não é uma reposição.');
+    if (pedido.status === 'ENTREGUE') throw new BadRequestException('Reposição já foi concluída.');
+    if (pedido.status === 'CANCELADO') throw new BadRequestException('Reposição cancelada.');
+
+    // 1. Baixa de estoque como PERDA (permite saldo negativo) + acumula o custo.
+    let custoPerda = 0;
+    for (const item of pedido.itens) {
+      if (!item.produtoId) continue;
+      const custo = Number((item as any).produto?.precoCompra || 0) * Number(item.quantidade);
+      custoPerda += custo;
+      try {
+        await this.estoque.baixarFefo(tenantId, {
+          filialId: pedido.filialOrigemId,
+          produtoId: item.produtoId,
+          tipo: TipoMovimentacao.PERDA,
+          quantidade: Number(item.quantidade),
+          usuarioId,
+          observacoes: `Reposição grátis (perda) — pedido #${pedido.numero}`,
+        });
+      } catch (e: any) {
+        this.logger.warn(`Baixa de estoque falhou p/ produto ${item.produtoId}: ${e.message}`);
+      }
+    }
+    custoPerda = Math.round(custoPerda * 100) / 100;
+
+    // 2. Lança a PERDA no financeiro (débito/despesa) — não gera Contas a Receber.
+    await this.prisma.lancamentoFinanceiro.create({
+      data: {
+        tenantId,
+        filialId: pedido.filialOrigemId,
+        tipo: 'DEBITO',
+        valor: custoPerda,
+        dataCompetencia: new Date(),
+        descricao: `Perda por reposição — pedido #${pedido.numero}`,
+        historico: `REPOSICAO;PEDIDO:${pedido.id};ORIGEM:${pedido.pedidoOrigemId || ''}`,
+      },
+    });
+
+    // 3. Marca a reposição como ENTREGUE (concluída).
+    await this.prisma.pedido.update({ where: { id: pedido.id }, data: { status: 'ENTREGUE' } });
+
+    return { ok: true, custoPerda, itens: pedido.itens.length };
   }
 
   // Aprovar = CONFIRMADO. Bloqueia só por crédito. Estoque pode ficar NEGATIVO

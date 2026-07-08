@@ -19,6 +19,8 @@ import { ComprasModule } from './modules/compras/compras.module';
 import { PedidosModule } from './modules/pedidos/pedidos.module';
 import { NFeModule } from './modules/nfe/nfe.module';
 import { FiscalModule } from './modules/fiscal/fiscal.module';
+import { FiscalReformaModule } from './modules/fiscal-reforma/fiscal-reforma.module';
+import { InterpretadorModule } from './modules/interpretador/interpretador.module';
 import { RomaneiosModule } from './modules/romaneios/romaneios.module';
 import { ContasReceberModule } from './modules/contas-receber/contas-receber.module';
 import { ContasPagarModule } from './modules/contas-pagar/contas-pagar.module';
@@ -56,6 +58,8 @@ import { HealthController } from './health.controller';
     PedidosModule,
     NFeModule,
     FiscalModule,
+    FiscalReformaModule,
+    InterpretadorModule,
     RomaneiosModule,
     ContasReceberModule,
     ContasPagarModule,

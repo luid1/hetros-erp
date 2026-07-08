@@ -403,6 +403,9 @@ model Produto {
   cstIcms             String?
   cstPis              String?
   cstCofins           String?
+  // Reforma Tributária (IBS/CBS) — EC 132/2023
+  tipoAliquotaReforma String    @default("PADRAO") // PADRAO, REDUZIDA, ISENTA, SELETIVA
+  confiancaIa         Decimal   @default(0) @db.Decimal(5, 2) // 0..100 — confiança da classificação NCM por IA
   // Armazenamento
   requerLote          Boolean   @default(false)
   requerValidade      Boolean   @default(false) // perecíveis/FLV
@@ -684,14 +687,24 @@ model Pedido {
   usuarioId         String
   usuario           Usuario   @relation(fields: [usuarioId], references: [id])
   numero            Int       // gerado por sequência por filial
-  tipo              String    @default("VENDA") // VENDA, TRANSFERENCIA, DEVOLUCAO, BONIFICACAO
+  tipo              String    @default("VENDA") // VENDA, TRANSFERENCIA, DEVOLUCAO, BONIFICACAO, REPOSICAO
   status            StatusPedido @default(RASCUNHO)
   observacoes       String?
+  // Reposição (grátis, gerada a partir de um pedido de origem)
+  pedidoOrigemId    String?
+  pedidoOrigem      Pedido?   @relation("PedidoReposicao", fields: [pedidoOrigemId], references: [id])
+  reposicoes        Pedido[]  @relation("PedidoReposicao")
+  motivoReposicao   String?   // ex.: PRODUTO_AVARIADO, FALTA, TROCA
   // Totais
   subtotal          Decimal   @default(0) @db.Decimal(12, 2)
   descontoTotal     Decimal   @default(0) @db.Decimal(12, 2)
   valorFrete        Decimal   @default(0) @db.Decimal(12, 2)
   valorTotal        Decimal   @default(0) @db.Decimal(12, 2)
+  // Reforma Tributária (IBS/CBS)
+  valorIbs          Decimal   @default(0) @db.Decimal(12, 2)
+  valorCbs          Decimal   @default(0) @db.Decimal(12, 2)
+  chaveAcessoNfe    String?   // chave de acesso retornada pela mensageria na emissão
+  numeroNfe         String?   // número da NF-e emitida no faturamento
   // Frete
   tipoFrete         String?   // CIF, FOB
   transportadoraId  String?
@@ -755,6 +768,10 @@ model ItemPedido {
   valorIcms       Decimal   @default(0) @db.Decimal(12, 2)
   valorPis        Decimal   @default(0) @db.Decimal(12, 2)
   valorCofins     Decimal   @default(0) @db.Decimal(12, 2)
+  // Reforma Tributária (IBS/CBS)
+  ncmAplicado     String?   // NCM congelado no momento do faturamento
+  ibsCalculado    Decimal   @default(0) @db.Decimal(12, 2)
+  cbsCalculado    Decimal   @default(0) @db.Decimal(12, 2)
 
   @@index([pedidoId])
   @@index([produtoId])

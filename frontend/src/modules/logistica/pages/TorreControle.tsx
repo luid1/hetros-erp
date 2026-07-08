@@ -22,8 +22,11 @@ import {
   Plus,
   ChevronDown,
   ChevronUp,
+  Navigation,
+  Printer,
 } from 'lucide-react';
-import { rotasApi, pedidosApi } from '../../../services/api';
+import api, { rotasApi, pedidosApi } from '../../../services/api';
+import { imprimirEspelho, imprimirCapaDados, imprimirCapaRomaneio, imprimirComprovanteReposicao, type CapaDados } from '../impressos';
 import { useAuth } from '../../../contexts/AuthContext';
 import { toast } from '../../../components/ui/feedback';
 
@@ -38,6 +41,24 @@ import { toast } from '../../../components/ui/feedback';
 const hoje = () => new Date().toISOString().slice(0, 10);
 const kg = (n: number) => `${Number(n || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg`;
 const num = (n: number) => Number(n || 0).toLocaleString('pt-BR');
+
+/* ─── Navegação externa (Google Maps / Waze) — sem API, só deep links ─── */
+const enderecoStop = (s: { clienteNome: string; cidade?: string }) =>
+  [s.clienteNome, s.cidade].filter(Boolean).join(', ');
+const urlMapsParada = (s: { clienteNome: string; cidade?: string }) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(enderecoStop(s))}`;
+const urlWazeParada = (s: { clienteNome: string; cidade?: string }) =>
+  `https://waze.com/ul?q=${encodeURIComponent(enderecoStop(s))}&navigate=yes`;
+/** Rota completa no Google Maps: origem = local atual, waypoints na ordem, destino = última parada. */
+const urlMapsRota = (stops: { clienteNome: string; cidade?: string }[]) => {
+  if (stops.length === 0) return '';
+  const enderecos = stops.map(enderecoStop);
+  const destino = enderecos[enderecos.length - 1];
+  const waypoints = enderecos.slice(0, -1);
+  const base = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destino)}`;
+  return waypoints.length ? `${base}&waypoints=${waypoints.map(encodeURIComponent).join('|')}` : base;
+};
+const abrirNav = (url: string) => { if (url) window.open(url, '_blank', 'noopener'); };
 
 interface PedidoAberto {
   id: string;
@@ -60,6 +81,7 @@ interface Stop {
   status: string;
   pesoKg: number;
   volumes: number;
+  tipo?: string; // VENDA, REPOSICAO...
 }
 
 interface Motorista {
@@ -70,6 +92,7 @@ interface Motorista {
   capacidadeKg: number;
   origemOtimizacao: string;
   stops: Stop[];
+  romaneioId?: string; // quando a rota já é um Romaneio persistido (Capa oficial)
 }
 
 /* ────────────────────────── Mock fallback (offline / sem dados) ────────────── */
@@ -95,9 +118,6 @@ const ROSTER_MOTORISTAS: Motorista[] = [
   { id: 'mm-7', motoristaNome: 'Rafael Nunes', placaVeiculo: 'XCV-6G22', regiao: 'OESTE', capacidadeKg: 9000, origemOtimizacao: 'MANUAL', stops: [] },
   { id: 'mm-8', motoristaNome: 'Diego Martins', placaVeiculo: 'QAZ-2H90', regiao: 'NORTE', capacidadeKg: 4500, origemOtimizacao: 'MANUAL', stops: [] },
 ];
-
-// Compat: primeiros 3 servem de fallback quando não há API.
-const MOCK_MOTORISTAS: Motorista[] = ROSTER_MOTORISTAS.slice(0, 3);
 
 /* ──────────────────── Motoristas frequentes (favoritos) ────────────────────── */
 
@@ -173,6 +193,32 @@ function mapMotorista(r: any): Motorista {
       status: s.status,
       pesoKg: Number(s.pesoKg || 0),
       volumes: Number(s.volumes || 0),
+    })),
+  };
+}
+
+// Romaneio (rota persistida) → Motorista com paradas, pra aparecer na Torre com
+// os botões de Capa/Espelho. Guarda o romaneioId p/ imprimir a Capa oficial.
+function mapRomaneio(r: any): Motorista {
+  return {
+    id: `rom-${r.id}`,
+    romaneioId: r.id,
+    motoristaNome: r.motorista || 'Sem motorista',
+    placaVeiculo: r.placaVeiculo || '—',
+    regiao: r.regiaoRota || r.regiao || '—',
+    capacidadeKg: Number(r.capacidadeKg || 0),
+    origemOtimizacao: 'ROMANEIO',
+    stops: (r.entregas || []).map((e: any, i: number) => ({
+      id: `${r.id}-${e.pedidoId}`,
+      pedidoId: e.pedidoId,
+      numeroPedido: e.numero,
+      clienteNome: e.cliente || '—',
+      cidade: '',
+      ordem: e.ordem || i + 1,
+      status: 'PENDING',
+      pesoKg: Number(e.peso || 0),
+      volumes: 0,
+      tipo: e.tipo || 'VENDA',
     })),
   };
 }
@@ -279,31 +325,32 @@ export default function TorreControle() {
     }
     setLoading(true);
     try {
-      const [pRes, rRes] = await Promise.all([
+      const [pRes, rRes, cargaRes] = await Promise.all([
         pedidosApi.list(filialId, { status: 'CONFIRMADO' }),
         rotasApi.listar(filialId, data),
+        api.get(`/carga/${filialId}/rotas`, { params: { data } }).catch(() => ({ data: [] })),
       ]);
 
       const rotasRaw = rRes.data || [];
+      // Romaneios do dia (rotas salvas pela Torre/Controle de Carga) → viram rotas de motorista com paradas.
+      const romaneiosRotas: Motorista[] = (cargaRes.data || []).map(mapRomaneio);
+
       const roteirizados = new Set<number>();
       rotasRaw.forEach((r: any) => (r.stops || []).forEach((s: any) => s.numeroPedido && roteirizados.add(s.numeroPedido)));
+      romaneiosRotas.forEach((m) => m.stops.forEach((s) => s.numeroPedido && roteirizados.add(s.numeroPedido)));
 
       const rawPedidos = pRes.data?.items || pRes.data || [];
       const abertos = rawPedidos.map(mapPedido).filter((p: PedidoAberto) => !roteirizados.has(p.numero));
-      const mots = rotasRaw.map(mapMotorista);
+      const mots = [...rotasRaw.map(mapMotorista), ...romaneiosRotas];
 
-      if (abertos.length === 0 && mots.length === 0) {
-        setPedidos(MOCK_PEDIDOS);
-        setMotoristas(MOCK_MOTORISTAS);
-        setUsandoMock(true);
-        resetSnapshot(MOCK_PEDIDOS, MOCK_MOTORISTAS);
-      } else {
-        const comFrequentes = mesclarFrequentes(mots, favoritos);
-        setPedidos(abertos);
-        setMotoristas(comFrequentes);
-        setUsandoMock(false);
-        resetSnapshot(abertos, comFrequentes);
-      }
+      // Conectou ao backend: usa os dados reais (mesmo que vazios). Só cai no
+      // modo demonstração quando a API falha (catch) ou não há filial ativa —
+      // nunca por estar "vazio", pra não bloquear o Salvar sem motivo.
+      const comFrequentes = mesclarFrequentes(mots, favoritos);
+      setPedidos(abertos);
+      setMotoristas(comFrequentes);
+      setUsandoMock(false);
+      resetSnapshot(abertos, comFrequentes);
     } catch {
       // Falhou a API: mantém a tela usável em modo demonstração.
       setPedidos(MOCK_PEDIDOS);
@@ -391,12 +438,42 @@ export default function TorreControle() {
   /* ── Salvar / Reverter ── */
 
   async function salvar() {
+    // Modo demonstração: sem backend não há como persistir/mover para separação.
+    if (usandoMock || !filialId) {
+      toast('Roteirização manual requer conexão com o backend (modo demonstração ativo).', 'info');
+      return;
+    }
+    const comParadas = motoristas.filter((m) => m.stops.length > 0);
+    if (comParadas.length === 0) {
+      toast('Arraste ao menos um pedido para um motorista antes de salvar.', 'info');
+      return;
+    }
+
     setSalvando(true);
     try {
-      // Sem endpoint de atribuição manual: persistimos o snapshot atual como
-      // a nova base e confirmamos visualmente. (A otimização por IA persiste no back.)
-      resetSnapshot(pedidos, motoristas);
-      toast('✅ Roteirização salva.', 'success');
+      // Cada motorista com paradas vira um Romaneio (rota persistida). O backend,
+      // ao criar o romaneio, move os pedidos para EM_SEPARACAO — seguindo o fluxo.
+      let rotas = 0;
+      let pedidosMovidos = 0;
+      for (const m of comParadas) {
+        const pedidoIds = m.stops.map((s) => s.pedidoId);
+        await api.post('/carga/romaneio', {
+          filialId,
+          motorista: m.motoristaNome,
+          codigoCondutor: m.placaVeiculo,
+          placaVeiculo: m.placaVeiculo,
+          regiaoRota: m.regiao,
+          dataMovimento: new Date().toISOString(),
+          dataEntrega: data,
+          pedidoIds,
+        });
+        rotas++;
+        pedidosMovidos += pedidoIds.length;
+      }
+      toast(`✅ Roteirização salva: ${rotas} rota(s) · ${pedidosMovidos} pedido(s) enviados para separação.`, 'success');
+      await carregar(); // recarrega: os pedidos roteirizados saem da fila de abertos
+    } catch (e: any) {
+      toast(e?.response?.data?.message || 'Falha ao salvar a roteirização.', 'error');
     } finally {
       setSalvando(false);
     }
@@ -658,6 +735,8 @@ export default function TorreControle() {
       {selectedDriver && (
         <DriverDrawer
           motorista={selectedDriver}
+          dataRota={data}
+          filialNome={filialAtiva?.nome}
           onClose={() => setSelectedDriverId(null)}
           onRemoveStop={(s) => removerStop(selectedDriver.id, s)}
         />
@@ -792,10 +871,14 @@ function haversine(a: [number, number], b: [number, number]): number {
 
 function DriverDrawer({
   motorista,
+  dataRota,
+  filialNome,
   onClose,
   onRemoveStop,
 }: {
   motorista: Motorista;
+  dataRota?: string;
+  filialNome?: string;
   onClose: () => void;
   onRemoveStop: (s: Stop) => void;
 }) {
@@ -994,9 +1077,49 @@ function DriverDrawer({
 
           {/* D) Timeline de paradas */}
           <div className="px-6 py-4">
-            <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold mb-3 flex items-center gap-2">
-              <Clock className="h-3.5 w-3.5" /> Roteiro da rota
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs uppercase tracking-widest text-slate-400 font-semibold flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5" /> Roteiro da rota
+              </h3>
+              {stopsOrdenados.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() =>
+                      motorista.romaneioId
+                        ? imprimirCapaRomaneio(motorista.romaneioId).catch(() => toast('Não foi possível gerar a Capa de Rota.', 'error'))
+                        : imprimirCapaDados({
+                            idEntrega: motorista.placaVeiculo,
+                            cd: filialNome,
+                            empresa: filialNome,
+                            rotaLabel: [motorista.placaVeiculo, motorista.regiao, motorista.motoristaNome].filter(Boolean).join(' - '),
+                            dataCarga: dataRota,
+                            qtdEntregas: stopsOrdenados.length,
+                            pesoTotalKg: peso,
+                            unidades: stopsOrdenados.map((s): CapaDados['unidades'][number] => ({
+                              bilhete: s.numeroPedido,
+                              nomeCliente: s.clienteNome,
+                              endereco: s.cidade || '',
+                              bairroCidadeUf: s.cidade || '',
+                              tpFatura: 'NFE PADRAO',
+                              idVenda: s.numeroPedido,
+                            })),
+                          })
+                    }
+                    className="flex items-center gap-1.5 rounded-lg bg-slate-700 text-slate-100 border border-slate-600 px-2.5 py-1 text-[11px] font-semibold hover:bg-slate-600"
+                    title="Imprimir a Capa de Rota deste motorista"
+                  >
+                    <Printer className="h-3.5 w-3.5" /> Capa de Rota
+                  </button>
+                  <button
+                    onClick={() => abrirNav(urlMapsRota(stopsOrdenados))}
+                    className="flex items-center gap-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 px-2.5 py-1 text-[11px] font-semibold hover:bg-emerald-500/25"
+                    title="Abrir a rota completa no Google Maps (na ordem das paradas)"
+                  >
+                    <Navigation className="h-3.5 w-3.5" /> Rota no Maps
+                  </button>
+                </div>
+              )}
+            </div>
             {stopsOrdenados.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-600 py-8 text-center text-[13px] text-slate-500">
                 <PackageOpen className="h-6 w-6 mx-auto mb-2 opacity-40" />
@@ -1036,6 +1159,38 @@ function DriverDrawer({
                         )}
                         <span className="flex items-center gap-1">
                           <Weight className="h-3 w-3" /> {kg(s.pesoKg)}
+                        </span>
+                        <span className="ml-auto flex items-center gap-1.5">
+                          <button
+                            onClick={() => abrirNav(urlMapsParada(s))}
+                            className="rounded-md bg-slate-700/60 text-slate-200 px-2 py-0.5 text-[10px] font-semibold hover:bg-slate-600"
+                            title="Abrir esta parada no Google Maps"
+                          >
+                            Maps
+                          </button>
+                          <button
+                            onClick={() => abrirNav(urlWazeParada(s))}
+                            className="rounded-md bg-sky-500/15 text-sky-300 border border-sky-500/30 px-2 py-0.5 text-[10px] font-semibold hover:bg-sky-500/25"
+                            title="Abrir esta parada no Waze"
+                          >
+                            Waze
+                          </button>
+                          <button
+                            onClick={() => imprimirEspelho(s.pedidoId).catch(() => toast('Não foi possível gerar o Espelho.', 'error'))}
+                            className="rounded-md bg-slate-700/60 text-slate-200 px-2 py-0.5 text-[10px] font-semibold hover:bg-slate-600 flex items-center gap-1"
+                            title="Imprimir o Espelho (picking) deste pedido"
+                          >
+                            <Printer className="h-3 w-3" /> Espelho
+                          </button>
+                          {s.tipo === 'REPOSICAO' && (
+                            <button
+                              onClick={() => imprimirComprovanteReposicao(s.pedidoId).catch(() => toast('Não foi possível gerar o Comprovante.', 'error'))}
+                              className="rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 text-[10px] font-semibold hover:bg-amber-500/25 flex items-center gap-1"
+                              title="Imprimir o Comprovante de Reposição"
+                            >
+                              <Printer className="h-3 w-3" /> Comprovante
+                            </button>
+                          )}
                         </span>
                       </div>
                     </div>

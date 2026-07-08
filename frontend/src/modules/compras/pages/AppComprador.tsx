@@ -8,7 +8,6 @@ import {
   X,
   TrendingDown,
   Package,
-  ArrowRight,
   BadgeCheck,
   AlertTriangle,
   User,
@@ -18,6 +17,12 @@ import {
   Loader2,
   Truck,
   Trash2,
+  Ban,
+  History,
+  ChevronRight,
+  CalendarDays,
+  Store,
+  Pencil,
 } from 'lucide-react';
 import { comprasApi, produtosApi, fornecedoresApi } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -77,6 +82,26 @@ interface ItemAComprar {
   estoqueMinimo: number;
 }
 
+interface HistoricoCompra {
+  ordemId: string;
+  numero: number;
+  status: StatusOC;
+  data: string | null;
+  fornecedor: string;
+  quantidade: number;
+  unidade: string;
+  precoUnitario: number;
+  subtotal: number;
+}
+
+const STATUS_CI: Record<StatusOC, { label: string; cls: string }> = {
+  PENDENTE: { label: 'Pendente', cls: 'bg-amber-100 text-amber-700' },
+  APROVADA: { label: 'Aprovada', cls: 'bg-emerald-100 text-emerald-700' },
+  PARCIAL: { label: 'Parcial', cls: 'bg-sky-100 text-sky-700' },
+  ENTREGUE: { label: 'Entregue', cls: 'bg-neutral-200 text-neutral-600' },
+  CANCELADA: { label: 'Cancelada', cls: 'bg-rose-100 text-rose-700' },
+};
+
 /* Meta mensal de compras (teto orçamentário do comprador). O comprometido é
    derivado das OCs reais aprovadas no mês corrente. */
 const META_MENSAL = 45000;
@@ -134,6 +159,14 @@ export default function AppComprador() {
 
   const [modalNovaOC, setModalNovaOC] = useState(false);
   const [prefillRep, setPrefillRep] = useState<ItemAComprar | null>(null);
+  const [editandoOcId, setEditandoOcId] = useState<string | null>(null);
+  const [produtoSel, setProdutoSel] = useState<ItemAComprar | null>(null);
+
+  const fecharModal = useCallback(() => {
+    setModalNovaOC(false);
+    setPrefillRep(null);
+    setEditandoOcId(null);
+  }, []);
 
   // Toast interno
   const [toast, setToast] = useState<{ msg: string; tone: 'ok' | 'erro' | 'info' } | null>(null);
@@ -175,19 +208,19 @@ export default function AppComprador() {
 
   /* ── Regras de negócio (reais) ── */
   const alterarStatus = useCallback(
-    async (oc: OrdemCompra, novo: 'APROVADA' | 'CANCELADA') => {
+    async (oc: OrdemCompra, novo: 'APROVADA' | 'CANCELADA', rotulo?: string) => {
       try {
         await comprasApi.updateStatus(oc.id, novo);
         setOcs((prev) => prev.map((o) => (o.id === oc.id ? { ...o, status: novo } : o)));
         notificar(
           novo === 'APROVADA'
-            ? `OC #${oc.numero} aprovada · ${brl(n(oc.valorTotal))}`
-            : `OC #${oc.numero} reprovada`,
+            ? `CI #${oc.numero} aprovada · ${brl(n(oc.valorTotal))}`
+            : `CI #${oc.numero} ${rotulo ?? 'reprovada'}`,
           novo === 'APROVADA' ? 'ok' : 'info',
         );
       } catch (e: unknown) {
         const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-        notificar(msg || 'Erro ao atualizar a OC.', 'erro');
+        notificar(msg || 'Erro ao atualizar a CI.', 'erro');
       }
     },
     [notificar],
@@ -216,8 +249,37 @@ export default function AppComprador() {
     [filialAtiva?.id, notificar, carregarOcs],
   );
 
+  const editarOC = useCallback(
+    async (payload: {
+      fornecedorId: string;
+      condicaoPagamento: string;
+      dataEntregaPrevista: string | null;
+      observacoes: string | null;
+      itens: { produtoId: string | null; descricao: string; unidade: string; quantidade: number; precoUnitario: number }[];
+    }) => {
+      if (!editandoOcId) return;
+      try {
+        await comprasApi.update(editandoOcId, { ...payload, filialId: filialAtiva?.id });
+        fecharModal();
+        notificar('CI atualizada no sistema.', 'ok');
+        carregarOcs();
+      } catch (e: unknown) {
+        const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        notificar(msg || 'Erro ao atualizar a CI.', 'erro');
+      }
+    },
+    [editandoOcId, filialAtiva?.id, notificar, carregarOcs, fecharModal],
+  );
+
   const abrirNovaOCPara = useCallback((item: ItemAComprar) => {
     setPrefillRep(item);
+    setEditandoOcId(null);
+    setModalNovaOC(true);
+  }, []);
+
+  const abrirEdicao = useCallback((oc: OrdemCompra) => {
+    setPrefillRep(null);
+    setEditandoOcId(oc.id);
     setModalNovaOC(true);
   }, []);
 
@@ -238,7 +300,16 @@ export default function AppComprador() {
   const pctDisp = Math.max(0, Math.min(100, (disponivel / META_MENSAL) * 100));
 
   return (
-    <div className="min-h-full w-full flex items-center justify-center bg-neutral-200/60 py-6 px-4">
+    <div className="hetros-comprador min-h-full w-full flex items-center justify-center bg-neutral-200/60 py-6 px-4">
+      {/* Escapa do tema dark global: dentro do celular o app é claro (iOS-like) */}
+      <style>{`
+        .hetros-comprador .bg-white { background-color: #ffffff !important; }
+        .hetros-comprador input:not([type="checkbox"]):not([type="radio"]),
+        .hetros-comprador select,
+        .hetros-comprador textarea { background-color: #ffffff !important; color: #262626 !important; }
+        .hetros-comprador input::placeholder,
+        .hetros-comprador textarea::placeholder { color: #9ca3af !important; }
+      `}</style>
       <div className="relative w-full max-w-[400px] h-[820px] bg-[#FAFAFA] rounded-[2.75rem] shadow-2xl ring-1 ring-black/10 overflow-hidden flex flex-col">
         {/* Notch */}
         <div className="absolute top-0 inset-x-0 h-7 flex justify-center z-30 pointer-events-none">
@@ -265,16 +336,19 @@ export default function AppComprador() {
               erro={erroOcs}
               onAprovar={(oc) => alterarStatus(oc, 'APROVADA')}
               onReprovar={(oc) => alterarStatus(oc, 'CANCELADA')}
+              onCancelar={(oc) => alterarStatus(oc, 'CANCELADA', 'cancelada')}
+              onEditar={abrirEdicao}
               onAtualizar={carregarOcs}
             />
           )}
           {aba === 'reposicao' && (
             <ReposicaoTab
               itens={aComprar}
+              cis={ocs}
               carregando={carregandoRep}
               temFilial={!!filialAtiva?.id}
               onNovaOC={() => setModalNovaOC(true)}
-              onReporItem={abrirNovaOCPara}
+              onAbrirProduto={setProdutoSel}
               onAtualizar={carregarReposicao}
             />
           )}
@@ -310,15 +384,30 @@ export default function AppComprador() {
           </div>
         )}
 
-        {/* Modal Nova OC */}
+        {/* Painel do produto (histórico de compras + quem está pedindo) */}
+        {produtoSel && (
+          <ProdutoSheet
+            item={produtoSel}
+            onClose={() => setProdutoSel(null)}
+            onNovaCI={() => {
+              setProdutoSel(null);
+              setModalNovaOC(true);
+            }}
+            onComprar={() => {
+              const item = produtoSel;
+              setProdutoSel(null);
+              abrirNovaOCPara(item);
+            }}
+          />
+        )}
+
+        {/* Modal Nova/Editar CI */}
         {modalNovaOC && (
           <NovaOCModal
             prefill={prefillRep}
-            onClose={() => {
-              setModalNovaOC(false);
-              setPrefillRep(null);
-            }}
-            onSubmit={criarOC}
+            ordemId={editandoOcId}
+            onClose={fecharModal}
+            onSubmit={editandoOcId ? editarOC : criarOC}
             notificar={notificar}
           />
         )}
@@ -340,6 +429,8 @@ function AprovacoesTab({
   erro,
   onAprovar,
   onReprovar,
+  onCancelar,
+  onEditar,
   onAtualizar,
 }: {
   disponivel: number;
@@ -351,6 +442,8 @@ function AprovacoesTab({
   erro: string;
   onAprovar: (oc: OrdemCompra) => void;
   onReprovar: (oc: OrdemCompra) => void;
+  onCancelar: (oc: OrdemCompra) => void;
+  onEditar: (oc: OrdemCompra) => void;
   onAtualizar: () => void;
 }) {
   return (
@@ -412,7 +505,7 @@ function AprovacoesTab({
         ) : (
           <div className="space-y-3">
             {pendentes.map((oc) => (
-              <OCCard key={oc.id} oc={oc} onAprovar={() => onAprovar(oc)} onReprovar={() => onReprovar(oc)} />
+              <OCCard key={oc.id} oc={oc} onAprovar={() => onAprovar(oc)} onReprovar={() => onReprovar(oc)} onEditar={() => onEditar(oc)} />
             ))}
           </div>
         )}
@@ -436,13 +529,33 @@ function AprovacoesTab({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-medium text-neutral-800 truncate">
-                    OC #{oc.numero} · {nomeForn(oc.fornecedor)}
+                    CI #{oc.numero} · {nomeForn(oc.fornecedor)}
                   </p>
                   <p className="text-[11px] text-neutral-400">
-                    {oc.status === 'CANCELADA' ? 'Reprovada' : 'Aprovada'} · {dataCurta(oc.dataEmissao)}
+                    {oc.status === 'CANCELADA' ? 'Cancelada' : 'Aprovada'} · {dataCurta(oc.dataEmissao)}
                   </p>
                 </div>
                 <p className="text-[13px] font-semibold text-neutral-500 tabular-nums">{brl(n(oc.valorTotal))}</p>
+                {oc.status === 'APROVADA' && (
+                  <button
+                    onClick={() => onEditar(oc)}
+                    title="Editar CI"
+                    className="shrink-0 h-8 w-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-neutral-900 hover:text-white active:scale-95 transition"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                )}
+                {oc.status === 'APROVADA' && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Cancelar a CI #${oc.numero}?`)) onCancelar(oc);
+                    }}
+                    title="Cancelar CI"
+                    className="shrink-0 h-8 w-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-rose-50 hover:text-rose-600 active:scale-95 transition"
+                  >
+                    <Ban className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -453,7 +566,7 @@ function AprovacoesTab({
 }
 
 /* ── Card de OC com swipe (arrastar) + botões ── */
-function OCCard({ oc, onAprovar, onReprovar }: { oc: OrdemCompra; onAprovar: () => void; onReprovar: () => void }) {
+function OCCard({ oc, onAprovar, onReprovar, onEditar }: { oc: OrdemCompra; onAprovar: () => void; onReprovar: () => void; onEditar: () => void }) {
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [saindo, setSaindo] = useState<null | 'ok' | 'no'>(null);
@@ -562,7 +675,13 @@ function OCCard({ oc, onAprovar, onReprovar }: { oc: OrdemCompra; onAprovar: () 
             <Check className="h-4 w-4" /> Aprovar
           </button>
         </div>
-        <p className="mt-2 text-center text-[10px] text-neutral-300">arraste para aprovar → ou ← reprovar</p>
+        <button
+          onClick={onEditar}
+          className="mt-2 w-full flex items-center justify-center gap-1.5 text-[12px] font-semibold text-neutral-500 hover:text-neutral-900 active:scale-[0.98] transition py-1"
+        >
+          <Pencil className="h-3.5 w-3.5" /> Editar CI
+        </button>
+        <p className="mt-1 text-center text-[10px] text-neutral-300">arraste para aprovar → ou ← reprovar</p>
       </div>
     </div>
   );
@@ -573,20 +692,25 @@ function OCCard({ oc, onAprovar, onReprovar }: { oc: OrdemCompra; onAprovar: () 
    ════════════════════════════════════════════════════════════════════════════ */
 function ReposicaoTab({
   itens,
+  cis,
   carregando,
   temFilial,
   onNovaOC,
-  onReporItem,
+  onAbrirProduto,
   onAtualizar,
 }: {
   itens: ItemAComprar[];
+  cis: OrdemCompra[];
   carregando: boolean;
   temFilial: boolean;
   onNovaOC: () => void;
-  onReporItem: (item: ItemAComprar) => void;
+  onAbrirProduto: (item: ItemAComprar) => void;
   onAtualizar: () => void;
 }) {
+  const [sub, setSub] = useState<'repor' | 'cis'>('repor');
   const [busca, setBusca] = useState('');
+  const [buscaCI, setBuscaCI] = useState('');
+
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
     const base = q
@@ -596,10 +720,18 @@ function ReposicaoTab({
     return [...base].sort((a, b) => nivelEstoque(a.disponivel, a.estoqueMinimo) - nivelEstoque(b.disponivel, b.estoqueMinimo));
   }, [busca, itens]);
 
+  const cisFiltradas = useMemo(() => {
+    const q = buscaCI.trim().toLowerCase();
+    const base = q
+      ? cis.filter((o) => String(o.numero).includes(q) || nomeForn(o.fornecedor).toLowerCase().includes(q))
+      : cis;
+    return [...base].sort((a, b) => Number(b.numero) - Number(a.numero)).slice(0, 40);
+  }, [buscaCI, cis]);
+
   const zerados = itens.filter((p) => p.disponivel <= 0).length;
 
   return (
-    <div className="relative pb-24">
+    <div className="relative pb-28">
       <header className="px-6 pt-4 pb-3 bg-gradient-to-b from-[#EFEBE4] to-[#FAFAFA]">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-neutral-900 tracking-tight">Reposição</h1>
@@ -612,91 +744,282 @@ function ReposicaoTab({
           {zerados > 0 && <> · <span className="text-rose-600 font-medium">{zerados} sem estoque</span></>}
         </p>
 
-        <div className="mt-4 relative">
+        {/* Segmento: A repor · Últimas CIs */}
+        <div className="mt-4 grid grid-cols-2 gap-1 bg-neutral-200/70 rounded-2xl p-1">
+          <button
+            onClick={() => setSub('repor')}
+            className={`py-2 rounded-xl text-[13px] font-semibold transition ${sub === 'repor' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500'}`}
+          >
+            A repor · {itens.length}
+          </button>
+          <button
+            onClick={() => setSub('cis')}
+            className={`py-2 rounded-xl text-[13px] font-semibold transition ${sub === 'cis' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500'}`}
+          >
+            Últimas CIs · {cis.length}
+          </button>
+        </div>
+
+        {/* Busca (muda conforme o segmento) */}
+        <div className="mt-3 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar produto ou código…"
-            className="w-full rounded-2xl border border-neutral-200 bg-white pl-11 pr-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-400"
-          />
+          {sub === 'repor' ? (
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar produto ou código…"
+              className="w-full rounded-2xl border border-neutral-200 bg-white pl-11 pr-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-400"
+            />
+          ) : (
+            <input
+              value={buscaCI}
+              onChange={(e) => setBuscaCI(e.target.value)}
+              placeholder="Buscar por nº da CI ou fornecedor…"
+              className="w-full rounded-2xl border border-neutral-200 bg-white pl-11 pr-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-400"
+            />
+          )}
         </div>
       </header>
 
-      {/* Lista compacta de itens críticos */}
-      <section className="px-4 mt-2 space-y-2">
-        {carregando ? (
-          <div className="py-14 text-center text-neutral-400">
-            <Loader2 className="h-7 w-7 mx-auto animate-spin mb-2" />
-            <p className="text-sm">Consultando o estoque…</p>
-          </div>
-        ) : !temFilial ? (
-          <div className="rounded-3xl border border-dashed border-neutral-300 py-12 text-center text-neutral-400 text-sm px-6">
-            Selecione uma filial ativa para ver os itens a repor.
-          </div>
-        ) : filtrados.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-neutral-300 py-12 text-center">
-            <Package className="h-9 w-9 mx-auto text-neutral-300 mb-2" />
-            <p className="text-neutral-500 text-sm font-medium">
-              {busca ? 'Nenhum item encontrado.' : 'Estoque em dia — nada a repor.'}
-            </p>
-          </div>
-        ) : (
-          filtrados.map((p) => {
-            const nivel = nivelEstoque(p.disponivel, p.estoqueMinimo);
-            const zerado = p.disponivel <= 0;
-            const critico = nivel < 0.35;
-            return (
-              <div key={p.produtoId} className="rounded-2xl bg-white border border-neutral-200 px-3.5 py-3 shadow-sm">
-                <div className="flex items-center gap-3">
-                  {/* Quantidade compacta à esquerda */}
-                  <div className="w-14 shrink-0 text-center">
-                    <p className={`text-[26px] leading-none font-semibold tabular-nums ${zerado ? 'text-rose-600' : critico ? 'text-rose-500' : 'text-amber-600'}`}>
-                      {num(p.disponivel)}
-                    </p>
-                    <p className="text-[9px] text-neutral-400 uppercase tracking-wide mt-0.5">{p.unidade || 'un'}</p>
-                  </div>
-
-                  {/* Nome + barra fina */}
+      {sub === 'repor' ? (
+        /* Lista bem compacta de itens críticos (toque abre o painel do produto) */
+        <section className="px-4 mt-2 space-y-1.5">
+          {carregando ? (
+            <div className="py-14 text-center text-neutral-400">
+              <Loader2 className="h-7 w-7 mx-auto animate-spin mb-2" />
+              <p className="text-sm">Consultando o estoque…</p>
+            </div>
+          ) : !temFilial ? (
+            <div className="rounded-3xl border border-dashed border-neutral-300 py-12 text-center text-neutral-400 text-sm px-6">
+              Selecione uma filial ativa para ver os itens a repor.
+            </div>
+          ) : filtrados.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-neutral-300 py-12 text-center">
+              <Package className="h-9 w-9 mx-auto text-neutral-300 mb-2" />
+              <p className="text-neutral-500 text-sm font-medium">
+                {busca ? 'Nenhum item encontrado.' : 'Estoque em dia — nada a repor.'}
+              </p>
+            </div>
+          ) : (
+            filtrados.map((p) => {
+              const nivel = nivelEstoque(p.disponivel, p.estoqueMinimo);
+              const zerado = p.disponivel <= 0;
+              const critico = nivel < 0.35;
+              const cor = zerado ? 'text-rose-600' : critico ? 'text-rose-500' : 'text-amber-600';
+              return (
+                <button
+                  key={p.produtoId}
+                  onClick={() => onAbrirProduto(p)}
+                  className="w-full text-left rounded-xl bg-white border border-neutral-200 pl-3 pr-2 py-2 flex items-center gap-2.5 active:scale-[0.99] hover:border-neutral-300 transition"
+                >
+                  <span className={`h-2 w-2 rounded-full shrink-0 ${zerado ? 'bg-rose-500' : critico ? 'bg-rose-400' : 'bg-amber-400'}`} />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[13.5px] font-semibold text-neutral-900 truncate">{p.descricao}</p>
-                      <span className={`shrink-0 text-[10px] font-bold uppercase ${zerado ? 'text-rose-600' : critico ? 'text-rose-500' : 'text-amber-600'}`}>
-                        {zerado ? 'Zerado' : critico ? 'Crítico' : 'Baixo'}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 h-1.5 rounded-full bg-neutral-100 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full ${zerado || critico ? 'bg-rose-500' : 'bg-amber-500'}`}
-                        style={{ width: `${Math.max(4, nivel * 100)}%` }}
-                      />
-                    </div>
-                    <div className="mt-1 flex items-center justify-between">
-                      <span className="text-[10px] text-neutral-400 flex items-center gap-1">
-                        <TrendingDown className="h-3 w-3" /> mín. {num(p.estoqueMinimo)} {p.codigo ? `· ${p.codigo}` : ''}
-                      </span>
-                      <button
-                        onClick={() => onReporItem(p)}
-                        className="text-[11.5px] font-semibold text-neutral-900 flex items-center gap-0.5 hover:gap-1 transition-all"
-                      >
-                        Comprar <ArrowRight className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    <p className="text-[13px] font-medium text-neutral-800 truncate leading-tight">{p.descricao}</p>
+                    <p className="text-[10px] text-neutral-400 flex items-center gap-1 mt-0.5">
+                      <TrendingDown className="h-3 w-3" /> mín. {num(p.estoqueMinimo)}{p.codigo ? ` · ${p.codigo}` : ''}
+                    </p>
                   </div>
+                  <div className="text-right shrink-0 leading-none">
+                    <p className={`text-[15px] font-semibold tabular-nums ${cor}`}>{num(p.disponivel)}</p>
+                    <p className="text-[9px] text-neutral-400 uppercase tracking-wide">{p.unidade || 'un'}</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-neutral-300 shrink-0" />
+                </button>
+              );
+            })
+          )}
+        </section>
+      ) : (
+        /* Últimas CIs feitas (com data) */
+        <section className="px-4 mt-2 space-y-1.5">
+          {cisFiltradas.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-neutral-300 py-12 text-center">
+              <ClipboardList className="h-9 w-9 mx-auto text-neutral-300 mb-2" />
+              <p className="text-neutral-500 text-sm font-medium">
+                {buscaCI ? 'Nenhuma CI encontrada.' : 'Nenhuma CI registrada ainda.'}
+              </p>
+            </div>
+          ) : (
+            cisFiltradas.map((oc) => {
+              const st = STATUS_CI[oc.status] ?? STATUS_CI.PENDENTE;
+              return (
+                <div key={oc.id} className="rounded-xl bg-white border border-neutral-200 px-3 py-2.5 flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-medium text-neutral-800 truncate leading-tight">
+                      CI #{oc.numero} · {nomeForn(oc.fornecedor)}
+                    </p>
+                    <p className="text-[10px] text-neutral-400 flex items-center gap-1 mt-0.5">
+                      <CalendarDays className="h-3 w-3" /> {dataCurta(oc.dataEmissao)} · {oc._count?.itens ?? 0} {(oc._count?.itens ?? 0) === 1 ? 'item' : 'itens'}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span>
+                  <p className="text-[12.5px] font-semibold text-neutral-600 tabular-nums shrink-0">{brl(n(oc.valorTotal))}</p>
                 </div>
-              </div>
-            );
-          })
-        )}
-      </section>
+              );
+            })
+          )}
+        </section>
+      )}
 
-      {/* FAB — Nova OC */}
-      <button
-        onClick={onNovaOC}
-        className="fixed sm:absolute bottom-24 right-5 z-20 rounded-2xl bg-neutral-900 text-white pl-4 pr-5 py-3.5 shadow-xl shadow-black/25 flex items-center gap-2 font-semibold text-sm hover:bg-black active:scale-95 transition"
+      {/* Nova OC — discreto, no rodapé do conteúdo */}
+      <div className="px-4 mt-5">
+        <button
+          onClick={onNovaOC}
+          className="w-full rounded-2xl border border-dashed border-neutral-300 bg-white/60 text-neutral-700 py-3 text-sm font-semibold flex items-center justify-center gap-2 hover:bg-white active:scale-[0.99] transition"
+        >
+          <Plus className="h-4 w-4" /> Nova CI / Ordem de compra
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Painel deslizante do produto (histórico de compras + pedidos) ── */
+function ProdutoSheet({
+  item,
+  onComprar,
+  onNovaCI,
+  onClose,
+}: {
+  item: ItemAComprar;
+  onComprar: () => void;
+  onNovaCI: () => void;
+  onClose: () => void;
+}) {
+  const [hist, setHist] = useState<HistoricoCompra[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [show, setShow] = useState(false);
+  const zerado = item.disponivel <= 0;
+
+  // Anima a entrada no próximo frame (desliza de baixo)
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setShow(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Fecha com transição: desliza pra baixo + some o fundo e só então executa a ação
+  const sairPara = (cb: () => void) => {
+    setShow(false);
+    setTimeout(cb, 280);
+  };
+
+  useEffect(() => {
+    let vivo = true;
+    setCarregando(true);
+    comprasApi
+      .historicoProduto(item.produtoId)
+      .then((r) => { if (vivo) setHist(Array.isArray(r.data) ? r.data : []); })
+      .catch(() => { if (vivo) setHist([]); })
+      .finally(() => { if (vivo) setCarregando(false); });
+    return () => { vivo = false; };
+  }, [item.produtoId]);
+
+  return (
+    <div className="absolute inset-0 z-40 flex items-end">
+      <div
+        className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${show ? 'opacity-100' : 'opacity-0'}`}
+        onClick={() => sairPara(onClose)}
+      />
+      <div
+        className="relative w-full bg-[#FAFAFA] rounded-t-[2rem] max-h-[92%] overflow-y-auto transition-transform duration-300 ease-out will-change-transform"
+        style={{ transform: show ? 'translateY(0)' : 'translateY(100%)' }}
       >
-        <Plus className="h-5 w-5" /> Nova OC
-      </button>
+        <div className="sticky top-0 bg-[#FAFAFA] px-6 pt-3 pb-4 z-10">
+          <div className="mx-auto h-1.5 w-12 rounded-full bg-neutral-300 mb-4" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-neutral-900 leading-snug">{item.descricao}</h2>
+              <p className="text-[12px] text-neutral-400 mt-0.5">{item.codigo ? `Cód. ${item.codigo} · ` : ''}unidade {item.unidade || 'un'}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => sairPara(onNovaCI)}
+                className="h-9 pl-2.5 pr-3 rounded-full bg-neutral-900 text-white flex items-center gap-1 text-[12px] font-semibold hover:bg-black active:scale-95 transition"
+              >
+                <Plus className="h-3.5 w-3.5" /> Nova CI
+              </button>
+              <button onClick={() => sairPara(onClose)} className="h-9 w-9 rounded-full bg-neutral-200 flex items-center justify-center active:scale-95 transition">
+                <X className="h-4 w-4 text-neutral-600" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 pb-8 space-y-5">
+          {/* Situação de estoque */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-white border border-neutral-200 p-3.5">
+              <p className="text-[11px] uppercase tracking-wide text-neutral-400 font-semibold">Disponível</p>
+              <p className={`text-2xl font-semibold tabular-nums mt-0.5 ${zerado ? 'text-rose-600' : 'text-neutral-900'}`}>
+                {num(item.disponivel)} <span className="text-sm text-neutral-400">{item.unidade || 'un'}</span>
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white border border-neutral-200 p-3.5">
+              <p className="text-[11px] uppercase tracking-wide text-neutral-400 font-semibold">Estoque mínimo</p>
+              <p className="text-2xl font-semibold tabular-nums mt-0.5 text-neutral-900">
+                {num(item.estoqueMinimo)} <span className="text-sm text-neutral-400">{item.unidade || 'un'}</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Histórico de compras — quem pediu das últimas vezes */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <History className="h-4 w-4 text-neutral-500" />
+              <span className="text-[12px] font-semibold text-neutral-500 uppercase tracking-wide">Últimas compras</span>
+            </div>
+            {carregando ? (
+              <div className="py-6 text-center text-neutral-400">
+                <Loader2 className="h-6 w-6 mx-auto animate-spin" />
+              </div>
+            ) : hist.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-neutral-300 py-6 text-center text-[13px] text-neutral-400">
+                Nenhuma compra anterior deste produto.
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                {hist.map((h) => {
+                  const st = STATUS_CI[h.status] ?? STATUS_CI.PENDENTE;
+                  return (
+                    <div key={h.ordemId} className="rounded-2xl bg-white border border-neutral-200 px-3.5 py-2.5 flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-medium text-neutral-800 truncate leading-tight">{h.fornecedor}</p>
+                        <p className="text-[10px] text-neutral-400 flex items-center gap-1 mt-0.5">
+                          <CalendarDays className="h-3 w-3" /> {dataCurta(h.data)} · CI #{h.numero}
+                          <span className={`ml-1 px-1.5 py-px rounded-full font-bold uppercase ${st.cls}`}>{st.label}</span>
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0 leading-tight">
+                        <p className="text-[13px] font-semibold text-neutral-800 tabular-nums">{num(h.quantidade)} {h.unidade}</p>
+                        <p className="text-[10px] text-neutral-400">{brl(h.precoUnitario)}/{h.unidade}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Quem está pedindo — pedidos internos (etapa futura) */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Store className="h-4 w-4 text-neutral-500" />
+              <span className="text-[12px] font-semibold text-neutral-500 uppercase tracking-wide">Quem está pedindo</span>
+            </div>
+            <div className="rounded-2xl border border-dashed border-neutral-300 bg-white/60 py-5 px-4 text-center">
+              <p className="text-[13px] text-neutral-500 font-medium">Pedidos internos das lojas/setores</p>
+              <p className="text-[11.5px] text-neutral-400 mt-1">Cadastro ainda não disponível — será a próxima etapa.</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => sairPara(onComprar)}
+            className="w-full rounded-2xl bg-neutral-900 text-white py-4 text-[15px] font-semibold flex items-center justify-center gap-2 hover:bg-black active:scale-[0.99] transition shadow-lg"
+          >
+            <Plus className="h-5 w-5" /> Criar CI deste produto
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -711,11 +1034,13 @@ const itemVazio = (): ItemForm => ({ produtoId: '', descricao: '', unidade: 'KG'
 
 function NovaOCModal({
   prefill,
+  ordemId,
   onClose,
   onSubmit,
   notificar,
 }: {
   prefill: ItemAComprar | null;
+  ordemId?: string | null;
   onClose: () => void;
   onSubmit: (payload: {
     fornecedorId: string;
@@ -747,18 +1072,43 @@ function NovaOCModal({
   ]);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
+  const [numeroEdicao, setNumeroEdicao] = useState<number | string>('');
+  const editando = !!ordemId;
 
   useEffect(() => {
     Promise.all([
       fornecedoresApi.list().then((r) => (Array.isArray(r.data) ? r.data : [])).catch(() => []),
       produtosApi.list().then((r) => (Array.isArray(r.data) ? r.data : [])).catch(() => []),
+      ordemId ? comprasApi.get(ordemId).then((r) => r.data).catch(() => null) : Promise.resolve(null),
     ])
-      .then(([forn, prods]) => {
+      .then(([forn, prods, ordem]) => {
         setFornecedores(forn);
         // Prioriza FLV; se o cadastro não tiver categoria marcada, cai para todos.
         const flv = (prods as Produto[]).filter(ehFLV);
         setProdutos(flv.length ? flv : (prods as Produto[]));
-        // Preenche preço do prefill a partir do cadastro.
+
+        // Modo edição: preenche o formulário com a CI existente.
+        if (ordem) {
+          setNumeroEdicao(ordem.numero);
+          setFornecedorId(ordem.fornecedorId || ordem.fornecedor?.id || '');
+          setCondicao(ordem.condicaoPagamento || '30_DIAS');
+          setEntrega(ordem.dataEntregaPrevista ? String(ordem.dataEntregaPrevista).slice(0, 10) : '');
+          setObs(ordem.observacoes || '');
+          if (Array.isArray(ordem.itens) && ordem.itens.length) {
+            setItens(
+              ordem.itens.map((it: any) => ({
+                produtoId: it.produtoId || '',
+                descricao: it.descricao || it.produto?.descricao || '',
+                unidade: it.unidade || 'KG',
+                quantidade: String(n(it.quantidade)),
+                precoUnitario: String(n(it.precoUnitario)),
+              })),
+            );
+          }
+          return;
+        }
+
+        // Modo criação: preenche preço do prefill a partir do cadastro.
         if (prefill) {
           const prod = (prods as Produto[]).find((p) => p.id === prefill.produtoId);
           if (prod?.precoCompra != null) {
@@ -827,8 +1177,8 @@ function NovaOCModal({
           <div className="mx-auto h-1.5 w-12 rounded-full bg-neutral-300 mb-4" />
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-neutral-900">Nova Ordem de Compra</h2>
-              <p className="text-[12px] text-neutral-400">Enviada ao sistema como OC pendente</p>
+              <h2 className="text-xl font-semibold text-neutral-900">{editando ? `Editar CI #${numeroEdicao}` : 'Nova Ordem de Compra'}</h2>
+              <p className="text-[12px] text-neutral-400">{editando ? 'Altere itens, quantidades ou fornecedor' : 'Enviada ao sistema como OC pendente'}</p>
             </div>
             <button onClick={onClose} className="h-9 w-9 rounded-full bg-neutral-200 flex items-center justify-center">
               <X className="h-4 w-4 text-neutral-600" />
@@ -951,8 +1301,8 @@ function NovaOCModal({
               onClick={submeter}
               className="w-full rounded-2xl bg-neutral-900 text-white py-4 text-[15px] font-semibold flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-black active:scale-[0.99] transition shadow-lg"
             >
-              {salvando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
-              {salvando ? 'Enviando…' : 'Criar OC no sistema'}
+              {salvando ? <Loader2 className="h-5 w-5 animate-spin" /> : editando ? <Check className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+              {salvando ? 'Salvando…' : editando ? 'Salvar alterações' : 'Criar OC no sistema'}
             </button>
           </div>
         )}
