@@ -3,10 +3,13 @@ import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import { EstoqueService } from './estoque.service';
 import { CurrentTenant, CurrentUser, Modulo } from '../../common/decorators/context.decorator';
 import { AjusteEstoqueDto, TransferenciaEstoqueDto } from './dto/estoque.dto';
+import { PermissoesGuard } from '../../common/guards/permissoes.guard';
+import { RequirePermissao } from '../../common/decorators/permissoes.decorator';
 
 @ApiTags('Estoque/WMS')
 @ApiBearerAuth()
 @Modulo('ESTOQUE')
+@UseGuards(PermissoesGuard)
 @Controller('estoque')
 export class EstoqueController {
   constructor(private service: EstoqueService) {}
@@ -98,12 +101,14 @@ export class EstoqueController {
   }
 
   @Post('ajuste')
+  @RequirePermissao('ESTOQUE:UPDATE')
   @ApiOperation({ summary: 'Ajuste manual de estoque (perda, avaria, inventário)' })
   ajuste(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Body() body: AjusteEstoqueDto) {
     return this.service.movimentar(tenantId, { ...body, usuarioId: user.id });
   }
 
   @Post('transferencia')
+  @RequirePermissao('ESTOQUE:UPDATE')
   @ApiOperation({ summary: 'Transferência entre filiais/boxes' })
   transferir(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Body() body: TransferenciaEstoqueDto) {
     return this.service.transferir(tenantId, { ...body, usuarioId: user.id });

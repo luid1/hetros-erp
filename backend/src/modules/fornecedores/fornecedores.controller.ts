@@ -1,16 +1,21 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { FornecedoresService } from './fornecedores.service';
 import { CreateFornecedorDto, UpdateFornecedorDto } from './dto/fornecedor.dto';
-import { CurrentTenant } from '../../common/decorators/context.decorator';
+import { CurrentTenant, Modulo } from '../../common/decorators/context.decorator';
+import { PermissoesGuard } from '../../common/guards/permissoes.guard';
+import { RequirePermissao } from '../../common/decorators/permissoes.decorator';
 
 @ApiTags('Fornecedores')
 @ApiBearerAuth()
+@Modulo('CADASTROS')
+@UseGuards(PermissoesGuard)
 @Controller('fornecedores')
 export class FornecedoresController {
   constructor(private service: FornecedoresService) {}
 
   @Post()
+  @RequirePermissao('CADASTROS:CREATE')
   create(@CurrentTenant() tenantId: string, @Body() dto: CreateFornecedorDto) {
     return this.service.create(tenantId, dto);
   }
@@ -26,11 +31,13 @@ export class FornecedoresController {
   }
 
   @Put(':id')
+  @RequirePermissao('CADASTROS:UPDATE')
   update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: UpdateFornecedorDto) {
     return this.service.update(tenantId, id, dto);
   }
 
   @Delete(':id')
+  @RequirePermissao('CADASTROS:DELETE')
   @ApiOperation({ summary: 'Remove fornecedor' })
   remove(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.service.remove(tenantId, id);

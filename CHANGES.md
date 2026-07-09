@@ -20,6 +20,35 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-08] — RBAC: `@RequirePermissao` nas ações sensíveis de cadastros, pedidos e estoque
+
+### O que mudou
+
+- Antes, cadastros (produtos/clientes/fornecedores), pedidos e estoque exigiam **só JWT** — qualquer usuário logado, de qualquer perfil, criava/editava/excluía. Agora as **ações mutantes** passam pelo `PermissoesGuard` (RBAC granular já existente, no padrão de contas-pagar). Leituras (GET) seguem abertas a qualquer usuário autenticado.
+- Guard aplicado no nível da classe (`@UseGuards(PermissoesGuard)` — libera rotas sem `@RequirePermissao`) + permissão por rota, usando o catálogo do seed (`MODULO:ACAO`). `role === 'ADMIN'` continua bypassando tudo.
+
+| Rota | Permissão exigida |
+|---|---|
+| produtos/clientes/fornecedores · criar | `CADASTROS:CREATE` |
+| produtos/clientes/fornecedores · editar | `CADASTROS:UPDATE` |
+| produtos/clientes/fornecedores · remover | `CADASTROS:DELETE` |
+| pedidos · criar | `PEDIDOS:CREATE` |
+| pedidos · editar/status/separação/reposição | `PEDIDOS:UPDATE` |
+| pedidos · confirmar | `PEDIDOS:APROVAR` |
+| pedidos · cancelar | `PEDIDOS:CANCELAR` |
+| estoque · ajuste/transferência | `ESTOQUE:UPDATE` |
+
+- Testado: usuário **FINANCEIRO** (sem `CADASTROS`) → `POST /clientes` = **403**, `GET /clientes` = **200**; **ADMIN** passa o guard normalmente.
+
+### Arquivos modificados
+- `backend/src/modules/produtos/produtos.controller.ts`
+- `backend/src/modules/clientes/clientes.controller.ts`
+- `backend/src/modules/fornecedores/fornecedores.controller.ts`
+- `backend/src/modules/pedidos/pedidos.controller.ts`
+- `backend/src/modules/estoque/estoque.controller.ts`
+
+---
+
 ## [2026-07-08] — Deploy: migrations versionadas (`migrate deploy`) no lugar de `db push`
 
 ### O que mudou
