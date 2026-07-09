@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   FileText, RefreshCw, Plus, Send, Ban, CheckCircle2,
   FileStack, Receipt, Search, Printer, Undo2, X, ListChecks,
@@ -264,10 +265,10 @@ export default function GestaoFiscal() {
       </div>
 
       {/* Detalhe da nota — DANFE / CC-e / Devolução / duplicatas */}
-      {detalhe && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setDetalhe(null)}>
-          <div className="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-700 sticky top-0 bg-slate-800">
+      {detalhe && createPortal((
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4 animate-backdrop" onClick={() => setDetalhe(null)}>
+          <div className="bg-slate-800/90 backdrop-blur-2xl border border-white/10 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-auto animate-modal" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-700 sticky top-0 bg-slate-800/95 backdrop-blur-xl z-10">
               <h2 className="font-bold text-white">NF-e {String(detalhe.numero).padStart(6, '0')}/{detalhe.serie} · {detalhe.cliente?.razaoSocial || detalhe.destRazaoSocial || '—'}</h2>
               <button onClick={() => setDetalhe(null)} className="text-slate-400 hover:text-white"><X className="h-5 w-5" /></button>
             </div>
@@ -328,7 +329,7 @@ export default function GestaoFiscal() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }

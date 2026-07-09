@@ -104,8 +104,9 @@ export default function AppShell() {
     <div className="relative flex h-screen overflow-hidden" style={{ backgroundColor: '#0B0F17' }}>
       {/* Glow ambiente — profundidade no canvas (não intercepta cliques) */}
       <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
-        <div className="absolute -top-40 -left-40 h-[480px] w-[480px] rounded-full bg-sky-500/[0.05] blur-[140px]" />
-        <div className="absolute bottom-0 right-0 h-[420px] w-[420px] rounded-full bg-indigo-500/[0.04] blur-[140px]" />
+        <div className="absolute -top-40 -left-40 h-[480px] w-[480px] rounded-full bg-sky-500/[0.06] blur-[140px] animate-aurora" />
+        <div className="absolute bottom-0 right-0 h-[420px] w-[420px] rounded-full bg-indigo-500/[0.05] blur-[140px] animate-aurora-slow" />
+        <div className="absolute top-1/3 right-1/4 h-[360px] w-[360px] rounded-full bg-violet-500/[0.035] blur-[150px] animate-aurora" />
       </div>
 
       {mobileOpen && (
@@ -149,7 +150,7 @@ export default function AppShell() {
                       flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11px] font-medium
                       transition-all duration-300 ease-in-out group relative active:scale-[0.98]
                       ${isActive
-                        ? 'bg-sky-400/10 text-sky-300'
+                        ? 'bg-gradient-to-r from-sky-400/[0.18] to-sky-400/[0.04] text-sky-200 shadow-[inset_0_1px_0_0_rgba(56,189,248,0.15)]'
                         : highlight
                           ? 'text-amber-300/90 hover:bg-white/[0.05]'
                           : 'text-slate-400 hover:bg-white/[0.05] hover:text-slate-100'
@@ -160,7 +161,7 @@ export default function AppShell() {
                     {({ isActive }) => (
                       <>
                         {/* Indicador cirúrgico de foco */}
-                        {isActive && !collapsed && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-full bg-sky-400" />}
+                        {isActive && !collapsed && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.7)]" />}
                         <Icon className={`h-3.5 w-3.5 shrink-0 transition-colors duration-300 ${isActive ? 'text-sky-300' : highlight && !isActive ? 'text-amber-300/80' : 'text-slate-500 group-hover:text-slate-200'}`} />
                         {!collapsed && <span className="truncate">{label}</span>}
                         {badge && !collapsed && (

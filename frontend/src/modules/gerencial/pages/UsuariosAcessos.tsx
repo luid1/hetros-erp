@@ -1,9 +1,11 @@
 import { toast, confirmDialog, promptDialog } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Users, ShieldCheck, Plus, Pencil, Power, KeyRound, X, Check, Trash2, Building2, Monitor,
 } from 'lucide-react';
 import api from '../../../services/api';
+import { FAB } from '../../cadastros/ui';
 import { TELAS_POR_GRUPO, TELAS } from '../../../config/telas';
 
 interface Role { id: string; nome: string; descricao?: string | null; telas: string[]; telaInicial?: string | null; acoes?: Record<string, string[]>; _count: { usuarios: number } }
@@ -34,16 +36,16 @@ export default function UsuariosAcessos() {
 
   return (
     <div className="flex flex-col h-full bg-gray-50">
-      {/* Header + abas */}
-      <div className="bg-white border-b border-gray-200 px-5 pt-3 shrink-0">
-        <h1 className="text-base font-bold text-gray-900 flex items-center gap-2 mb-2">
-          <Users className="h-5 w-5 text-sky-500" /> Usuários & Acessos
+      {/* Header + abas (compacto, uma linha) */}
+      <div className="bg-white border-b border-gray-200 px-5 py-1.5 shrink-0 flex items-center gap-4">
+        <h1 className="text-sm font-bold text-gray-900 flex items-center gap-2 shrink-0">
+          <Users className="h-4 w-4 text-sky-500" /> Usuários & Acessos
         </h1>
         <div className="flex gap-1">
-          <button onClick={() => setAba('usuarios')} className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 ${aba === 'usuarios' ? 'border-sky-500 text-sky-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+          <button onClick={() => setAba('usuarios')} className={`px-3 py-1.5 text-sm font-semibold rounded-lg ${aba === 'usuarios' ? 'bg-sky-50 text-sky-600' : 'text-gray-500 hover:text-gray-700'}`}>
             <Users className="h-4 w-4 inline mr-1" /> Usuários ({usuarios.length})
           </button>
-          <button onClick={() => setAba('perfis')} className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 ${aba === 'perfis' ? 'border-sky-500 text-sky-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+          <button onClick={() => setAba('perfis')} className={`px-3 py-1.5 text-sm font-semibold rounded-lg ${aba === 'perfis' ? 'bg-sky-50 text-sky-600' : 'text-gray-500 hover:text-gray-700'}`}>
             <ShieldCheck className="h-4 w-4 inline mr-1" /> Perfis ({roles.length})
           </button>
         </div>
@@ -52,26 +54,21 @@ export default function UsuariosAcessos() {
       <div className="flex-1 overflow-auto p-5">
         {aba === 'usuarios' ? (
           <>
-            <div className="flex justify-end mb-3">
-              <button onClick={() => setModalUser('novo')} className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg px-4 py-2 text-sm font-bold">
-                <Plus className="h-4 w-4" /> Novo Usuário
-              </button>
-            </div>
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-gray-100 text-xs text-gray-600">
-                  <tr>{['Nome', 'E-mail', 'Perfil', 'Filiais', 'Último acesso', 'Status', ''].map(h => <th key={h} className="px-3 py-2 text-left font-semibold">{h}</th>)}</tr>
+                  <tr>{['Nome', 'E-mail', 'Perfil', 'Filiais', 'Último acesso', 'Status', ''].map(h => <th key={h} className="px-3 py-1.5 text-left font-semibold">{h}</th>)}</tr>
                 </thead>
                 <tbody>
                   {usuarios.map(u => (
                     <tr key={u.id} className={`border-t border-gray-100 ${!u.ativo ? 'opacity-50' : ''}`}>
-                      <td className="px-3 py-2 font-semibold text-gray-900">{u.nome}</td>
-                      <td className="px-3 py-2 text-gray-600">{u.email}</td>
-                      <td className="px-3 py-2"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-700">{u.role?.nome}</span></td>
-                      <td className="px-3 py-2 text-gray-500 text-xs">{u.filiais?.map(f => f.filial.codigo).join(', ') || '—'}</td>
-                      <td className="px-3 py-2 text-gray-400 text-xs">{u.ultimoAcesso ? new Date(u.ultimoAcesso).toLocaleString('pt-BR') : 'Nunca'}</td>
-                      <td className="px-3 py-2">{u.ativo ? <span className="text-emerald-600 text-xs font-bold">Ativo</span> : <span className="text-gray-400 text-xs">Inativo</span>}</td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-3 py-1.5 font-semibold text-gray-900">{u.nome}</td>
+                      <td className="px-3 py-1.5 text-gray-600">{u.email}</td>
+                      <td className="px-3 py-1.5"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-700">{u.role?.nome}</span></td>
+                      <td className="px-3 py-1.5 text-gray-500 text-xs">{u.filiais?.map(f => f.filial.codigo).join(', ') || '—'}</td>
+                      <td className="px-3 py-1.5 text-gray-400 text-xs">{u.ultimoAcesso ? new Date(u.ultimoAcesso).toLocaleString('pt-BR') : 'Nunca'}</td>
+                      <td className="px-3 py-1.5">{u.ativo ? <span className="text-emerald-600 text-xs font-bold">Ativo</span> : <span className="text-gray-400 text-xs">Inativo</span>}</td>
+                      <td className="px-3 py-1.5 text-right">
                         <button onClick={() => setModalUser(u)} className="text-gray-400 hover:text-sky-600 p-1"><Pencil className="h-4 w-4" /></button>
                       </td>
                     </tr>
@@ -82,11 +79,6 @@ export default function UsuariosAcessos() {
           </>
         ) : (
           <>
-            <div className="flex justify-end mb-3">
-              <button onClick={() => setModalRole('novo')} className="flex items-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg px-4 py-2 text-sm font-bold">
-                <Plus className="h-4 w-4" /> Novo Perfil
-              </button>
-            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {roles.map(r => {
                 const todas = r.telas.includes('*');
@@ -110,6 +102,10 @@ export default function UsuariosAcessos() {
           </>
         )}
       </div>
+
+      {aba === 'usuarios'
+        ? <FAB onClick={() => setModalUser('novo')} label="Novo Usuário" />
+        : <FAB onClick={() => setModalRole('novo')} label="Novo Perfil" />}
 
       {modalUser && <ModalUsuario alvo={modalUser} roles={roles} filiais={filiais} onClose={() => setModalUser(null)} onSalvo={() => { setModalUser(null); carregar(); }} />}
       {modalRole && <ModalPerfil alvo={modalRole} onClose={() => setModalRole(null)} onSalvo={() => { setModalRole(null); carregar(); }} />}
@@ -158,12 +154,12 @@ function ModalUsuario({ alvo, roles, filiais, onClose, onSalvo }: {
     try { await api.delete(`/usuarios/${u!.id}`); onSalvo(); } catch (e: any) { toast(e.response?.data?.message || 'Erro.'); }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-          <h2 className="font-bold text-gray-900">{novo ? 'Novo Usuário' : 'Editar Usuário'}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X className="h-5 w-5" /></button>
+  return createPortal((
+    <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 animate-backdrop">
+      <div className="bg-[#0E141F]/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden animate-modal">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+          <h2 className="font-bold text-slate-100">{novo ? 'Novo Usuário' : 'Editar Usuário'}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-100"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-5 space-y-3 overflow-auto">
           <div className="grid grid-cols-2 gap-3">
@@ -200,13 +196,13 @@ function ModalUsuario({ alvo, roles, filiais, onClose, onSalvo }: {
             {!novo && u?.ativo && <button onClick={inativar} className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 px-2 py-1.5 rounded border border-red-200"><Power className="h-3.5 w-3.5" /> Inativar</button>}
           </div>
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm">Cancelar</button>
+            <button onClick={onClose} className="px-4 py-2 bg-white/5 border border-white/10 text-slate-300 rounded-lg text-sm hover:bg-white/10">Cancelar</button>
             <button onClick={salvar} disabled={salvando} className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-1.5"><Check className="h-4 w-4" /> Salvar</button>
           </div>
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 // ─────────── Modal Perfil ───────────
@@ -257,12 +253,12 @@ function ModalPerfil({ alvo, onClose, onSalvo }: { alvo: Role | 'novo'; onClose:
     try { await api.delete(`/usuarios/roles/${r!.id}`); onSalvo(); } catch (e: any) { toast(e.response?.data?.message || 'Erro.'); }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-          <h2 className="font-bold text-gray-900">{novo ? 'Novo Perfil' : `Perfil — ${r?.nome}`}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X className="h-5 w-5" /></button>
+  return createPortal((
+    <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 animate-backdrop">
+      <div className="bg-[#0E141F]/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-modal">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/10">
+          <h2 className="font-bold text-slate-100">{novo ? 'Novo Perfil' : `Perfil — ${r?.nome}`}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-100"><X className="h-5 w-5" /></button>
         </div>
         <div className="p-5 space-y-4 overflow-auto">
           <div className="grid grid-cols-2 gap-3">
@@ -335,11 +331,11 @@ function ModalPerfil({ alvo, onClose, onSalvo }: { alvo: Role | 'novo'; onClose:
             ? <button onClick={excluir} className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 px-2 py-1.5 rounded border border-red-200"><Trash2 className="h-3.5 w-3.5" /> Excluir</button>
             : <span />}
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm">Cancelar</button>
+            <button onClick={onClose} className="px-4 py-2 bg-white/5 border border-white/10 text-slate-300 rounded-lg text-sm hover:bg-white/10">Cancelar</button>
             <button onClick={salvar} disabled={salvando} className="px-5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-1.5"><Check className="h-4 w-4" /> Salvar</button>
           </div>
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }

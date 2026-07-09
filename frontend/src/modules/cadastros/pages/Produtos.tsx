@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Apple, Pencil, Trash2, Package, Box, Tag } from 'lucide-react';
 import api from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
-import { CadastroShell, TopBar, FilterBar, Chips, TableCard, Th, StatusBadge, Modal, Secao, Campo, Loader, Vazio, inp, R$ } from '../ui';
+import { CadastroShell, TopBar, FilterBar, Chips, TableCard, Th, StatusBadge, Modal, SteppedForm, Step, Campo, Loader, Vazio, inp, R$ } from '../ui';
 
 const CATEGORIAS = ['FRUTA', 'LEGUME', 'VERDURA'];
 const CLASSIFICACOES = ['Extra', 'Tipo 1', 'Tipo 2', 'Graúdo', 'Médio', 'Miúdo'];
@@ -60,23 +60,23 @@ export default function Produtos() {
             <tbody>
               {filtrados.map(p => (
                 <tr key={p.id} className="border-t border-slate-800 hover:bg-sky-500/5">
-                  <td className="px-3 py-2.5">
+                  <td className="px-3 py-1.5">
                     <div className="flex items-center gap-2.5">
                       <span className="text-xl w-7 text-center">{emojiDe(p.descricao, p.categoria)}</span>
                       <div><p className="font-semibold text-slate-100 truncate max-w-[200px]">{p.descricao}</p><p className="text-slate-500 text-xs font-mono">{p.codigo}</p></div>
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-slate-400 text-xs">{p.ncm}</td>
-                  <td className="px-3 py-2.5"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700/60 text-slate-300">{p.categoria || '—'}</span></td>
-                  <td className="px-3 py-2.5 text-slate-300 text-xs">{p.classificacao || '—'}</td>
-                  <td className="px-3 py-2.5 text-slate-400 text-xs truncate max-w-[140px]">{p.tipoCaixaria || '—'}</td>
-                  <td className="px-3 py-2.5 text-xs">
+                  <td className="px-3 py-1.5 font-mono text-slate-400 text-xs">{p.ncm}</td>
+                  <td className="px-3 py-1.5"><span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-700/60 text-slate-300">{p.categoria || '—'}</span></td>
+                  <td className="px-3 py-1.5 text-slate-300 text-xs">{p.classificacao || '—'}</td>
+                  <td className="px-3 py-1.5 text-slate-400 text-xs truncate max-w-[140px]">{p.tipoCaixaria || '—'}</td>
+                  <td className="px-3 py-1.5 text-xs">
                     <span className="font-mono text-slate-200">{(Number(p.estoqueKg) || 0).toLocaleString('pt-BR')} kg</span>
                     {p.estoqueCaixas != null && <span className="text-slate-500 ml-1">· {Math.floor(p.estoqueCaixas)} cx</span>}
                   </td>
-                  <td className="px-3 py-2.5 text-right font-mono text-slate-300">{R$(p.precoVenda)}</td>
-                  <td className="px-3 py-2.5"><StatusBadge ativo={p.ativo} /></td>
-                  <td className="px-3 py-2.5"><div className="flex gap-1.5">
+                  <td className="px-3 py-1.5 text-right font-mono text-slate-300">{R$(p.precoVenda)}</td>
+                  <td className="px-3 py-1.5"><StatusBadge ativo={p.ativo} /></td>
+                  <td className="px-3 py-1.5"><div className="flex gap-1.5">
                     {pode('/cadastros/produtos', 'EDITAR') && <button onClick={() => setEditando(p)} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Pencil className="h-3 w-3" /> Editar</button>}
                     {pode('/cadastros/produtos', 'EXCLUIR') && <button onClick={() => excluir(p)} className="text-slate-500 hover:text-rose-400 px-1"><Trash2 className="h-3.5 w-3.5" /></button>}
                   </div></td>
@@ -123,37 +123,42 @@ function ModalProduto({ item, onClose, onSalvo }: { item: any | null; onClose: (
 
   return (
     <Modal titulo={item ? 'Editar Produto' : 'Novo Produto'} onClose={onClose} onSalvar={salvar} salvando={salvando} salvarLabel={item ? 'Salvar' : 'Cadastrar'}>
-      <Secao icon={<Tag className="h-3.5 w-3.5" />} titulo="Identificação" />
-      <div className="grid grid-cols-6 gap-3">
-        <Campo label="Nome do Produto *" className="col-span-4"><input value={f.descricao} onChange={e => set('descricao', e.target.value)} className={inp} placeholder="Ex: Tomate Italiano, Banana Nanica" /></Campo>
-        <Campo label="Código" className="col-span-1"><input value={f.codigo} onChange={e => set('codigo', e.target.value)} className={inp} placeholder="auto" /></Campo>
-        <Campo label="Cód. Barras" className="col-span-1"><input value={f.codigoBarras} onChange={e => set('codigoBarras', e.target.value)} className={inp} /></Campo>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <Campo label="NCM"><input value={f.ncm} onChange={e => set('ncm', e.target.value)} className={inp} placeholder="0702.00.00" /></Campo>
-        <Campo label="Categoria"><select value={f.categoria} onChange={e => set('categoria', e.target.value)} className={inp}>{CATEGORIAS.map(c => <option key={c}>{c}</option>)}</select></Campo>
-        <Campo label="Unidade Comercial"><select value={f.unidadeSigla} onChange={e => set('unidadeSigla', e.target.value)} className={inp}>{UNIDADES.map(u => <option key={u}>{u}</option>)}</select></Campo>
-      </div>
+      <SteppedForm>
+        <Step title="Identificação" icon={<Tag className="h-3.5 w-3.5" />} hint="Avançar para classificação"
+          complete={!!f.descricao.trim()}>
+          <div className="grid grid-cols-6 gap-3">
+            <Campo label="Nome do Produto *" className="col-span-4"><input value={f.descricao} onChange={e => set('descricao', e.target.value)} className={inp} placeholder="Ex: Tomate Italiano, Banana Nanica" /></Campo>
+            <Campo label="Código" className="col-span-1"><input value={f.codigo} onChange={e => set('codigo', e.target.value)} className={inp} placeholder="auto" /></Campo>
+            <Campo label="Cód. Barras" className="col-span-1"><input value={f.codigoBarras} onChange={e => set('codigoBarras', e.target.value)} className={inp} /></Campo>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Campo label="NCM"><input value={f.ncm} onChange={e => set('ncm', e.target.value)} className={inp} placeholder="0702.00.00" /></Campo>
+            <Campo label="Categoria"><select value={f.categoria} onChange={e => set('categoria', e.target.value)} className={inp}>{CATEGORIAS.map(c => <option key={c}>{c}</option>)}</select></Campo>
+            <Campo label="Unidade Comercial"><select value={f.unidadeSigla} onChange={e => set('unidadeSigla', e.target.value)} className={inp}>{UNIDADES.map(u => <option key={u}>{u}</option>)}</select></Campo>
+          </div>
+        </Step>
 
-      <Secao icon={<Box className="h-3.5 w-3.5" />} titulo="Classificação & caixaria (FLV)" />
-      <div className="grid grid-cols-3 gap-3">
-        <Campo label="Classificação / Calibre">
-          <input list="classes" value={f.classificacao} onChange={e => set('classificacao', e.target.value)} className={inp} placeholder="Tipo 1, Graúdo..." />
-          <datalist id="classes">{CLASSIFICACOES.map(c => <option key={c} value={c} />)}</datalist>
-        </Campo>
-        <Campo label="Tipo de Caixaria">
-          <input list="caixas" value={f.tipoCaixaria} onChange={e => set('tipoCaixaria', e.target.value)} className={inp} placeholder="Caixa Madeira 20kg..." />
-          <datalist id="caixas">{CAIXARIAS.map(c => <option key={c} value={c} />)}</datalist>
-        </Campo>
-        <Campo label="Peso Líq. Médio/Caixa (kg)"><input type="number" step="0.001" value={f.pesoCaixaria} onChange={e => set('pesoCaixaria', e.target.value)} className={inp} placeholder="20" /></Campo>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <Campo label="Peso Unitário (kg)"><input type="number" step="0.001" value={f.pesoLiquido} onChange={e => set('pesoLiquido', e.target.value)} className={inp} /></Campo>
-        <Campo label="Preço de Venda (R$)"><input type="number" step="0.01" value={f.precoVenda} onChange={e => set('precoVenda', e.target.value)} className={inp} /></Campo>
-      </div>
-      <p className="text-[11px] text-slate-500">O estoque (kg/caixas) vem das movimentações de entrada/saída — não é editado aqui.</p>
+        <Step title="Classificação, caixaria & preço (FLV)" icon={<Box className="h-3.5 w-3.5" />} complete={false}>
+          <div className="grid grid-cols-3 gap-3">
+            <Campo label="Classificação / Calibre">
+              <input list="classes" value={f.classificacao} onChange={e => set('classificacao', e.target.value)} className={inp} placeholder="Tipo 1, Graúdo..." />
+              <datalist id="classes">{CLASSIFICACOES.map(c => <option key={c} value={c} />)}</datalist>
+            </Campo>
+            <Campo label="Tipo de Caixaria">
+              <input list="caixas" value={f.tipoCaixaria} onChange={e => set('tipoCaixaria', e.target.value)} className={inp} placeholder="Caixa Madeira 20kg..." />
+              <datalist id="caixas">{CAIXARIAS.map(c => <option key={c} value={c} />)}</datalist>
+            </Campo>
+            <Campo label="Peso Líq. Médio/Caixa (kg)"><input type="number" step="0.001" value={f.pesoCaixaria} onChange={e => set('pesoCaixaria', e.target.value)} className={inp} placeholder="20" /></Campo>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Campo label="Peso Unitário (kg)"><input type="number" step="0.001" value={f.pesoLiquido} onChange={e => set('pesoLiquido', e.target.value)} className={inp} /></Campo>
+            <Campo label="Preço de Venda (R$)"><input type="number" step="0.01" value={f.precoVenda} onChange={e => set('precoVenda', e.target.value)} className={inp} /></Campo>
+          </div>
+          <p className="text-[11px] text-slate-500">O estoque (kg/caixas) vem das movimentações de entrada/saída — não é editado aqui.</p>
+        </Step>
+      </SteppedForm>
 
-      {erro && <p className="text-xs text-rose-400 bg-rose-500/10 px-3 py-2 rounded-lg">{erro}</p>}
+      {erro && <p className="text-xs text-rose-400 bg-rose-500/10 px-3 py-2 rounded-lg mt-3">{erro}</p>}
     </Modal>
   );
 }

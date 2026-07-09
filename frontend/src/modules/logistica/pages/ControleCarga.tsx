@@ -1,5 +1,6 @@
 import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Printer, Truck, CheckSquare,
   ChevronDown, RotateCcw, Trash2,
@@ -958,12 +959,12 @@ function ModalNovaEntrega({ dataCarga, filialId, pedidosJaRoteirizados, onClose,
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-2 animate-fade-in">
-      <div className="bg-white border border-gray-300 rounded-xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col">
+  return createPortal((
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-2 animate-backdrop">
+      <div className="bg-[#0E141F]/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden animate-modal">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-gray-50 rounded-t-xl shrink-0">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/10 bg-white/[0.02] shrink-0">
           <div className="flex items-center gap-2">
             <RotateCcw className="h-5 w-5 text-blue-600" />
             <h2 className="font-bold text-gray-900 text-sm">Nova Entrega — Roteirizar</h2>
@@ -1147,7 +1148,7 @@ function ModalNovaEntrega({ dataCarga, filialId, pedidosJaRoteirizados, onClose,
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 // KPI minimalista do resumo de rotas

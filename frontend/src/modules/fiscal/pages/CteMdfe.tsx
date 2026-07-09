@@ -1,5 +1,6 @@
 import { toast } from '../../../components/ui/feedback';
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Truck, Plus, X, FileText, CheckCircle2, Ban } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
@@ -124,10 +125,10 @@ export default function CteMdfe() {
       </div>
 
       {/* Modal de emissão */}
-      {modal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setModal(false)}>
-          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b sticky top-0 bg-white">
+      {modal && createPortal((
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4 animate-backdrop" onClick={() => setModal(false)}>
+          <div className="bg-[#0E141F]/90 backdrop-blur-2xl border border-white/10 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-auto animate-modal" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 sticky top-0 bg-[#0E141F]/95 backdrop-blur-xl z-10">
               <h2 className="font-bold text-gray-900">{aba === 'MDFE' ? 'Simular Manifesto (MDF-e)' : 'Novo CT-e'}</h2>
               <button onClick={() => setModal(false)}><X className="h-5 w-5 text-gray-400" /></button>
             </div>
@@ -157,13 +158,13 @@ export default function CteMdfe() {
                 <p className="text-[11px] text-gray-400 mt-1">{selNfes.size} nota(s) selecionada(s)</p>
               </div>
             </div>
-            <div className="px-5 py-3 border-t flex justify-end gap-2 sticky bottom-0 bg-white">
-              <button onClick={() => setModal(false)} className="px-4 py-2 rounded-lg border text-gray-600 text-sm">Cancelar</button>
+            <div className="px-5 py-3 border-t border-white/10 flex justify-end gap-2 sticky bottom-0 bg-[#0E141F]/95 backdrop-blur-xl">
+              <button onClick={() => setModal(false)} className="px-4 py-2 rounded-lg border border-white/10 text-slate-300 text-sm hover:bg-white/5">Cancelar</button>
               <button onClick={salvar} className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm">Emitir (mock)</button>
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }

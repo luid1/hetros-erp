@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Truck, Pencil, Trash2, Building2, MapPin } from 'lucide-react';
 import api from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
-import { CadastroShell, TopBar, FilterBar, Chips, TableCard, Th, StatusBadge, Modal, Secao, Campo, Loader, Vazio, inp, UFS, R$ } from '../ui';
+import { CadastroShell, TopBar, FilterBar, Chips, TableCard, Th, StatusBadge, Modal, SteppedForm, Step, Campo, Loader, Vazio, inp, UFS, R$ } from '../ui';
 
 const TIPOS_VEICULO = ['TRUCK', 'BITREM', 'CARRETA', 'BITRUCK', 'VAN', 'VAN REFRIGERADA', 'FIORINO', 'KOMBI', 'MOTO'];
 const REGIOES = ['Capital', 'Grande SP', 'Interior', 'Litoral', 'Interestadual'];
@@ -45,14 +45,14 @@ export default function Transportadoras() {
             <tbody>
               {lista.map(t => (
                 <tr key={t.id} className="border-t border-slate-800 hover:bg-sky-500/5">
-                  <td className="px-3 py-2.5"><p className="font-semibold text-slate-100 truncate max-w-[220px]">{t.razaoSocial}</p>{t.nomeFantasia && <p className="text-slate-500 text-xs">{t.nomeFantasia}</p>}</td>
-                  <td className="px-3 py-2.5 font-mono text-slate-400 text-xs">{t.cnpj}</td>
-                  <td className="px-3 py-2.5 font-mono text-slate-200">{t.placaPrincipal || '—'}</td>
-                  <td className="px-3 py-2.5 text-slate-300 text-xs">{t.tipoVeiculo || '—'}</td>
-                  <td className="px-3 py-2.5 text-slate-300">{t.regiaoAtuacao || '—'}</td>
-                  <td className="px-3 py-2.5 text-right font-mono text-slate-300">{t.freteBaseKg ? R$(t.freteBaseKg) : '—'}</td>
-                  <td className="px-3 py-2.5"><StatusBadge ativo={t.ativo} /></td>
-                  <td className="px-3 py-2.5"><div className="flex gap-1.5">
+                  <td className="px-3 py-1.5"><p className="font-semibold text-slate-100 truncate max-w-[220px]">{t.razaoSocial}</p>{t.nomeFantasia && <p className="text-slate-500 text-xs">{t.nomeFantasia}</p>}</td>
+                  <td className="px-3 py-1.5 font-mono text-slate-400 text-xs">{t.cnpj}</td>
+                  <td className="px-3 py-1.5 font-mono text-slate-200">{t.placaPrincipal || '—'}</td>
+                  <td className="px-3 py-1.5 text-slate-300 text-xs">{t.tipoVeiculo || '—'}</td>
+                  <td className="px-3 py-1.5 text-slate-300">{t.regiaoAtuacao || '—'}</td>
+                  <td className="px-3 py-1.5 text-right font-mono text-slate-300">{t.freteBaseKg ? R$(t.freteBaseKg) : '—'}</td>
+                  <td className="px-3 py-1.5"><StatusBadge ativo={t.ativo} /></td>
+                  <td className="px-3 py-1.5"><div className="flex gap-1.5">
                     {pode('/cadastros/transportadoras', 'EDITAR') && <button onClick={() => setEditando(t)} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Pencil className="h-3 w-3" /> Editar</button>}
                     {pode('/cadastros/transportadoras', 'EXCLUIR') && <button onClick={() => excluir(t)} className="text-slate-500 hover:text-rose-400 px-1"><Trash2 className="h-3.5 w-3.5" /></button>}
                   </div></td>
@@ -100,36 +100,43 @@ function ModalTransp({ item, onClose, onSalvo }: { item: any | null; onClose: ()
 
   return (
     <Modal titulo={item ? 'Editar Transportadora' : 'Nova Transportadora'} onClose={onClose} onSalvar={salvar} salvando={salvando} salvarLabel={item ? 'Salvar' : 'Cadastrar'}>
-      <Secao icon={<Building2 className="h-3.5 w-3.5" />} titulo="Identificação" />
-      <Campo label="Nome do Transportador / Razão Social *"><input value={f.razaoSocial} onChange={e => set('razaoSocial', e.target.value)} className={inp} /></Campo>
-      <div className="grid grid-cols-3 gap-3">
-        <Campo label="CPF / CNPJ *"><input value={f.cnpj} onChange={e => set('cnpj', e.target.value)} className={inp} /></Campo>
-        <Campo label="Inscrição Estadual"><input value={f.ie} onChange={e => set('ie', e.target.value)} className={inp} /></Campo>
-        <Campo label="Registro ANTT"><input value={f.antt} onChange={e => set('antt', e.target.value)} className={inp} /></Campo>
-      </div>
+      <SteppedForm>
+        <Step title="Identificação" icon={<Building2 className="h-3.5 w-3.5" />} hint="Avançar para veículo & frete"
+          complete={!!f.razaoSocial.trim() && !!f.cnpj.trim()}>
+          <Campo label="Nome do Transportador / Razão Social *"><input value={f.razaoSocial} onChange={e => set('razaoSocial', e.target.value)} className={inp} /></Campo>
+          <div className="grid grid-cols-3 gap-3">
+            <Campo label="CPF / CNPJ *"><input value={f.cnpj} onChange={e => set('cnpj', e.target.value)} className={inp} /></Campo>
+            <Campo label="Inscrição Estadual"><input value={f.ie} onChange={e => set('ie', e.target.value)} className={inp} /></Campo>
+            <Campo label="Registro ANTT"><input value={f.antt} onChange={e => set('antt', e.target.value)} className={inp} /></Campo>
+          </div>
+        </Step>
 
-      <Secao icon={<Truck className="h-3.5 w-3.5" />} titulo="Veículo & frete" />
-      <div className="grid grid-cols-3 gap-3">
-        <Campo label="Placa do Veículo Principal"><input value={f.placaPrincipal} onChange={e => set('placaPrincipal', e.target.value.toUpperCase())} className={inp} placeholder="ABC1D23" /></Campo>
-        <Campo label="Tipo de Veículo"><select value={f.tipoVeiculo} onChange={e => set('tipoVeiculo', e.target.value)} className={inp}>{TIPOS_VEICULO.map(v => <option key={v}>{v}</option>)}</select></Campo>
-        <Campo label="Frete padrão por kg (R$)"><input type="number" step="0.0001" value={f.freteBaseKg} onChange={e => set('freteBaseKg', e.target.value)} className={inp} placeholder="0,00" /></Campo>
-      </div>
+        <Step title="Veículo & frete" icon={<Truck className="h-3.5 w-3.5" />} hint="Avançar para atuação"
+          complete={!!(f.placaPrincipal.trim() || f.freteBaseKg)}>
+          <div className="grid grid-cols-3 gap-3">
+            <Campo label="Placa do Veículo Principal"><input value={f.placaPrincipal} onChange={e => set('placaPrincipal', e.target.value.toUpperCase())} className={inp} placeholder="ABC1D23" /></Campo>
+            <Campo label="Tipo de Veículo"><select value={f.tipoVeiculo} onChange={e => set('tipoVeiculo', e.target.value)} className={inp}>{TIPOS_VEICULO.map(v => <option key={v}>{v}</option>)}</select></Campo>
+            <Campo label="Frete padrão por kg (R$)"><input type="number" step="0.0001" value={f.freteBaseKg} onChange={e => set('freteBaseKg', e.target.value)} className={inp} placeholder="0,00" /></Campo>
+          </div>
+        </Step>
 
-      <Secao icon={<MapPin className="h-3.5 w-3.5" />} titulo="Atuação & contato" />
-      <div className="grid grid-cols-4 gap-3">
-        <Campo label="Região de Atuação"><select value={f.regiaoAtuacao} onChange={e => set('regiaoAtuacao', e.target.value)} className={inp}>{REGIOES.map(r => <option key={r}>{r}</option>)}</select></Campo>
-        <Campo label="Cidade"><input value={f.cidade} onChange={e => set('cidade', e.target.value)} className={inp} /></Campo>
-        <Campo label="UF"><select value={f.uf} onChange={e => set('uf', e.target.value)} className={inp}>{UFS.map(u => <option key={u}>{u}</option>)}</select></Campo>
-        <Campo label="Situação">
-          <button type="button" onClick={() => set('ativo', !f.ativo)} className={`w-full rounded-lg px-3 py-2 text-sm font-bold border ${f.ativo ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/15 text-rose-300 border-rose-500/40'}`}>{f.ativo ? 'ATIVO' : 'INATIVO'}</button>
-        </Campo>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Campo label="Telefone"><input value={f.telefone} onChange={e => set('telefone', e.target.value)} className={inp} /></Campo>
-        <Campo label="E-mail"><input value={f.email} onChange={e => set('email', e.target.value)} className={inp} /></Campo>
-      </div>
+        <Step title="Atuação & contato" icon={<MapPin className="h-3.5 w-3.5" />} complete={false}>
+          <div className="grid grid-cols-4 gap-3">
+            <Campo label="Região de Atuação"><select value={f.regiaoAtuacao} onChange={e => set('regiaoAtuacao', e.target.value)} className={inp}>{REGIOES.map(r => <option key={r}>{r}</option>)}</select></Campo>
+            <Campo label="Cidade"><input value={f.cidade} onChange={e => set('cidade', e.target.value)} className={inp} /></Campo>
+            <Campo label="UF"><select value={f.uf} onChange={e => set('uf', e.target.value)} className={inp}>{UFS.map(u => <option key={u}>{u}</option>)}</select></Campo>
+            <Campo label="Situação">
+              <button type="button" onClick={() => set('ativo', !f.ativo)} className={`w-full rounded-lg px-3 py-2 text-sm font-bold border ${f.ativo ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/15 text-rose-300 border-rose-500/40'}`}>{f.ativo ? 'ATIVO' : 'INATIVO'}</button>
+            </Campo>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo label="Telefone"><input value={f.telefone} onChange={e => set('telefone', e.target.value)} className={inp} /></Campo>
+            <Campo label="E-mail"><input value={f.email} onChange={e => set('email', e.target.value)} className={inp} /></Campo>
+          </div>
+        </Step>
+      </SteppedForm>
 
-      {erro && <p className="text-xs text-rose-400 bg-rose-500/10 px-3 py-2 rounded-lg">{erro}</p>}
+      {erro && <p className="text-xs text-rose-400 bg-rose-500/10 px-3 py-2 rounded-lg mt-3">{erro}</p>}
     </Modal>
   );
 }

@@ -1,12 +1,14 @@
 import { toast, confirmDialog, promptDialog } from '../../../components/ui/feedback';
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ClipboardList, Plus, Search, X, Check, Trash2, Pencil,
-  Package, Truck, FileText, ShoppingCart, AlertTriangle, Save, CreditCard, MapPin, Lock, Unlock, Repeat, Loader2,
+  Package, Truck, FileText, ShoppingCart, AlertTriangle, Save, CreditCard, MapPin, Lock, Unlock, Repeat, Loader2, User,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { imprimirComprovanteReposicao } from '../impressos';
+import { SteppedForm, Step } from '../../cadastros/ui';
 
 const R$ = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 // Senha para liberar descontos no pedido (trocar aqui conforme política da empresa)
@@ -205,7 +207,17 @@ export default function PedidosVenda() {
 
       <div className="flex-1 overflow-auto">
         {loading ? (
-          <div className="flex justify-center py-16"><div className="animate-spin h-6 w-6 border-2 border-sky-500 border-t-transparent rounded-full" /></div>
+          <div className="p-4 space-y-2">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-3 py-2.5 rounded-lg border border-white/[0.04] bg-white/[0.015]">
+                <div className="skeleton h-3 w-8 rounded" />
+                <div className="skeleton h-3 rounded flex-1" style={{ maxWidth: `${40 + (i % 4) * 12}%` }} />
+                <div className="skeleton h-3 w-14 rounded" />
+                <div className="skeleton h-3 w-16 rounded" />
+                <div className="skeleton h-6 w-20 rounded-full" />
+              </div>
+            ))}
+          </div>
         ) : (
           <table className="w-full text-xs border-collapse">
             <thead className="bg-gray-100 sticky top-0 z-10">
@@ -387,16 +399,17 @@ function ModalReposicao({ pedidoId, onClose, onGerado }: { pedidoId: string; onC
 
   const nomeCli = pedido?.cliente?.nomeFantasia || pedido?.cliente?.razaoSocial || '—';
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+  return createPortal((
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 animate-backdrop" onClick={onClose}>
+      <div className="relative w-full max-w-lg bg-[#0E141F]/85 backdrop-blur-2xl border border-white/[0.09] rounded-2xl shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] max-h-[90vh] overflow-y-auto overflow-x-hidden animate-modal" onClick={e => e.stopPropagation()}>
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-400/70 to-transparent" aria-hidden />
+        <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-40 w-72 rounded-full bg-amber-500/10 blur-3xl" aria-hidden />
+        <div className="sticky top-0 z-10 bg-[#0E141F]/80 backdrop-blur-xl border-b border-white/[0.08] px-5 py-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Repeat className="h-5 w-5 text-amber-600" /> Gerar Reposição</h2>
-            <p className="text-xs text-gray-500 mt-0.5">{pedido ? `Pedido #${pedido.numero} · ${nomeCli}` : 'Carregando…'} · grátis (só comprovante)</p>
+            <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2"><Repeat className="h-5 w-5 text-amber-400" /> Gerar Reposição</h2>
+            <p className="text-xs text-slate-400 mt-0.5">{pedido ? `Pedido #${pedido.numero} · ${nomeCli}` : 'Carregando…'} · grátis (só comprovante)</p>
           </div>
-          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center hover:bg-gray-200"><X className="h-4 w-4 text-gray-600" /></button>
+          <button onClick={onClose} className="h-8 w-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10"><X className="h-4 w-4 text-slate-300" /></button>
         </div>
 
         {carregando ? (
@@ -453,7 +466,7 @@ function ModalReposicao({ pedidoId, onClose, onGerado }: { pedidoId: string; onC
         )}
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 // ─────────────────────────────────────────────────────────
@@ -658,28 +671,30 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
     } finally { setSalvando(false); }
   };
 
-  const lbl = 'block text-[10px] font-bold text-gray-600 uppercase mb-1';
-  const inp = 'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400';
+  const lbl = 'block text-[10px] font-bold text-slate-400 uppercase mb-1';
+  const inp = 'w-full border border-white/10 bg-white/[0.04] text-slate-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-400/60 focus:border-sky-400/50 outline-none';
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[94vh] flex flex-col">
+  return createPortal((
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-3 animate-backdrop" onClick={onClose}>
+      <div className="relative bg-[#0E141F]/85 backdrop-blur-2xl border border-white/[0.09] rounded-2xl shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] w-full max-w-4xl max-h-[94vh] flex flex-col overflow-hidden animate-modal" onClick={e => e.stopPropagation()}>
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-400/70 to-transparent" aria-hidden />
+        <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-40 w-72 rounded-full bg-sky-500/10 blur-3xl" aria-hidden />
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-xl shrink-0">
-          <h2 className="font-bold text-gray-900 text-sm flex items-center gap-2">
-            <ShoppingCart className="h-4 w-4 text-green-600" />
+        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.08] bg-white/[0.02] shrink-0">
+          <h2 className="font-bold text-slate-100 text-sm flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4 text-emerald-400" />
             {editando ? `Editar Pedido nº ${numero ?? ''}` : 'Novo Pedido de Venda'}
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_CORES[statusPedido]}`}>
               {statusPedido === 'CONFIRMADO' ? 'APROVADO' : statusPedido}
             </span>
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-100"><X className="h-4 w-4" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* ── A. Cabeçalho ── */}
-          <section>
-            <h3 className="text-[11px] font-bold text-gray-400 uppercase mb-2">A · Dados Gerais</h3>
+        <div className="flex-1 overflow-y-auto p-5">
+          <SteppedForm>
+            {/* ── A. Dados Gerais ── */}
+            <Step title="Cliente & dados gerais" icon={<User className="h-3.5 w-3.5" />} hint="Avançar para itens" complete={!!clienteSel}>
             <div>
               <label className={lbl}>Cliente *</label>
               {clienteSel ? (
@@ -734,18 +749,17 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
                 </select>
               </div>
             </div>
-          </section>
+            </Step>
 
-          {/* ── B. Itens ── */}
-          <section>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-[11px] font-bold text-gray-400 uppercase">B · Itens do Pedido</h3>
+            {/* ── B. Itens ── */}
+            <Step title="Itens do pedido" icon={<Package className="h-3.5 w-3.5" />} hint="Avançar para pagamento" complete={itens.length > 0}>
+            <div className="flex items-center justify-end mb-2">
               <button onClick={liberarDesconto} type="button"
-                className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded border ${descontoLiberado ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
+                className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded border ${descontoLiberado ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-white/5 text-slate-400 border-white/10'}`}>
                 {descontoLiberado ? <><Unlock className="h-3 w-3" /> Descontos liberados</> : <><Lock className="h-3 w-3" /> Liberar descontos (senha)</>}
               </button>
             </div>
-            <p className="text-[10px] text-gray-400 mb-2">Preço unitário é definido pela área de custo (somente leitura).</p>
+            <p className="text-[10px] text-slate-500 mb-2">Preço unitário é definido pela área de custo (somente leitura).</p>
             <BuscaProduto filialId={filialAtiva?.id} onSelecionar={addProduto} />
             <div className="border border-gray-200 rounded-lg overflow-hidden mt-2">
               <table className="w-full text-xs">
@@ -809,11 +823,10 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
                 </tbody>
               </table>
             </div>
-          </section>
+            </Step>
 
-          {/* ── C. Pagamento e Entrega ── */}
-          <section>
-            <h3 className="text-[11px] font-bold text-gray-400 uppercase mb-2">C · Pagamento e Entrega</h3>
+            {/* ── C. Pagamento e Entrega ── */}
+            <Step title="Pagamento & entrega" icon={<CreditCard className="h-3.5 w-3.5" />} hint="Avançar para observações" complete={!!clienteSel && itens.length > 0}>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={lbl}><CreditCard className="h-3 w-3 inline" /> Forma de Pagamento</label>
@@ -842,10 +855,11 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
                 <input value={endEntrega.cep} onChange={e => setEndEntrega({ ...endEntrega, cep: e.target.value })} placeholder="CEP" className={`${inp} col-span-2`} />
               </div>
             </div>
-          </section>
+            </Step>
 
-          {/* ── D. Observações ── */}
-          <section className="grid grid-cols-2 gap-3">
+            {/* ── D. Observações ── */}
+            <Step title="Volumes & observações" icon={<FileText className="h-3.5 w-3.5" />} complete={false}>
+            <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={lbl}>Volumes</label>
               <input type="number" min="0" value={volumes} onChange={e => setVolumes(e.target.value)} className={inp} />
@@ -856,33 +870,35 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
               <label className={lbl}>Observações da Nota Fiscal</label>
               <textarea value={obsNf} onChange={e => setObsNf(e.target.value)} rows={5} placeholder="Texto que sairá na NF-e" className={`${inp} resize-none`} />
             </div>
-          </section>
+            </div>
+            </Step>
+          </SteppedForm>
 
-          {erro && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{erro}</p>}
+          {erro && <p className="text-xs text-rose-400 bg-rose-500/10 px-3 py-2 rounded-lg mt-3">{erro}</p>}
         </div>
 
         {/* ── Rodapé fixo: Totais ── */}
-        <div className="border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0 px-5 py-3">
+        <div className="border-t border-white/[0.08] bg-white/[0.02] shrink-0 px-5 py-3">
           <div className="flex items-end justify-between gap-4">
-            <div className="flex items-center gap-5 text-xs text-gray-600">
-              <div><span className="block text-[10px] uppercase text-gray-400">Total dos Itens</span><strong className="font-mono text-sm">{R$(totalBruto)}</strong></div>
+            <div className="flex items-center gap-5 text-xs text-slate-300">
+              <div><span className="block text-[10px] uppercase text-slate-400">Total dos Itens</span><strong className="font-mono text-sm text-slate-100">{R$(totalBruto)}</strong></div>
               <div className="flex flex-col">
-                <span className="text-[10px] uppercase text-gray-400 flex items-center gap-1">
+                <span className="text-[10px] uppercase text-slate-400 flex items-center gap-1">
                   Desc. Geral (R$) {!descontoLiberado && <Lock className="h-2.5 w-2.5" />}
                 </span>
                 <input type="number" min="0" step="0.01" value={descontoGeral} disabled={!descontoLiberado}
                   onChange={e => setDescontoGeral(e.target.value)}
-                  className={`w-24 border rounded px-2 py-1 text-right text-sm ${descontoLiberado ? 'border-gray-300' : 'border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed'}`} />
+                  className={`w-24 border rounded px-2 py-1 text-right text-sm outline-none ${descontoLiberado ? 'border-white/10 bg-white/[0.04] text-slate-100' : 'border-white/5 bg-white/[0.02] text-slate-500 cursor-not-allowed'}`} />
               </div>
-              <div className="border-l border-gray-300 pl-5">
-                <span className="block text-[10px] uppercase text-gray-400">Total Líquido</span>
-                <strong className="font-mono text-xl text-green-700">{R$(totalLiquido)}</strong>
+              <div className="border-l border-white/10 pl-5">
+                <span className="block text-[10px] uppercase text-slate-400">Total Líquido</span>
+                <strong className="font-mono text-xl text-emerald-400">{R$(totalLiquido)}</strong>
               </div>
             </div>
             <div className="flex gap-2">
-              <button onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50">Cancelar</button>
+              <button onClick={onClose} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-300 hover:bg-white/10">Cancelar</button>
               <button onClick={handleSalvar} disabled={salvando || !clienteSel || itens.length === 0}
-                className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-1.5">
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold disabled:opacity-40 flex items-center gap-1.5 shadow-[0_0_20px_-4px_rgba(16,185,129,0.5)]">
                 {salvando ? 'Salvando...' : <><Save className="h-4 w-4" /> {editando ? 'Salvar Alterações' : 'Lançar Pedido'}</>}
               </button>
             </div>
@@ -890,7 +906,7 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 // ─── Autocomplete de produto ───

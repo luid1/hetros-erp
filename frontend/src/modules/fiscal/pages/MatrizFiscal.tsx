@@ -1,5 +1,6 @@
 import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Scale, Plus, RefreshCw, Trash2, X, Sparkles, Pencil, Building2, Save } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
@@ -184,10 +185,10 @@ export default function MatrizFiscal() {
         )}
       </div>
 
-      {edit && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setEdit(null)}>
-          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b sticky top-0 bg-white">
+      {edit && createPortal((
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4 animate-backdrop" onClick={() => setEdit(null)}>
+          <div className="bg-[#0E141F]/90 backdrop-blur-2xl border border-white/10 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-auto animate-modal" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 sticky top-0 bg-[#0E141F]/95 backdrop-blur-xl z-10">
               <h2 className="font-bold text-gray-900">{edit.id ? 'Editar' : 'Nova'} regra fiscal</h2>
               <button onClick={() => setEdit(null)}><X className="h-5 w-5 text-gray-400" /></button>
             </div>
@@ -226,13 +227,13 @@ export default function MatrizFiscal() {
                 </div>
               </L>
             </div>
-            <div className="px-5 py-3 border-t flex justify-end gap-2 sticky bottom-0 bg-white">
-              <button onClick={() => setEdit(null)} className="px-4 py-2 rounded-lg border text-gray-600 text-sm">Cancelar</button>
+            <div className="px-5 py-3 border-t border-white/10 flex justify-end gap-2 sticky bottom-0 bg-[#0E141F]/95 backdrop-blur-xl">
+              <button onClick={() => setEdit(null)} className="px-4 py-2 rounded-lg border border-white/10 text-slate-300 text-sm hover:bg-white/5">Cancelar</button>
               <button onClick={salvar} className="px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-bold text-sm">Salvar</button>
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }

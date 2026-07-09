@@ -1,5 +1,6 @@
 import { toast } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Receipt, RefreshCw, FileText, Printer, Check, AlertTriangle, Loader2, ShieldCheck, X, XCircle, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
@@ -172,10 +173,10 @@ export default function Faturamento() {
       </div>
 
       {/* Modal de conferência: checklist anti-erro + preview de impostos */}
-      {conferindo && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setConferindo(null)}>
-          <div className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-3 border-b sticky top-0 bg-white">
+      {conferindo && createPortal((
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4 animate-backdrop" onClick={() => setConferindo(null)}>
+          <div className="bg-[#0E141F]/90 backdrop-blur-2xl border border-white/10 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-auto animate-modal" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 sticky top-0 bg-[#0E141F]/95 backdrop-blur-xl z-10">
               <h2 className="font-bold text-gray-900 flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-violet-500" /> Conferência — Pedido {conferindo.numero} · {conferindo.cliente?.nomeFantasia || conferindo.cliente?.razaoSocial}</h2>
               <button onClick={() => setConferindo(null)}><X className="h-5 w-5 text-gray-400" /></button>
             </div>
@@ -246,8 +247,8 @@ export default function Faturamento() {
               </div>
             )}
 
-            <div className="px-5 py-3 border-t flex justify-end gap-2 sticky bottom-0 bg-white">
-              <button onClick={() => setConferindo(null)} className="px-4 py-2 rounded-lg border text-gray-600 text-sm">Fechar</button>
+            <div className="px-5 py-3 border-t border-white/10 flex justify-end gap-2 sticky bottom-0 bg-[#0E141F]/95 backdrop-blur-xl">
+              <button onClick={() => setConferindo(null)} className="px-4 py-2 rounded-lg border border-white/10 text-slate-300 text-sm hover:bg-white/5">Fechar</button>
               <button
                 disabled={!validacao?.podeFaturar || processando}
                 onClick={async () => { const id = conferindo.id; setConferindo(null); await faturarLinha(id); }}
@@ -257,7 +258,7 @@ export default function Faturamento() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }

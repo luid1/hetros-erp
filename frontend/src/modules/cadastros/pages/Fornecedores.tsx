@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Sprout, Pencil, Trash2, Building2, MapPin, Landmark, Handshake } from 'lucide-react';
 import api from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
-import { CadastroShell, TopBar, FilterBar, Chips, TableCard, Th, StatusBadge, Modal, Secao, Campo, Loader, Vazio, inp, UFS } from '../ui';
+import { CadastroShell, TopBar, FilterBar, Chips, TableCard, Th, StatusBadge, Modal, SteppedForm, Step, Campo, Loader, Vazio, inp, UFS } from '../ui';
 
 const PARCERIA: Record<string, { label: string; cor: string }> = {
   COMPRA_DIRETA: { label: 'Compra Direta', cor: 'bg-sky-500/15 text-sky-300' },
@@ -51,14 +51,14 @@ export default function Fornecedores() {
             <tbody>
               {lista.map(f => (
                 <tr key={f.id} className="border-t border-slate-800 hover:bg-sky-500/5">
-                  <td className="px-3 py-2.5"><p className="font-semibold text-slate-100 truncate max-w-[220px]">{f.razaoSocial}</p>{f.nomeFantasia && <p className="text-slate-500 text-xs">{f.nomeFantasia}</p>}</td>
-                  <td className="px-3 py-2.5 font-mono text-slate-400 text-xs">{f.cnpj}</td>
-                  <td className="px-3 py-2.5 text-slate-400 text-xs">{f.inscricaoRural || '—'}</td>
-                  <td className="px-3 py-2.5 text-slate-300">{f.localizacaoPropriedade || '—'}</td>
-                  <td className="px-3 py-2.5"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${PARCERIA[f.tipoParceria]?.cor || 'bg-slate-700 text-slate-300'}`}>{PARCERIA[f.tipoParceria]?.label || f.tipoParceria}</span></td>
-                  <td className="px-3 py-2.5 font-mono text-slate-400 text-xs truncate max-w-[120px]">{f.pix || '—'}</td>
-                  <td className="px-3 py-2.5"><StatusBadge ativo={f.ativo} /></td>
-                  <td className="px-3 py-2.5"><div className="flex gap-1.5">
+                  <td className="px-3 py-1.5"><p className="font-semibold text-slate-100 truncate max-w-[220px]">{f.razaoSocial}</p>{f.nomeFantasia && <p className="text-slate-500 text-xs">{f.nomeFantasia}</p>}</td>
+                  <td className="px-3 py-1.5 font-mono text-slate-400 text-xs">{f.cnpj}</td>
+                  <td className="px-3 py-1.5 text-slate-400 text-xs">{f.inscricaoRural || '—'}</td>
+                  <td className="px-3 py-1.5 text-slate-300">{f.localizacaoPropriedade || '—'}</td>
+                  <td className="px-3 py-1.5"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${PARCERIA[f.tipoParceria]?.cor || 'bg-slate-700 text-slate-300'}`}>{PARCERIA[f.tipoParceria]?.label || f.tipoParceria}</span></td>
+                  <td className="px-3 py-1.5 font-mono text-slate-400 text-xs truncate max-w-[120px]">{f.pix || '—'}</td>
+                  <td className="px-3 py-1.5"><StatusBadge ativo={f.ativo} /></td>
+                  <td className="px-3 py-1.5"><div className="flex gap-1.5">
                     {pode('/cadastros/fornecedores', 'EDITAR') && <button onClick={() => setEditando(f)} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Pencil className="h-3 w-3" /> Editar</button>}
                     {pode('/cadastros/fornecedores', 'EXCLUIR') && <button onClick={() => excluir(f)} className="text-slate-500 hover:text-rose-400 px-1"><Trash2 className="h-3.5 w-3.5" /></button>}
                   </div></td>
@@ -109,48 +109,57 @@ function ModalFornecedor({ item, onClose, onSalvo }: { item: any | null; onClose
 
   return (
     <Modal titulo={item ? 'Editar Fornecedor' : 'Novo Fornecedor'} onClose={onClose} onSalvar={salvar} salvando={salvando} salvarLabel={item ? 'Salvar' : 'Cadastrar'}>
-      <Secao icon={<Building2 className="h-3.5 w-3.5" />} titulo="Produtor rural / parceiro" />
-      <Campo label="Nome do Produtor / Razão Social *"><input value={f.razaoSocial} onChange={e => set('razaoSocial', e.target.value)} className={inp} /></Campo>
-      <div className="grid grid-cols-3 gap-3">
-        <Campo label="CPF / CNPJ *"><input value={f.cnpj} onChange={e => set('cnpj', e.target.value)} className={inp} /></Campo>
-        <Campo label="Inscrição Estadual"><input value={f.ie} onChange={e => set('ie', e.target.value)} className={inp} /></Campo>
-        <Campo label="Inscrição de Produtor Rural"><input value={f.inscricaoRural} onChange={e => set('inscricaoRural', e.target.value)} className={inp} /></Campo>
-      </div>
+      <SteppedForm>
+        <Step title="Produtor rural / parceiro" icon={<Building2 className="h-3.5 w-3.5" />} hint="Avançar para localização"
+          complete={!!f.razaoSocial.trim() && !!f.cnpj.trim()}>
+          <Campo label="Nome do Produtor / Razão Social *"><input value={f.razaoSocial} onChange={e => set('razaoSocial', e.target.value)} className={inp} /></Campo>
+          <div className="grid grid-cols-3 gap-3">
+            <Campo label="CPF / CNPJ *"><input value={f.cnpj} onChange={e => set('cnpj', e.target.value)} className={inp} /></Campo>
+            <Campo label="Inscrição Estadual"><input value={f.ie} onChange={e => set('ie', e.target.value)} className={inp} /></Campo>
+            <Campo label="Inscrição de Produtor Rural"><input value={f.inscricaoRural} onChange={e => set('inscricaoRural', e.target.value)} className={inp} /></Campo>
+          </div>
+        </Step>
 
-      <Secao icon={<MapPin className="h-3.5 w-3.5" />} titulo="Localização" />
-      <div className="grid grid-cols-6 gap-3">
-        <Campo label="Propriedade / Sítio / Município" className="col-span-4"><input value={f.localizacaoPropriedade} onChange={e => set('localizacaoPropriedade', e.target.value)} className={inp} placeholder="Ex: Sítio Boa Esperança — Mogi das Cruzes" /></Campo>
-        <Campo label="Cidade"><input value={f.cidade} onChange={e => set('cidade', e.target.value)} className={inp} /></Campo>
-        <Campo label="UF"><select value={f.uf} onChange={e => set('uf', e.target.value)} className={inp}>{UFS.map(u => <option key={u}>{u}</option>)}</select></Campo>
-      </div>
+        <Step title="Localização" icon={<MapPin className="h-3.5 w-3.5" />} hint="Avançar para parceria"
+          complete={!!(f.localizacaoPropriedade.trim() || f.cidade.trim())}>
+          <div className="grid grid-cols-6 gap-3">
+            <Campo label="Propriedade / Sítio / Município" className="col-span-4"><input value={f.localizacaoPropriedade} onChange={e => set('localizacaoPropriedade', e.target.value)} className={inp} placeholder="Ex: Sítio Boa Esperança — Mogi das Cruzes" /></Campo>
+            <Campo label="Cidade"><input value={f.cidade} onChange={e => set('cidade', e.target.value)} className={inp} /></Campo>
+            <Campo label="UF"><select value={f.uf} onChange={e => set('uf', e.target.value)} className={inp}>{UFS.map(u => <option key={u}>{u}</option>)}</select></Campo>
+          </div>
+        </Step>
 
-      <Secao icon={<Handshake className="h-3.5 w-3.5" />} titulo="Parceria" />
-      <div className="grid grid-cols-3 gap-3">
-        <Campo label="Tipo de Parceria">
-          <select value={f.tipoParceria} onChange={e => set('tipoParceria', e.target.value)} className={inp}>
-            <option value="COMPRA_DIRETA">Compra Direta</option>
-            <option value="CONSIGNACAO">Consignação / Comissão</option>
-          </select>
-        </Campo>
-        <Campo label="Prazo de Entrega (dias)"><input type="number" min="0" value={f.prazoEntrega} onChange={e => set('prazoEntrega', e.target.value)} className={inp} /></Campo>
-        <Campo label="Telefone"><input value={f.telefone} onChange={e => set('telefone', e.target.value)} className={inp} /></Campo>
-      </div>
+        <Step title="Parceria" icon={<Handshake className="h-3.5 w-3.5" />} hint="Avançar para dados de acerto"
+          complete={!!f.tipoParceria}>
+          <div className="grid grid-cols-3 gap-3">
+            <Campo label="Tipo de Parceria">
+              <select value={f.tipoParceria} onChange={e => set('tipoParceria', e.target.value)} className={inp}>
+                <option value="COMPRA_DIRETA">Compra Direta</option>
+                <option value="CONSIGNACAO">Consignação / Comissão</option>
+              </select>
+            </Campo>
+            <Campo label="Prazo de Entrega (dias)"><input type="number" min="0" value={f.prazoEntrega} onChange={e => set('prazoEntrega', e.target.value)} className={inp} /></Campo>
+            <Campo label="Telefone"><input value={f.telefone} onChange={e => set('telefone', e.target.value)} className={inp} /></Campo>
+          </div>
+        </Step>
 
-      <Secao icon={<Landmark className="h-3.5 w-3.5" />} titulo="Dados para acerto (Pix / conta)" />
-      <div className="grid grid-cols-4 gap-3">
-        <Campo label="Chave PIX" className="col-span-2"><input value={f.pix} onChange={e => set('pix', e.target.value)} className={inp} placeholder="CPF/CNPJ, e-mail, telefone..." /></Campo>
-        <Campo label="Banco"><input value={f.banco} onChange={e => set('banco', e.target.value)} className={inp} /></Campo>
-        <Campo label="E-mail"><input value={f.email} onChange={e => set('email', e.target.value)} className={inp} /></Campo>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <Campo label="Agência"><input value={f.agencia} onChange={e => set('agencia', e.target.value)} className={inp} /></Campo>
-        <Campo label="Conta"><input value={f.conta} onChange={e => set('conta', e.target.value)} className={inp} /></Campo>
-        <Campo label="Situação">
-          <button type="button" onClick={() => set('ativo', !f.ativo)} className={`w-full rounded-lg px-3 py-2 text-sm font-bold border ${f.ativo ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/15 text-rose-300 border-rose-500/40'}`}>{f.ativo ? 'ATIVO' : 'INATIVO'}</button>
-        </Campo>
-      </div>
+        <Step title="Dados para acerto (Pix / conta)" icon={<Landmark className="h-3.5 w-3.5" />} complete={false}>
+          <div className="grid grid-cols-4 gap-3">
+            <Campo label="Chave PIX" className="col-span-2"><input value={f.pix} onChange={e => set('pix', e.target.value)} className={inp} placeholder="CPF/CNPJ, e-mail, telefone..." /></Campo>
+            <Campo label="Banco"><input value={f.banco} onChange={e => set('banco', e.target.value)} className={inp} /></Campo>
+            <Campo label="E-mail"><input value={f.email} onChange={e => set('email', e.target.value)} className={inp} /></Campo>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Campo label="Agência"><input value={f.agencia} onChange={e => set('agencia', e.target.value)} className={inp} /></Campo>
+            <Campo label="Conta"><input value={f.conta} onChange={e => set('conta', e.target.value)} className={inp} /></Campo>
+            <Campo label="Situação">
+              <button type="button" onClick={() => set('ativo', !f.ativo)} className={`w-full rounded-lg px-3 py-2 text-sm font-bold border ${f.ativo ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' : 'bg-rose-500/15 text-rose-300 border-rose-500/40'}`}>{f.ativo ? 'ATIVO' : 'INATIVO'}</button>
+            </Campo>
+          </div>
+        </Step>
+      </SteppedForm>
 
-      {erro && <p className="text-xs text-rose-400 bg-rose-500/10 px-3 py-2 rounded-lg">{erro}</p>}
+      {erro && <p className="text-xs text-rose-400 bg-rose-500/10 px-3 py-2 rounded-lg mt-3">{erro}</p>}
     </Modal>
   );
 }

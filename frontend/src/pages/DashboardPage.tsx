@@ -20,22 +20,33 @@ interface Resumo {
   fluxoDia: { entradas: number; faturados: number; romaneios: number; entregues: number };
 }
 
-// Ícone vazado, solto e sutil — sem caixa colorida pesada (map estático p/ o Tailwind enxergar as classes)
-const KPI_ICON_COLOR: Record<string, string> = {
-  'bg-sky-500': 'text-sky-400', 'bg-red-500': 'text-red-400', 'bg-amber-500': 'text-amber-400',
-  'bg-violet-500': 'text-violet-400', 'bg-teal-500': 'text-teal-400', 'bg-emerald-500': 'text-emerald-400',
-  'bg-blue-500': 'text-blue-400', 'bg-indigo-500': 'text-indigo-400', 'bg-rose-500': 'text-rose-400',
-  'bg-gray-500': 'text-slate-500',
+// Acento semântico por KPI: chip de ícone tingido + glow sutil (classes estáticas p/ o Tailwind enxergar)
+const KPI_ACCENT: Record<string, { chip: string; icon: string; glow: string }> = {
+  'bg-sky-500':     { chip: 'bg-sky-500/10 border-sky-400/20',       icon: 'text-sky-300',     glow: 'bg-sky-500/20' },
+  'bg-red-500':     { chip: 'bg-red-500/10 border-red-400/20',       icon: 'text-red-300',     glow: 'bg-red-500/20' },
+  'bg-amber-500':   { chip: 'bg-amber-500/10 border-amber-400/20',   icon: 'text-amber-300',   glow: 'bg-amber-500/20' },
+  'bg-violet-500':  { chip: 'bg-violet-500/10 border-violet-400/20', icon: 'text-violet-300',  glow: 'bg-violet-500/20' },
+  'bg-teal-500':    { chip: 'bg-teal-500/10 border-teal-400/20',     icon: 'text-teal-300',    glow: 'bg-teal-500/20' },
+  'bg-emerald-500': { chip: 'bg-emerald-500/10 border-emerald-400/20', icon: 'text-emerald-300', glow: 'bg-emerald-500/20' },
+  'bg-blue-500':    { chip: 'bg-blue-500/10 border-blue-400/20',     icon: 'text-blue-300',    glow: 'bg-blue-500/20' },
+  'bg-indigo-500':  { chip: 'bg-indigo-500/10 border-indigo-400/20', icon: 'text-indigo-300',  glow: 'bg-indigo-500/20' },
+  'bg-rose-500':    { chip: 'bg-rose-500/10 border-rose-400/20',     icon: 'text-rose-300',    glow: 'bg-rose-500/20' },
+  'bg-gray-500':    { chip: 'bg-white/[0.04] border-white/[0.08]',   icon: 'text-slate-400',   glow: 'bg-transparent' },
 };
 function KPICard({ icon: Icon, label, value, sub, color }: { icon: any; label: string; value: string; sub?: string; color: string }) {
+  const a = KPI_ACCENT[color] || KPI_ACCENT['bg-gray-500'];
   return (
-    <div className="card glass-hover p-5 cursor-default">
-      <div className="flex items-center gap-2 mb-3">
-        <Icon className={`h-4 w-4 ${KPI_ICON_COLOR[color] || 'text-slate-400'}`} strokeWidth={1.75} />
+    <div className="card glass-hover p-5 cursor-default relative overflow-hidden">
+      {/* glow de acento no canto — dá vida sem pesar */}
+      <div className={`pointer-events-none absolute -top-10 -right-10 h-28 w-28 rounded-full blur-2xl ${a.glow}`} aria-hidden />
+      <div className="flex items-center gap-2.5 mb-3 relative">
+        <div className={`h-8 w-8 rounded-lg border flex items-center justify-center shrink-0 ${a.chip}`}>
+          <Icon className={`h-4 w-4 ${a.icon}`} strokeWidth={2} />
+        </div>
         <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-[0.12em] truncate">{label}</p>
       </div>
-      <p className="text-3xl font-extrabold text-white tracking-tight tabular-nums truncate">{value}</p>
-      {sub && <p className="text-xs text-slate-500 mt-1 truncate">{sub}</p>}
+      <p className="text-3xl font-extrabold text-white tracking-tight tabular-nums truncate relative">{value}</p>
+      {sub && <p className="text-xs text-slate-500 mt-1 truncate relative">{sub}</p>}
     </div>
   );
 }
@@ -111,9 +122,9 @@ export default function DashboardPage() {
           <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-emerald-500" /> Faturamento — últimos 7 dias</h3>
           <div className="flex items-end gap-2 h-44 pt-4">
             {(d?.serieFaturamento || []).map(s => (
-              <div key={s.dia} className="flex-1 flex flex-col items-center gap-1" title={R$(s.valor)}>
-                <span className="text-[10px] text-gray-400 font-mono">{s.valor > 0 ? R$k(s.valor) : ''}</span>
-                <div className="w-full bg-emerald-500 hover:bg-emerald-400 rounded-t transition-all" style={{ height: `${Math.max(3, (s.valor / maxFat) * 140)}px` }} />
+              <div key={s.dia} className="flex-1 flex flex-col items-center gap-1 group" title={R$(s.valor)}>
+                <span className="text-[10px] text-gray-400 font-mono group-hover:text-emerald-300 transition-colors">{s.valor > 0 ? R$k(s.valor) : ''}</span>
+                <div className="w-full bg-gradient-to-t from-emerald-600/70 to-emerald-400 rounded-t-md transition-all duration-300 group-hover:from-emerald-500 group-hover:to-emerald-300 group-hover:shadow-[0_0_16px_rgba(16,185,129,0.35)]" style={{ height: `${Math.max(3, (s.valor / maxFat) * 140)}px` }} />
                 <span className="text-[10px] text-gray-400">{s.label}</span>
               </div>
             ))}
@@ -127,8 +138,8 @@ export default function DashboardPage() {
             {Object.entries(d?.pedidosPorStatus || {}).map(([s, n]) => (
               <div key={s}>
                 <div className="flex justify-between text-xs text-gray-500 mb-1"><span>{STATUS_INFO[s]?.label || s}</span><span className="font-bold text-gray-700">{n}</span></div>
-                <div className="h-2.5 rounded-full bg-slate-700/50 overflow-hidden">
-                  <div className={`h-full ${STATUS_INFO[s]?.cor || 'bg-slate-500'} rounded-full transition-all`} style={{ width: `${(n / maxStatus) * 100}%` }} />
+                <div className="h-2.5 rounded-full bg-white/[0.04] overflow-hidden">
+                  <div className={`h-full ${STATUS_INFO[s]?.cor || 'bg-slate-500'} rounded-full transition-all duration-500 shadow-[0_0_8px_rgba(255,255,255,0.15)]`} style={{ width: `${(n / maxStatus) * 100}%` }} />
                 </div>
               </div>
             ))}
@@ -148,7 +159,7 @@ export default function DashboardPage() {
           ].map((item, i, arr) => (
             <div key={i} className="flex items-center">
               <div className="flex flex-col items-center flex-1">
-                <div className={`h-10 w-10 rounded-full ${item.color} flex items-center justify-center text-white text-xs font-bold`}>{item.step}</div>
+                <div className={`h-10 w-10 rounded-full ${item.color} flex items-center justify-center text-white text-xs font-bold ring-4 ring-white/[0.04] shadow-lg`}>{item.step}</div>
                 <p className="text-xs font-medium text-gray-600 mt-2 text-center whitespace-pre-line">{item.label}</p>
                 <p className="text-sm font-bold text-gray-900 mt-0.5">{item.value}</p>
               </div>

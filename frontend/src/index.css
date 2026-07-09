@@ -20,26 +20,31 @@
 @layer components {
   /* Placa de vidro — superfícies flutuantes (cards, painéis) */
   .glass {
-    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06] rounded-2xl;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    @apply backdrop-blur-xl border border-white/[0.06] rounded-2xl;
+    background-image: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
   }
   .glass-hover {
     @apply transition-all duration-300 ease-in-out;
   }
   .glass-hover:hover {
-    @apply bg-white/[0.05] border-white/[0.1];
+    @apply border-white/[0.12];
+    box-shadow: 0 14px 40px 0 rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
     transform: translateY(-2px);
   }
 
   /* Card legado (Dashboard e telas antigas) → vira vidro automaticamente */
   .card {
     @apply rounded-2xl transition-all duration-300 ease-in-out;
-    background-color: rgba(255, 255, 255, 0.03) !important;
+    background-image: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)) !important;
     border: 1px solid rgba(255, 255, 255, 0.06) !important;
     backdrop-filter: blur(20px);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
   }
-  .card:hover { border-color: rgba(255, 255, 255, 0.1) !important; }
+  .card:hover {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.44), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  }
 
   .btn-primary { @apply inline-flex items-center gap-2 px-3 py-2 bg-sky-600 text-white rounded-lg text-xs font-semibold hover:bg-sky-500 transition-all duration-300 disabled:opacity-50 shadow-lg shadow-sky-900/30 active:scale-[0.98]; }
   .btn-secondary { @apply inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-300 active:scale-[0.98]; }
@@ -64,6 +69,51 @@
 .animate-fade-in-up { animation: fadeInUp 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .animate-fade-in { animation: fadeIn 0.25s ease-out; }
+
+/* Pop-up com física: entra com escala + leve rotação de perspectiva + blur */
+@keyframes modalPop {
+  from { opacity: 0; transform: translateY(24px) scale(0.92); filter: blur(8px); }
+  60%  { filter: blur(0); }
+  to   { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.animate-modal { animation: modalPop 0.42s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Backdrop desfoca o mundo ao redor de forma progressiva */
+@keyframes backdropIn { from { opacity: 0; backdrop-filter: blur(0); } to { opacity: 1; backdrop-filter: blur(14px); } }
+.animate-backdrop { animation: backdropIn 0.3s ease-out forwards; }
+
+/* Aurora — blobs de fundo derivam lentamente, dando vida ao canvas */
+@keyframes auroraDrift {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(6%, 4%) scale(1.08); }
+  66%  { transform: translate(-4%, 6%) scale(0.96); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+.animate-aurora { animation: auroraDrift 22s ease-in-out infinite; }
+.animate-aurora-slow { animation: auroraDrift 30s ease-in-out infinite reverse; }
+
+/* Shimmer — skeleton de carregamento em vez de tela vazia */
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+.skeleton {
+  position: relative; overflow: hidden;
+  background: rgba(255,255,255,0.04); border-radius: 0.5rem;
+}
+.skeleton::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+  animation: shimmer 1.6s infinite;
+}
+
+/* Glow pulsante para indicadores "ao vivo" */
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 6px rgba(52,211,153,0.6); }
+  50%      { box-shadow: 0 0 14px rgba(52,211,153,0.95); }
+}
+.animate-pulse-glow { animation: pulseGlow 2.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-aurora, .animate-aurora-slow, .animate-pulse-glow, .skeleton::after { animation: none !important; }
+}
 
 /* ============================================================
    TEMA DARK GLOBAL — remapeia as telas legadas (claras) para o
@@ -105,3 +155,11 @@ input::placeholder, textarea::placeholder { color: #64748b; }
 
 /* Tabelas legadas: linhas respiram com hover de vidro */
 tbody tr { transition: background-color 0.2s ease-out; }
+tbody tr:hover { background-color: rgba(255, 255, 255, 0.025) !important; }
+
+/* Foco de input mais presente — anel sky sutil ao redor do vidro */
+.input:focus, input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.55) !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14) !important;
+}

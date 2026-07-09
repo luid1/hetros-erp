@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { CheckCircle, Printer, Download, X, ChevronRight, Search, AlertTriangle, TrendingDown } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
@@ -673,9 +674,9 @@ export default function AnaliseEstoqueFisico() {
       </div>
 
       {/* ── Modal "Processando..." ── */}
-      {processando && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white border-2 border-gray-400 rounded-lg shadow-xl p-6 w-80 text-center">
+      {processando && createPortal((
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] animate-backdrop">
+          <div className="bg-[#0E141F]/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] p-6 w-80 text-center animate-modal">
             <p className="text-xs text-gray-500">Análise de Estoque</p>
             <p className="text-sm text-gray-600 mt-1">Processando...</p>
             <p className="text-xl font-bold text-gray-900 mt-2">Aguarde...</p>
@@ -686,13 +687,13 @@ export default function AnaliseEstoqueFisico() {
             </button>
           </div>
         </div>
-      )}
+      ), document.body)}
 
       {/* ── Modal Detalhamento do Registro ── */}
-      {detalheAberto && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white border-2 border-gray-400 rounded-lg shadow-xl w-full max-w-5xl max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-300 bg-gray-100 shrink-0">
+      {detalheAberto && createPortal((
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4 animate-backdrop">
+          <div className="bg-[#0E141F]/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden animate-modal">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-white/[0.02] shrink-0">
               <span className="text-xs font-semibold text-gray-700">⊞ Detalhamento do Registro</span>
               <button onClick={() => setDetalheAberto(null)} className="text-gray-500 hover:text-gray-800">
                 <X className="h-4 w-4" />
@@ -778,7 +779,7 @@ export default function AnaliseEstoqueFisico() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }

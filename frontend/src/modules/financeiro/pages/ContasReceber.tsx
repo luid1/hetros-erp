@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowDownCircle, RefreshCw, Plus, X, CheckCircle2, Ban, Search,
   Wallet, Clock, AlertTriangle, CircleDollarSign,
@@ -210,10 +211,9 @@ function ModalBaixa({ conta, onClose, onDone }: { conta: Conta; onClose: () => v
     } finally { setSalvando(false); }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative w-full max-w-sm bg-[#0e1729] border border-slate-800 rounded-2xl shadow-2xl p-5" onClick={e => e.stopPropagation()}>
+  return createPortal((
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 animate-backdrop" onClick={onClose}>
+      <div className="relative w-full max-w-sm bg-[#0e1729]/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] p-5 animate-modal" onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between mb-4">
           <div>
             <h2 className="font-bold text-white">Baixar recebimento</h2>
@@ -237,7 +237,7 @@ function ModalBaixa({ conta, onClose, onDone }: { conta: Conta; onClose: () => v
         </button>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 function ModalNovo({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
@@ -264,10 +264,9 @@ function ModalNovo({ onClose, onDone }: { onClose: () => void; onDone: () => voi
     } finally { setSalvando(false); }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative w-full max-w-sm bg-[#0e1729] border border-slate-800 rounded-2xl shadow-2xl p-5" onClick={e => e.stopPropagation()}>
+  return createPortal((
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 animate-backdrop" onClick={onClose}>
+      <div className="relative w-full max-w-sm bg-[#0e1729]/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] p-5 animate-modal" onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between mb-4">
           <h2 className="font-bold text-white">Novo título a receber</h2>
           <button onClick={onClose} className="h-8 w-8 rounded-lg hover:bg-slate-800 text-slate-400 flex items-center justify-center"><X className="h-4 w-4" /></button>
@@ -297,7 +296,7 @@ function ModalNovo({ onClose, onDone }: { onClose: () => void; onDone: () => voi
         </button>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 const CORES: Record<string, string> = {

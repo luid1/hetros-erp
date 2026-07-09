@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   LayoutDashboard,
   Users,
@@ -948,10 +949,10 @@ function TagStatus({ status }: { status: StatusTitulo }) {
 }
 
 function DetalheTitulo({ titulo, onClose, onBaixar }: { titulo: Titulo; onClose: () => void; onBaixar: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-2xl flex flex-col animate-[slideL_.2s_ease-out]">
+  return createPortal((
+    <div className="fixed inset-0 z-[70]">
+      <div className="absolute inset-0 bg-slate-950/60 animate-backdrop" onClick={onClose} />
+      <div className="absolute right-0 top-0 h-full w-full max-w-md bg-[#0E141F]/90 backdrop-blur-2xl border-l border-white/10 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] flex flex-col animate-[slideL_.2s_ease-out]">
         <div className="border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
           <div>
             <p className="text-[11px] uppercase tracking-widest text-neutral-400 font-semibold">Detalhes do título</p>
@@ -994,7 +995,7 @@ function DetalheTitulo({ titulo, onClose, onBaixar }: { titulo: Titulo; onClose:
       </div>
       <style>{`@keyframes slideL { from { transform: translateX(100%); } to { transform: translateX(0); } }`}</style>
     </div>
-  );
+  ), document.body);
 }
 
 function LinhaDet({ termo, valor }: { termo: string; valor: string }) {

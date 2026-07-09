@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Truck,
   Sparkles,
@@ -990,10 +991,10 @@ function DriverDrawer({
     });
   }, [mapPronto, coords, stopsOrdenados]);
 
-  return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-full max-w-[46%] min-w-[420px] bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col animate-[slideIn_.2s_ease-out]">
+  return createPortal((
+    <div className="fixed inset-0 z-[70]">
+      <div className="absolute inset-0 bg-slate-950/70 animate-backdrop" onClick={onClose} />
+      <div className="absolute right-0 top-0 h-full w-full max-w-[46%] min-w-[420px] bg-slate-900/90 backdrop-blur-2xl border-l border-white/10 shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] flex flex-col animate-[slideIn_.2s_ease-out]">
         {/* A) Header */}
         <div className="shrink-0 border-b border-slate-700 px-6 py-4 flex items-start justify-between">
           <div className="min-w-0">
@@ -1202,7 +1203,7 @@ function DriverDrawer({
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 /* ────────────────────────── Mapa de Frotas (Live Tracking) ─────────────────── */
@@ -1487,9 +1488,9 @@ function MapaFrotas({ motoristas, onClose }: { motoristas: Motorista[]; onClose:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selecionado]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-6xl h-[82vh] rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden flex flex-col">
+  return createPortal((
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 animate-backdrop">
+      <div className="w-full max-w-6xl h-[82vh] rounded-2xl border border-white/10 bg-slate-900/90 backdrop-blur-2xl shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] overflow-hidden flex flex-col animate-modal">
         {/* Header do modal */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-700">
           <div className="flex items-center gap-2">
@@ -1635,7 +1636,7 @@ function MapaFrotas({ motoristas, onClose }: { motoristas: Motorista[]; onClose:
         </div>
       </div>
     </div>
-  );
+  ), document.body);
 }
 
 function MiniStat({ label, valor }: { label: string; valor: string }) {
