@@ -16,5 +16,7 @@ RUN npx prisma generate && npm run build
 
 EXPOSE 3002
 
-# Ao subir: sincroniza o schema no banco gerenciado (db push) e inicia
-CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/src/main"]
+# Ao subir: aplica migrations versionadas no banco gerenciado e inicia.
+# 1ª subida sobre um banco pré-existente (criado por db push): rode uma vez
+#   `npx prisma migrate resolve --applied 20260708000000_baseline` para baselinar.
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]

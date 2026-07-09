@@ -28,6 +28,21 @@ CREATE TYPE "OrigemProduto" AS ENUM ('NACIONAL_0', 'NACIONAL_3', 'NACIONAL_4', '
 -- CreateEnum
 CREATE TYPE "TipoAjusteInventario" AS ENUM ('DIFERENCA_CONTAGEM', 'PERDA_VALIDADE', 'AVARIA_FISICA', 'ROUBO_FURTO', 'QUEBRA_OPERACIONAL');
 
+-- CreateEnum
+CREATE TYPE "StatusOrdemCompra" AS ENUM ('PENDENTE', 'APROVADA', 'PARCIAL', 'ENTREGUE', 'CANCELADA');
+
+-- CreateEnum
+CREATE TYPE "InvoiceStatus" AS ENUM ('DRAFT', 'ISSUED', 'CANCELED', 'ERRONEOUS');
+
+-- CreateEnum
+CREATE TYPE "TaxType" AS ENUM ('ICMS', 'ISS', 'PIS', 'COFINS', 'IPI');
+
+-- CreateEnum
+CREATE TYPE "RouteStatus" AS ENUM ('PLANNED', 'DISPATCHED', 'COMPLETED', 'CANCELED');
+
+-- CreateEnum
+CREATE TYPE "RouteStopStatus" AS ENUM ('PENDING', 'IN_TRANSIT', 'DELIVERED', 'FAILED');
+
 -- CreateTable
 CREATE TABLE "Tenant" (
     "id" TEXT NOT NULL,
@@ -58,6 +73,12 @@ CREATE TABLE "Filial" (
     "ie" TEXT,
     "endereco" JSONB NOT NULL,
     "tipo" TEXT NOT NULL DEFAULT 'DEPOSITO',
+    "regimeTributario" TEXT NOT NULL DEFAULT 'SIMPLES_NACIONAL',
+    "crt" TEXT NOT NULL DEFAULT '1',
+    "responsavel" TEXT,
+    "capacidadePaletes" INTEGER,
+    "ocupacaoPaletes" INTEGER NOT NULL DEFAULT 0,
+    "camaraFria" BOOLEAN NOT NULL DEFAULT false,
     "ativo" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -70,6 +91,9 @@ CREATE TABLE "Role" (
     "tenantId" TEXT NOT NULL,
     "nome" TEXT NOT NULL,
     "descricao" TEXT,
+    "telas" TEXT[] DEFAULT ARRAY[]::TEXT[],
+    "telaInicial" TEXT,
+    "acoes" JSONB,
 
     CONSTRAINT "Role_pkey" PRIMARY KEY ("id")
 );
@@ -138,6 +162,7 @@ CREATE TABLE "Cliente" (
     "ativo" BOOLEAN NOT NULL DEFAULT true,
     "sintegraOk" BOOLEAN NOT NULL DEFAULT false,
     "sintegraAt" TIMESTAMP(3),
+    "exigeRastreabilidade" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -158,6 +183,11 @@ CREATE TABLE "Fornecedor" (
     "contatoJson" JSONB,
     "prazoEntrega" INTEGER NOT NULL DEFAULT 1,
     "observacoes" TEXT,
+    "inscricaoRural" TEXT,
+    "localizacaoPropriedade" TEXT,
+    "tipoParceria" TEXT NOT NULL DEFAULT 'COMPRA_DIRETA',
+    "pix" TEXT,
+    "dadosBancarios" JSONB,
     "ativo" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -176,6 +206,10 @@ CREATE TABLE "Transportadora" (
     "email" TEXT,
     "telefone" TEXT,
     "enderecoJson" JSONB NOT NULL,
+    "placaPrincipal" TEXT,
+    "tipoVeiculo" TEXT,
+    "regiaoAtuacao" TEXT,
+    "freteBaseKg" DECIMAL(10,4),
     "ativo" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -216,12 +250,17 @@ CREATE TABLE "Produto" (
     "grupo" TEXT,
     "subgrupo" TEXT,
     "marca" TEXT,
+    "classificacao" TEXT,
+    "tipoCaixaria" TEXT,
+    "pesoCaixaria" DECIMAL(10,3),
     "aliquotaIcms" DECIMAL(6,4) NOT NULL DEFAULT 0,
     "aliquotaPis" DECIMAL(6,4) NOT NULL DEFAULT 0,
     "aliquotaCofins" DECIMAL(6,4) NOT NULL DEFAULT 0,
     "cstIcms" TEXT,
     "cstPis" TEXT,
     "cstCofins" TEXT,
+    "tipoAliquotaReforma" TEXT NOT NULL DEFAULT 'PADRAO',
+    "confiancaIa" DECIMAL(5,2) NOT NULL DEFAULT 0,
     "requerLote" BOOLEAN NOT NULL DEFAULT false,
     "requerValidade" BOOLEAN NOT NULL DEFAULT false,
     "diasAlertaValidade" INTEGER NOT NULL DEFAULT 3,
@@ -232,6 +271,12 @@ CREATE TABLE "Produto" (
     "precoCusto" DECIMAL(12,4) NOT NULL DEFAULT 0,
     "precoVenda" DECIMAL(12,4) NOT NULL DEFAULT 0,
     "margemMinima" DECIMAL(5,2) NOT NULL DEFAULT 0,
+    "custoBase" DECIMAL(12,4) NOT NULL DEFAULT 0,
+    "custoAliquotaImp" DECIMAL(6,4) NOT NULL DEFAULT 0,
+    "custoEmbalagem" DECIMAL(12,4) NOT NULL DEFAULT 0,
+    "custoFrete" DECIMAL(12,4) NOT NULL DEFAULT 0,
+    "custoChapa" DECIMAL(12,4) NOT NULL DEFAULT 0,
+    "fatorPerdaPct" DECIMAL(5,2) NOT NULL DEFAULT 0,
     "estoqueMinimo" DECIMAL(12,4) NOT NULL DEFAULT 0,
     "estoqueMaximo" DECIMAL(12,4),
     "ativo" BOOLEAN NOT NULL DEFAULT true,
@@ -380,6 +425,42 @@ CREATE TABLE "ItemInventario" (
 );
 
 -- CreateTable
+CREATE TABLE "OrdemCompra" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "filialId" TEXT,
+    "fornecedorId" TEXT NOT NULL,
+    "numero" INTEGER NOT NULL,
+    "status" "StatusOrdemCompra" NOT NULL DEFAULT 'PENDENTE',
+    "condicaoPagamento" TEXT,
+    "dataEmissao" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "dataEntregaPrevista" TIMESTAMP(3),
+    "dataEntregaReal" TIMESTAMP(3),
+    "observacoes" TEXT,
+    "valorTotal" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "entradaId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "OrdemCompra_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ItemOrdemCompra" (
+    "id" TEXT NOT NULL,
+    "ordemId" TEXT NOT NULL,
+    "produtoId" TEXT,
+    "descricao" TEXT NOT NULL,
+    "unidade" TEXT NOT NULL DEFAULT 'KG',
+    "quantidade" DECIMAL(12,4) NOT NULL,
+    "quantidadeRecebida" DECIMAL(12,4) NOT NULL DEFAULT 0,
+    "precoUnitario" DECIMAL(12,4) NOT NULL,
+    "subtotal" DECIMAL(12,2) NOT NULL,
+
+    CONSTRAINT "ItemOrdemCompra_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Pedido" (
     "id" TEXT NOT NULL,
     "tenantId" TEXT NOT NULL,
@@ -391,12 +472,30 @@ CREATE TABLE "Pedido" (
     "tipo" TEXT NOT NULL DEFAULT 'VENDA',
     "status" "StatusPedido" NOT NULL DEFAULT 'RASCUNHO',
     "observacoes" TEXT,
+    "pedidoOrigemId" TEXT,
+    "motivoReposicao" TEXT,
     "subtotal" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "descontoTotal" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "valorFrete" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "valorTotal" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "valorIbs" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "valorCbs" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "chaveAcessoNfe" TEXT,
+    "numeroNfe" TEXT,
     "tipoFrete" TEXT,
     "transportadoraId" TEXT,
+    "formaPagamento" TEXT,
+    "condicaoPagamento" TEXT,
+    "numeroParcelas" INTEGER NOT NULL DEFAULT 1,
+    "periodo" TEXT,
+    "regiao" TEXT,
+    "pesoTotal" DECIMAL(12,3) NOT NULL DEFAULT 0,
+    "volumes" INTEGER NOT NULL DEFAULT 0,
+    "enderecoEntregaJson" JSONB,
+    "observacoesNf" TEXT,
+    "bloqueioCredito" BOOLEAN NOT NULL DEFAULT false,
+    "motivoBloqueio" TEXT,
+    "dataEmissao" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "dataEntrega" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -413,9 +512,14 @@ CREATE TABLE "ItemPedido" (
     "descricao" TEXT NOT NULL,
     "quantidade" DECIMAL(12,4) NOT NULL,
     "quantidadeSeparada" DECIMAL(12,4) NOT NULL DEFAULT 0,
+    "pesoAferido" DECIMAL(12,3),
+    "separado" BOOLEAN NOT NULL DEFAULT false,
+    "cortado" BOOLEAN NOT NULL DEFAULT false,
     "unidade" TEXT NOT NULL,
     "precoUnitario" DECIMAL(12,4) NOT NULL,
     "desconto" DECIMAL(12,4) NOT NULL DEFAULT 0,
+    "descontoTipo" TEXT NOT NULL DEFAULT 'VALOR',
+    "descontoPercent" DECIMAL(6,4) NOT NULL DEFAULT 0,
     "valorTotal" DECIMAL(12,2) NOT NULL,
     "cfop" TEXT,
     "cstIcms" TEXT,
@@ -424,6 +528,9 @@ CREATE TABLE "ItemPedido" (
     "valorIcms" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "valorPis" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "valorCofins" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "ncmAplicado" TEXT,
+    "ibsCalculado" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "cbsCalculado" DECIMAL(12,2) NOT NULL DEFAULT 0,
 
     CONSTRAINT "ItemPedido_pkey" PRIMARY KEY ("id")
 );
@@ -442,6 +549,10 @@ CREATE TABLE "NFe" (
     "chaveAcesso" TEXT,
     "protocolo" TEXT,
     "status" "StatusDFe" NOT NULL DEFAULT 'RASCUNHO',
+    "tipoOperacao" TEXT NOT NULL DEFAULT 'SAIDA',
+    "finalidade" TEXT NOT NULL DEFAULT '1',
+    "nfeReferenciadaId" TEXT,
+    "chaveReferenciada" TEXT,
     "naturezaOperacao" TEXT NOT NULL,
     "cfop" TEXT NOT NULL,
     "emitenteCnpj" TEXT NOT NULL,
@@ -453,6 +564,8 @@ CREATE TABLE "NFe" (
     "valorSeguro" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "valorDesconto" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "valorIcms" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "valorIcmsSt" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "valorIpi" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "valorPis" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "valorCofins" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "valorNfe" DECIMAL(12,2) NOT NULL,
@@ -517,6 +630,74 @@ CREATE TABLE "DuplicataNFe" (
 );
 
 -- CreateTable
+CREATE TABLE "CartaCorrecao" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "nfeId" TEXT NOT NULL,
+    "sequencia" INTEGER NOT NULL,
+    "correcao" TEXT NOT NULL,
+    "protocolo" TEXT,
+    "xml" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'REGISTRADO',
+    "dataEvento" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "usuarioId" TEXT,
+
+    CONSTRAINT "CartaCorrecao_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Cotacao" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "filialId" TEXT NOT NULL,
+    "produtoId" TEXT,
+    "codigo" TEXT NOT NULL,
+    "descricao" TEXT NOT NULL,
+    "unidade" TEXT,
+    "precoVenda" DECIMAL(12,4) NOT NULL,
+    "custoComposto" DECIMAL(12,4) NOT NULL DEFAULT 0,
+    "cobrir" BOOLEAN NOT NULL DEFAULT false,
+    "motivo" TEXT,
+    "usuarioId" TEXT,
+    "data" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Cotacao_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RegraFiscal" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "descricao" TEXT NOT NULL,
+    "ncm" TEXT,
+    "ufDestino" TEXT,
+    "tipoOperacao" TEXT NOT NULL DEFAULT 'VENDA',
+    "consumidorFinal" BOOLEAN,
+    "cfopInterno" TEXT NOT NULL DEFAULT '5102',
+    "cfopInterestadual" TEXT NOT NULL DEFAULT '6102',
+    "cstIcms" TEXT NOT NULL DEFAULT '102',
+    "origemProd" TEXT NOT NULL DEFAULT '0',
+    "aliquotaIcms" DECIMAL(6,4) NOT NULL DEFAULT 0,
+    "reducaoBaseIcms" DECIMAL(6,4) NOT NULL DEFAULT 0,
+    "temSt" BOOLEAN NOT NULL DEFAULT false,
+    "mvaSt" DECIMAL(6,4) NOT NULL DEFAULT 0,
+    "aliquotaIcmsSt" DECIMAL(6,4) NOT NULL DEFAULT 0,
+    "temDifal" BOOLEAN NOT NULL DEFAULT false,
+    "cstIpi" TEXT,
+    "aliquotaIpi" DECIMAL(6,4) NOT NULL DEFAULT 0,
+    "cstPis" TEXT NOT NULL DEFAULT '07',
+    "aliquotaPis" DECIMAL(6,4) NOT NULL DEFAULT 0,
+    "cstCofins" TEXT NOT NULL DEFAULT '07',
+    "aliquotaCofins" DECIMAL(6,4) NOT NULL DEFAULT 0,
+    "prioridade" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "RegraFiscal_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "CTe" (
     "id" TEXT NOT NULL,
     "tenantId" TEXT NOT NULL,
@@ -544,15 +725,19 @@ CREATE TABLE "CTe" (
 CREATE TABLE "Veiculo" (
     "id" TEXT NOT NULL,
     "tenantId" TEXT NOT NULL,
-    "transportadoraId" TEXT NOT NULL,
+    "transportadoraId" TEXT,
     "placa" TEXT NOT NULL,
-    "uf" TEXT NOT NULL,
+    "uf" TEXT NOT NULL DEFAULT 'SP',
     "tipo" TEXT NOT NULL,
     "marca" TEXT,
     "modelo" TEXT,
     "anoFabricacao" INTEGER,
     "capacidadeKg" DECIMAL(10,2),
     "capacidadeM3" DECIMAL(10,2),
+    "capacidadeCaixasH" INTEGER,
+    "propriedade" TEXT NOT NULL DEFAULT 'PROPRIO',
+    "motoristaPadrao" TEXT,
+    "refrigerado" BOOLEAN NOT NULL DEFAULT false,
     "ativo" BOOLEAN NOT NULL DEFAULT true,
 
     CONSTRAINT "Veiculo_pkey" PRIMARY KEY ("id")
@@ -573,6 +758,17 @@ CREATE TABLE "Romaneio" (
     "motorista" TEXT,
     "pesoTotalKg" DECIMAL(12,2),
     "observacoes" TEXT,
+    "codigoCondutor" TEXT,
+    "foneCondutor" TEXT,
+    "placaVeiculo" TEXT,
+    "modeloVeiculo" TEXT,
+    "tipoVeiculo" TEXT,
+    "refrigerado" BOOLEAN NOT NULL DEFAULT false,
+    "periodo" TEXT,
+    "dataMovimento" TIMESTAMP(3),
+    "dataEntrega" TIMESTAMP(3),
+    "autorizacaoCarga" TEXT,
+    "valorFrete" DECIMAL(12,2) NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Romaneio_pkey" PRIMARY KEY ("id")
@@ -676,6 +872,26 @@ CREATE TABLE "LancamentoFinanceiro" (
 );
 
 -- CreateTable
+CREATE TABLE "HistoricoFinanceiro" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "contaReceberId" TEXT,
+    "contaPagarId" TEXT,
+    "tipoConta" TEXT NOT NULL,
+    "acao" TEXT NOT NULL,
+    "statusAnterior" "StatusFinanceiro",
+    "statusNovo" "StatusFinanceiro" NOT NULL,
+    "valorMovimentado" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "valorPagoAcumulado" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "usuarioId" TEXT NOT NULL,
+    "usuarioNome" TEXT,
+    "observacoes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "HistoricoFinanceiro_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "AuditLog" (
     "id" TEXT NOT NULL,
     "tenantId" TEXT NOT NULL,
@@ -691,6 +907,106 @@ CREATE TABLE "AuditLog" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AuditLog_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "invoices" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "invoiceNumber" TEXT NOT NULL,
+    "series" TEXT NOT NULL,
+    "status" "InvoiceStatus" NOT NULL DEFAULT 'DRAFT',
+    "orderId" TEXT NOT NULL,
+    "customerId" TEXT NOT NULL,
+    "netValue" INTEGER NOT NULL,
+    "taxValue" INTEGER NOT NULL,
+    "grossValue" INTEGER NOT NULL,
+    "issuedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdById" TEXT NOT NULL,
+
+    CONSTRAINT "invoices_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "invoice_taxes" (
+    "id" TEXT NOT NULL,
+    "invoiceId" TEXT NOT NULL,
+    "type" "TaxType" NOT NULL,
+    "rate" INTEGER NOT NULL,
+    "value" INTEGER NOT NULL,
+
+    CONSTRAINT "invoice_taxes_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "invoice_audit_logs" (
+    "id" TEXT NOT NULL,
+    "invoiceId" TEXT NOT NULL,
+    "action" TEXT NOT NULL,
+    "oldStatus" "InvoiceStatus",
+    "newStatus" "InvoiceStatus" NOT NULL,
+    "userId" TEXT NOT NULL,
+    "changedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "message" TEXT,
+
+    CONSTRAINT "invoice_audit_logs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "routes" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "filialId" TEXT NOT NULL,
+    "motoristaId" TEXT,
+    "motoristaNome" TEXT,
+    "veiculoId" TEXT,
+    "placaVeiculo" TEXT,
+    "dataRota" TIMESTAMP(3) NOT NULL,
+    "status" "RouteStatus" NOT NULL DEFAULT 'PLANNED',
+    "capacidadeKg" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "pesoTotalKg" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "volumesTotal" INTEGER NOT NULL DEFAULT 0,
+    "regiao" TEXT,
+    "origemOtimizacao" TEXT NOT NULL DEFAULT 'MANUAL',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "routes_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "route_stops" (
+    "id" TEXT NOT NULL,
+    "routeId" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "pedidoId" TEXT NOT NULL,
+    "numeroPedido" INTEGER,
+    "clienteNome" TEXT,
+    "cep" TEXT,
+    "endereco" TEXT,
+    "ordem" INTEGER NOT NULL,
+    "janelaInicio" TIMESTAMP(3),
+    "janelaFim" TIMESTAMP(3),
+    "pesoKg" DECIMAL(12,2) NOT NULL DEFAULT 0,
+    "volumes" INTEGER NOT NULL DEFAULT 0,
+    "status" "RouteStopStatus" NOT NULL DEFAULT 'PENDING',
+    "latitude" DECIMAL(10,7),
+    "longitude" DECIMAL(10,7),
+    "dataHoraEntrega" TIMESTAMP(3),
+    "linkFoto" TEXT,
+    "stringAssinatura" TEXT,
+    "recebedorNome" TEXT,
+    "recebedorDoc" TEXT,
+    "motivoFalha" TEXT,
+    "sefazProtocolo" TEXT,
+    "sefazStatus" TEXT,
+    "sefazPayload" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "route_stops_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -808,6 +1124,24 @@ CREATE INDEX "Inventario_tenantId_filialId_idx" ON "Inventario"("tenantId", "fil
 CREATE INDEX "ItemInventario_inventarioId_idx" ON "ItemInventario"("inventarioId");
 
 -- CreateIndex
+CREATE INDEX "OrdemCompra_tenantId_idx" ON "OrdemCompra"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "OrdemCompra_tenantId_status_idx" ON "OrdemCompra"("tenantId", "status");
+
+-- CreateIndex
+CREATE INDEX "OrdemCompra_fornecedorId_idx" ON "OrdemCompra"("fornecedorId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "OrdemCompra_tenantId_numero_key" ON "OrdemCompra"("tenantId", "numero");
+
+-- CreateIndex
+CREATE INDEX "ItemOrdemCompra_ordemId_idx" ON "ItemOrdemCompra"("ordemId");
+
+-- CreateIndex
+CREATE INDEX "ItemOrdemCompra_produtoId_idx" ON "ItemOrdemCompra"("produtoId");
+
+-- CreateIndex
 CREATE INDEX "Pedido_tenantId_filialOrigemId_idx" ON "Pedido"("tenantId", "filialOrigemId");
 
 -- CreateIndex
@@ -845,6 +1179,27 @@ CREATE INDEX "ItemNFe_nfeId_idx" ON "ItemNFe"("nfeId");
 
 -- CreateIndex
 CREATE INDEX "DuplicataNFe_nfeId_idx" ON "DuplicataNFe"("nfeId");
+
+-- CreateIndex
+CREATE INDEX "CartaCorrecao_tenantId_idx" ON "CartaCorrecao"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "CartaCorrecao_nfeId_idx" ON "CartaCorrecao"("nfeId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CartaCorrecao_nfeId_sequencia_key" ON "CartaCorrecao"("nfeId", "sequencia");
+
+-- CreateIndex
+CREATE INDEX "Cotacao_tenantId_filialId_data_idx" ON "Cotacao"("tenantId", "filialId", "data");
+
+-- CreateIndex
+CREATE INDEX "Cotacao_tenantId_produtoId_idx" ON "Cotacao"("tenantId", "produtoId");
+
+-- CreateIndex
+CREATE INDEX "RegraFiscal_tenantId_idx" ON "RegraFiscal"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "RegraFiscal_tenantId_ncm_idx" ON "RegraFiscal"("tenantId", "ncm");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "CTe_chaveAcesso_key" ON "CTe"("chaveAcesso");
@@ -901,6 +1256,18 @@ CREATE INDEX "LancamentoFinanceiro_tenantId_filialId_dataCompetencia_idx" ON "La
 CREATE INDEX "LancamentoFinanceiro_tenantId_tipo_idx" ON "LancamentoFinanceiro"("tenantId", "tipo");
 
 -- CreateIndex
+CREATE INDEX "HistoricoFinanceiro_tenantId_tipoConta_createdAt_idx" ON "HistoricoFinanceiro"("tenantId", "tipoConta", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "HistoricoFinanceiro_contaReceberId_idx" ON "HistoricoFinanceiro"("contaReceberId");
+
+-- CreateIndex
+CREATE INDEX "HistoricoFinanceiro_contaPagarId_idx" ON "HistoricoFinanceiro"("contaPagarId");
+
+-- CreateIndex
+CREATE INDEX "HistoricoFinanceiro_tenantId_usuarioId_idx" ON "HistoricoFinanceiro"("tenantId", "usuarioId");
+
+-- CreateIndex
 CREATE INDEX "AuditLog_tenantId_modulo_createdAt_idx" ON "AuditLog"("tenantId", "modulo", "createdAt");
 
 -- CreateIndex
@@ -908,6 +1275,39 @@ CREATE INDEX "AuditLog_tenantId_usuarioId_idx" ON "AuditLog"("tenantId", "usuari
 
 -- CreateIndex
 CREATE INDEX "AuditLog_entidade_entidadeId_idx" ON "AuditLog"("entidade", "entidadeId");
+
+-- CreateIndex
+CREATE INDEX "invoices_tenantId_status_idx" ON "invoices"("tenantId", "status");
+
+-- CreateIndex
+CREATE INDEX "invoices_tenantId_orderId_idx" ON "invoices"("tenantId", "orderId");
+
+-- CreateIndex
+CREATE INDEX "invoices_tenantId_customerId_idx" ON "invoices"("tenantId", "customerId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "invoices_tenantId_invoiceNumber_key" ON "invoices"("tenantId", "invoiceNumber");
+
+-- CreateIndex
+CREATE INDEX "invoice_taxes_invoiceId_idx" ON "invoice_taxes"("invoiceId");
+
+-- CreateIndex
+CREATE INDEX "invoice_audit_logs_invoiceId_changedAt_idx" ON "invoice_audit_logs"("invoiceId", "changedAt");
+
+-- CreateIndex
+CREATE INDEX "routes_tenantId_filialId_dataRota_idx" ON "routes"("tenantId", "filialId", "dataRota");
+
+-- CreateIndex
+CREATE INDEX "routes_tenantId_motoristaId_status_idx" ON "routes"("tenantId", "motoristaId", "status");
+
+-- CreateIndex
+CREATE INDEX "route_stops_tenantId_pedidoId_idx" ON "route_stops"("tenantId", "pedidoId");
+
+-- CreateIndex
+CREATE INDEX "route_stops_routeId_ordem_idx" ON "route_stops"("routeId", "ordem");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "route_stops_routeId_pedidoId_key" ON "route_stops"("routeId", "pedidoId");
 
 -- AddForeignKey
 ALTER TABLE "Filial" ADD CONSTRAINT "Filial_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1012,6 +1412,15 @@ ALTER TABLE "ItemInventario" ADD CONSTRAINT "ItemInventario_inventarioId_fkey" F
 ALTER TABLE "ItemInventario" ADD CONSTRAINT "ItemInventario_produtoId_fkey" FOREIGN KEY ("produtoId") REFERENCES "Produto"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "OrdemCompra" ADD CONSTRAINT "OrdemCompra_fornecedorId_fkey" FOREIGN KEY ("fornecedorId") REFERENCES "Fornecedor"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ItemOrdemCompra" ADD CONSTRAINT "ItemOrdemCompra_ordemId_fkey" FOREIGN KEY ("ordemId") REFERENCES "OrdemCompra"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ItemOrdemCompra" ADD CONSTRAINT "ItemOrdemCompra_produtoId_fkey" FOREIGN KEY ("produtoId") REFERENCES "Produto"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Pedido" ADD CONSTRAINT "Pedido_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1025,6 +1434,9 @@ ALTER TABLE "Pedido" ADD CONSTRAINT "Pedido_clienteId_fkey" FOREIGN KEY ("client
 
 -- AddForeignKey
 ALTER TABLE "Pedido" ADD CONSTRAINT "Pedido_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Pedido" ADD CONSTRAINT "Pedido_pedidoOrigemId_fkey" FOREIGN KEY ("pedidoOrigemId") REFERENCES "Pedido"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ItemPedido" ADD CONSTRAINT "ItemPedido_pedidoId_fkey" FOREIGN KEY ("pedidoId") REFERENCES "Pedido"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1045,6 +1457,9 @@ ALTER TABLE "NFe" ADD CONSTRAINT "NFe_clienteId_fkey" FOREIGN KEY ("clienteId") 
 ALTER TABLE "NFe" ADD CONSTRAINT "NFe_pedidoId_fkey" FOREIGN KEY ("pedidoId") REFERENCES "Pedido"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "NFe" ADD CONSTRAINT "NFe_nfeReferenciadaId_fkey" FOREIGN KEY ("nfeReferenciadaId") REFERENCES "NFe"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "ItemNFe" ADD CONSTRAINT "ItemNFe_nfeId_fkey" FOREIGN KEY ("nfeId") REFERENCES "NFe"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1054,10 +1469,13 @@ ALTER TABLE "ItemNFe" ADD CONSTRAINT "ItemNFe_produtoId_fkey" FOREIGN KEY ("prod
 ALTER TABLE "DuplicataNFe" ADD CONSTRAINT "DuplicataNFe_nfeId_fkey" FOREIGN KEY ("nfeId") REFERENCES "NFe"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "CartaCorrecao" ADD CONSTRAINT "CartaCorrecao_nfeId_fkey" FOREIGN KEY ("nfeId") REFERENCES "NFe"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "CTe" ADD CONSTRAINT "CTe_transportadoraId_fkey" FOREIGN KEY ("transportadoraId") REFERENCES "Transportadora"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Veiculo" ADD CONSTRAINT "Veiculo_transportadoraId_fkey" FOREIGN KEY ("transportadoraId") REFERENCES "Transportadora"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Veiculo" ADD CONSTRAINT "Veiculo_transportadoraId_fkey" FOREIGN KEY ("transportadoraId") REFERENCES "Transportadora"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Romaneio" ADD CONSTRAINT "Romaneio_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -1105,7 +1523,26 @@ ALTER TABLE "LancamentoFinanceiro" ADD CONSTRAINT "LancamentoFinanceiro_contaRec
 ALTER TABLE "LancamentoFinanceiro" ADD CONSTRAINT "LancamentoFinanceiro_contaPagarId_fkey" FOREIGN KEY ("contaPagarId") REFERENCES "ContaPagar"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "HistoricoFinanceiro" ADD CONSTRAINT "HistoricoFinanceiro_contaReceberId_fkey" FOREIGN KEY ("contaReceberId") REFERENCES "ContaReceber"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "HistoricoFinanceiro" ADD CONSTRAINT "HistoricoFinanceiro_contaPagarId_fkey" FOREIGN KEY ("contaPagarId") REFERENCES "ContaPagar"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "invoices" ADD CONSTRAINT "invoices_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "invoice_taxes" ADD CONSTRAINT "invoice_taxes_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "invoices"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "invoice_audit_logs" ADD CONSTRAINT "invoice_audit_logs_invoiceId_fkey" FOREIGN KEY ("invoiceId") REFERENCES "invoices"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "route_stops" ADD CONSTRAINT "route_stops_routeId_fkey" FOREIGN KEY ("routeId") REFERENCES "routes"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

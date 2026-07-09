@@ -20,6 +20,25 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-08] — Deploy: migrations versionadas (`migrate deploy`) no lugar de `db push`
+
+### O que mudou
+
+- O deploy passava `prisma db push` a cada subida — sincroniza o schema **sem histórico** e pode **apagar coluna/tabela** silenciosamente em produção. Trocado por `prisma migrate deploy`, que aplica **migrations versionadas** de forma previsível e auditável.
+- Como o schema vinha evoluindo só por `db push` (sem histórico de migration em nenhum ambiente), as duas migrations antigas parciais/inconsistentes (`20260626194636_init`, `add_carga_fields` sem timestamp) foram **substituídas por um baseline único** (`20260708000000_baseline`) gerado da schema atual — 1548 linhas cobrindo todo o modelo.
+- Baseline **marcado como aplicado** no banco de dev (que já tinha o schema via `db push`); `prisma migrate status` → *"Database schema is up to date!"* e drift DB×schema vazio.
+- Novo script `db:baseline` para **baselinar bancos pré-existentes** (criados por `db push`) numa única vez, antes do primeiro `migrate deploy`.
+
+> ⚠️ Operacional: num banco que já existia via `db push`, rode **uma vez** `npm run db:baseline` (ou `npx prisma migrate resolve --applied 20260708000000_baseline`) antes do primeiro deploy — senão o `migrate deploy` tenta recriar tabelas já existentes. Bancos novos aplicam o baseline direto.
+
+### Arquivos modificados
+- `backend/package.json` — `start:deploy` usa `migrate deploy`; novo script `db:baseline`
+- `backend/Dockerfile` — `CMD` usa `migrate deploy` (nota de baseline)
+- `backend/prisma/migrations/20260708000000_baseline/migration.sql` — **novo** baseline
+- `backend/prisma/migrations/{20260626194636_init,add_carga_fields}` — **removidas** (substituídas pelo baseline)
+
+---
+
 ## [2026-07-08] — Segurança & validação: rate limiting, JWT/CORS endurecidos, DTOs de validação
 
 ### O que mudou
