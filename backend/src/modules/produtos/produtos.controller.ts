@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Query, Param, Body } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ProdutosService } from './produtos.service';
+import { CreateProdutoDto, UpdateProdutoDto } from './dto/produto.dto';
 import { CurrentTenant, Modulo } from '../../common/decorators/context.decorator';
 
 @ApiTags('Produtos')
@@ -39,13 +40,13 @@ export class ProdutosController {
 
   @Post()
   @ApiOperation({ summary: 'Cadastra um novo produto (FLV)' })
-  create(@CurrentTenant() tenantId: string, @Body() dto: any) {
+  create(@CurrentTenant() tenantId: string, @Body() dto: CreateProdutoDto) {
     return this.service.create(tenantId, dto);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Editar produto (peso unitário, preço, etc.)' })
-  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: UpdateProdutoDto) {
     return this.service.update(tenantId, id, dto);
   }
 

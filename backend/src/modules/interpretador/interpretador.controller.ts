@@ -1,4 +1,5 @@
 import { Controller, Post, Body } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { InterpretadorService } from './interpretador.service';
 import { CurrentTenant, Modulo } from '../../common/decorators/context.decorator';
@@ -10,6 +11,8 @@ import { CurrentTenant, Modulo } from '../../common/decorators/context.decorator
 export class InterpretadorController {
   constructor(private service: InterpretadorService) {}
 
+  // IA custa por chamada: no máximo 20 interpretações por minuto por IP.
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('interpretar-whatsapp')
   @ApiOperation({
     summary: 'Interpreta um texto bruto de pedido (WhatsApp) e devolve os itens casados com o cadastro de produtos',

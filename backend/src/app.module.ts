@@ -1,6 +1,7 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -35,12 +36,16 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { getJwtSecret } from './common/config/jwt-secret';
 import { HealthController } from './health.controller';
 
 @Module({
   imports: [
     EventEmitterModule.forRoot({ wildcard: true, delimiter: '.' }),
-    JwtModule.register({ secret: process.env.JWT_SECRET || 'secret', global: true }),
+    // Rate limiting global: 120 req/min por IP (protege contra abuso/brute-force).
+    // Endpoints sensíveis (login, IA) têm limites mais rígidos via @Throttle.
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
+    JwtModule.register({ secret: getJwtSecret(), global: true }),
     PrismaModule,
     AuthModule,
     FiliaisModule,
@@ -74,6 +79,7 @@ import { HealthController } from './health.controller';
   ],
   controllers: [HealthController],
   providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },

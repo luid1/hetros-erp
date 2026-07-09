@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/co
 import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { EstoqueService } from './estoque.service';
 import { CurrentTenant, CurrentUser, Modulo } from '../../common/decorators/context.decorator';
+import { AjusteEstoqueDto, TransferenciaEstoqueDto } from './dto/estoque.dto';
 
 @ApiTags('Estoque/WMS')
 @ApiBearerAuth()
@@ -98,13 +99,13 @@ export class EstoqueController {
 
   @Post('ajuste')
   @ApiOperation({ summary: 'Ajuste manual de estoque (perda, avaria, inventário)' })
-  ajuste(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Body() body: any) {
+  ajuste(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Body() body: AjusteEstoqueDto) {
     return this.service.movimentar(tenantId, { ...body, usuarioId: user.id });
   }
 
   @Post('transferencia')
   @ApiOperation({ summary: 'Transferência entre filiais/boxes' })
-  transferir(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Body() body: any) {
+  transferir(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Body() body: TransferenciaEstoqueDto) {
     return this.service.transferir(tenantId, { ...body, usuarioId: user.id });
   }
 }

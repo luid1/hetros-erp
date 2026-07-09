@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ClientesService } from './clientes.service';
+import { CreateClienteDto, UpdateClienteDto } from './dto/cliente.dto';
 import { CurrentTenant, Modulo } from '../../common/decorators/context.decorator';
 
 @ApiTags('Clientes')
@@ -12,7 +13,7 @@ export class ClientesController {
 
   @Post()
   @ApiOperation({ summary: 'Cadastrar cliente' })
-  create(@CurrentTenant() tenantId: string, @Body() dto: any) {
+  create(@CurrentTenant() tenantId: string, @Body() dto: CreateClienteDto) {
     return this.service.create(tenantId, dto);
   }
 
@@ -28,7 +29,7 @@ export class ClientesController {
   }
 
   @Put(':id')
-  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: UpdateClienteDto) {
     return this.service.update(tenantId, id, dto);
   }
 

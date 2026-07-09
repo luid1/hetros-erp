@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Patch, Body, Param, Query } from '@nestjs/c
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { PedidosService } from './pedidos.service';
 import { CurrentTenant, CurrentUser, Modulo } from '../../common/decorators/context.decorator';
+import { CreatePedidoDto, UpdatePedidoDto, ReposicaoDto, SepararItemDto, UpdateStatusDto } from './dto/pedido.dto';
 
 @ApiTags('Pedidos')
 @ApiBearerAuth()
@@ -12,8 +13,8 @@ export class PedidosController {
 
   @Post()
   @ApiOperation({ summary: 'Criar pedido de venda' })
-  create(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Body() dto: any) {
-    return this.service.create(tenantId, { ...dto, usuarioId: user.id });
+  create(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Body() dto: CreatePedidoDto) {
+    return this.service.create(tenantId, { ...dto, usuarioId: user.id } as any);
   }
 
   @Get()
@@ -37,8 +38,8 @@ export class PedidosController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Editar pedido (rascunho)' })
-  update(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string, @Body() dto: any) {
-    return this.service.update(tenantId, id, { ...dto, usuarioId: user.id });
+  update(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string, @Body() dto: UpdatePedidoDto) {
+    return this.service.update(tenantId, id, { ...dto, usuarioId: user.id } as any);
   }
 
   @Patch(':id/confirmar')
@@ -49,7 +50,7 @@ export class PedidosController {
 
   @Post(':id/reposicao')
   @ApiOperation({ summary: 'Gera uma reposição (grátis) a partir deste pedido' })
-  reposicao(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string, @Body() dto: any) {
+  reposicao(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string, @Body() dto: ReposicaoDto) {
     return this.service.criarReposicao(tenantId, user.id, id, dto);
   }
 
@@ -66,8 +67,8 @@ export class PedidosController {
   }
 
   @Patch(':id/status')
-  updateStatus(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body('status') status: string) {
-    return this.service.updateStatus(tenantId, id, status);
+  updateStatus(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: UpdateStatusDto) {
+    return this.service.updateStatus(tenantId, id, dto.status);
   }
 
   @Patch(':id/itens/:itemId/separacao')
@@ -76,7 +77,7 @@ export class PedidosController {
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
     @Param('itemId') itemId: string,
-    @Body() dto: { pesoAferido?: number; quantidadeSeparada?: number; separado?: boolean; cortado?: boolean },
+    @Body() dto: SepararItemDto,
   ) {
     return this.service.separarItem(tenantId, id, itemId, dto);
   }

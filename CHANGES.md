@@ -20,6 +20,51 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-08] — Segurança & validação: rate limiting, JWT/CORS endurecidos, DTOs de validação
+
+### O que mudou
+
+**Rate limiting (anti-brute-force / anti-abuso)**
+- Adicionado `@nestjs/throttler` como guard global: **120 req/min por IP** por padrão.
+- **Login** limitado a **5 tentativas/min por IP** (`/auth/login` e `/auth/login-por-id`) — trava ataques de força bruta.
+- **Interpretador de IA** limitado a **20 req/min por IP** (`/pedidos/interpretar-whatsapp`) — protege contra abuso e custo de chamadas pagas.
+
+**Segredo JWT sem fallback inseguro**
+- Removido o `process.env.JWT_SECRET || 'secret'` (o app podia subir com segredo `'secret'`).
+- Novo helper `getJwtSecret()`: em **produção** exige uma `JWT_SECRET` forte (não sobe sem ela / bloqueia valores de exemplo); em dev usa fallback com aviso.
+
+**CORS fail-safe em produção**
+- Sem `FRONTEND_URL` em produção, o CORS agora **bloqueia** origens cruzadas (antes liberava qualquer origem). Dev continua liberado.
+
+**DTOs de validação (`class-validator`) — o `ValidationPipe` global agora valida de verdade**
+- Antes os controllers recebiam `dto: any` e o pipe não tinha o que validar. Criados DTOs com whitelist + `forbidNonWhitelisted` (rejeita campos desconhecidos) nos módulos:
+  - **auth** — `LoginDto`, `LoginPorIdDto`, `RegisterTenantDto`.
+  - **produtos** — `CreateProdutoDto`, `UpdateProdutoDto`.
+  - **clientes** — `CreateClienteDto`, `UpdateClienteDto`.
+  - **fornecedores** — `CreateFornecedorDto`, `UpdateFornecedorDto`.
+  - **pedidos** — `CreatePedidoDto`/`UpdatePedidoDto` (com itens aninhados validados via `ItemPedidoDto` + `@ValidateNested`), `ReposicaoDto`, `SepararItemDto`, `UpdateStatusDto`.
+  - **estoque** — `AjusteEstoqueDto` (movimentação/ajuste, com `tipo` validado pelo enum `TipoMovimentacao`), `TransferenciaEstoqueDto`.
+- Base `TenantAwareDto`: permite o `tenantId` que o `TenantInterceptor` injeta no body (interceptors rodam antes do pipe), sem abrir mão do bloqueio de campos desconhecidos.
+- Testado: payload válido `201`/`200`, campo obrigatório faltando ou campo desconhecido → `400`.
+
+> Próximos passos planejados: estender DTOs aos módulos restantes, trocar `prisma db push` por `migrate deploy` no deploy, e completar o RBAC (`@RequirePermissao`) nos módulos que só exigem JWT.
+
+### Arquivos modificados
+- `backend/package.json` — dependência `@nestjs/throttler`
+- `backend/src/app.module.ts` — ThrottlerModule/Guard + `getJwtSecret()`
+- `backend/src/main.ts` — CORS fail-safe
+- `backend/src/common/config/jwt-secret.ts` — **novo** helper de segredo JWT
+- `backend/src/common/dto/tenant-aware.dto.ts` — **novo** DTO base multi-tenant
+- `backend/src/modules/auth/auth.controller.ts` + `dto/auth.dto.ts` (**novo**)
+- `backend/src/modules/interpretador/interpretador.controller.ts` — throttle na IA
+- `backend/src/modules/produtos/produtos.controller.ts` + `dto/produto.dto.ts` (**novo**)
+- `backend/src/modules/clientes/clientes.controller.ts` + `dto/cliente.dto.ts` (**novo**)
+- `backend/src/modules/fornecedores/fornecedores.controller.ts` + `dto/fornecedor.dto.ts` (**novo**)
+- `backend/src/modules/pedidos/pedidos.controller.ts` + `dto/pedido.dto.ts` (**novo**)
+- `backend/src/modules/estoque/estoque.controller.ts` + `dto/estoque.dto.ts` (**novo**)
+
+---
+
 ## [2026-07-08] — Reposição, impressos fiéis, fluxo despacho→separação, Gestão Fiscal unificada, módulos IA/Reforma
 
 ### O que mudou

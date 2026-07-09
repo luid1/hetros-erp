@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { FornecedoresService } from './fornecedores.service';
+import { CreateFornecedorDto, UpdateFornecedorDto } from './dto/fornecedor.dto';
 import { CurrentTenant } from '../../common/decorators/context.decorator';
 
 @ApiTags('Fornecedores')
@@ -10,7 +11,7 @@ export class FornecedoresController {
   constructor(private service: FornecedoresService) {}
 
   @Post()
-  create(@CurrentTenant() tenantId: string, @Body() dto: any) {
+  create(@CurrentTenant() tenantId: string, @Body() dto: CreateFornecedorDto) {
     return this.service.create(tenantId, dto);
   }
 
@@ -25,7 +26,7 @@ export class FornecedoresController {
   }
 
   @Put(':id')
-  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: UpdateFornecedorDto) {
     return this.service.update(tenantId, id, dto);
   }
 

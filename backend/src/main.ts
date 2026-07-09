@@ -8,8 +8,21 @@ import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
-  // CORS: se FRONTEND_URL definido, restringe (aceita lista separada por vírgula); senão libera (app nativo + demo)
-  app.enableCors({ origin: process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : true });
+  // CORS:
+  // - FRONTEND_URL definido  -> restringe à lista (separada por vírgula). Recomendado em produção.
+  // - Sem FRONTEND_URL em DEV -> libera (facilita app nativo + testes locais).
+  // - Sem FRONTEND_URL em PROD -> bloqueia origens cruzadas (fail-safe) e avisa no log.
+  const isProd = process.env.NODE_ENV === 'production';
+  let corsOrigin: string[] | boolean;
+  if (process.env.FRONTEND_URL) {
+    corsOrigin = process.env.FRONTEND_URL.split(',').map((o) => o.trim());
+  } else if (isProd) {
+    console.warn('⚠️  FRONTEND_URL não definido em produção — CORS bloqueado por segurança. Defina FRONTEND_URL.');
+    corsOrigin = false;
+  } else {
+    corsOrigin = true;
+  }
+  app.enableCors({ origin: corsOrigin, credentials: true });
 
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
