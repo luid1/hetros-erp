@@ -198,21 +198,27 @@ export class ComprasService {
       await this.prisma.itemOrdemCompra.update({ where: { id: item.id }, data: { quantidadeRecebida: item.quantidade } });
     }
 
-    // 2. Contas a pagar
-    await this.prisma.contaPagar.create({
-      data: {
-        tenantId, filialId: oc.filialId, fornecedorId: oc.fornecedorId,
-        descricao: `Compra — OC #${oc.numero}`,
-        valorOriginal: oc.valorTotal,
-        dataVencimento: this.vencimentoPorCondicao(oc.condicaoPagamento),
-        status: 'ABERTO',
-      },
-    });
+    // 2 + 3. Contas a Pagar e status ENTREGUE numa única transação — não pode
+    // existir título sem a OC virar ENTREGUE (nem o contrário).
+    // OBS: a entrada no estoque (passo 1) usa a transação interna do `movimentar`;
+    // tornar o estoque atômico junto exige `movimentar` aceitar um `tx` externo
+    // (tracked como P1-1 — refatoração do núcleo WMS).
+    const [, atualizado] = await this.prisma.$transaction([
+      this.prisma.contaPagar.create({
+        data: {
+          tenantId, filialId: oc.filialId, fornecedorId: oc.fornecedorId,
+          descricao: `Compra — OC #${oc.numero}`,
+          valorOriginal: oc.valorTotal,
+          dataVencimento: this.vencimentoPorCondicao(oc.condicaoPagamento),
+          status: 'ABERTO',
+        },
+      }),
+      this.prisma.ordemCompra.update({
+        where: { id }, data: { status: StatusOrdemCompra.ENTREGUE, dataEntregaReal: new Date() },
+      }),
+    ]);
 
-    // 3. Marca entregue
-    return this.prisma.ordemCompra.update({
-      where: { id }, data: { status: StatusOrdemCompra.ENTREGUE, dataEntregaReal: new Date() },
-    });
+    return atualizado;
   }
 
   /** Converte a condição de pagamento num vencimento simples (à vista = hoje). */

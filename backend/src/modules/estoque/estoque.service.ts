@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
-import { TipoMovimentacao } from '@prisma/client';
+import { Prisma, TipoMovimentacao } from '@prisma/client';
 
 export interface MovimentarEstoqueDto {
   filialId: string;
@@ -288,6 +288,41 @@ export class EstoqueService {
         data: {
           quantidadeReservada: Number(saldo.quantidadeReservada) + item.quantidade,
           quantidadeDisponivel: Number(saldo.quantidadeDisponivel) - item.quantidade,
+        },
+      });
+    }
+  }
+
+  /**
+   * LIBERA a reserva feita para um pedido — inverso de `reservar`/`confirmar`.
+   *
+   * Deve ser chamado quando a reserva deixa de fazer sentido:
+   *  - no FATURAMENTO (a mercadoria saiu de fato — o físico já foi baixado);
+   *  - no CANCELAMENTO do pedido (a reserva simplesmente some).
+   *
+   * Sem isso, `quantidadeReservada` só crescia e o "disponível" ficava errado
+   * para sempre. Idempotente: nunca deixa a reserva negativa. Opcionalmente
+   * recebe uma transação (`tx`) para participar de uma operação atômica maior.
+   */
+  async liberarReserva(
+    tenantId: string,
+    filialId: string,
+    itens: { produtoId: string; loteId?: string | null; quantidade: number }[],
+    tx?: Prisma.TransactionClient,
+  ) {
+    const db = (tx ?? this.prisma) as any;
+    for (const item of itens) {
+      if (!item.produtoId || !(Number(item.quantidade) > 0)) continue;
+      const saldo = await db.estoqueSaldo.findFirst({
+        where: { tenantId, filialId, produtoId: item.produtoId, loteId: item.loteId ?? null },
+      });
+      if (!saldo) continue;
+      const novaReservada = Math.max(0, Number(saldo.quantidadeReservada) - Number(item.quantidade));
+      await db.estoqueSaldo.update({
+        where: { id: saldo.id },
+        data: {
+          quantidadeReservada: novaReservada,
+          quantidadeDisponivel: Number(saldo.quantidade) - novaReservada,
         },
       });
     }

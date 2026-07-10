@@ -36,6 +36,8 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module';
 import { TenantInterceptor } from './common/interceptors/tenant.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { PermissoesGuard } from './common/guards/permissoes.guard';
+import { FilialGuard } from './common/guards/filial.guard';
 import { getJwtSecret } from './common/config/jwt-secret';
 import { HealthController } from './health.controller';
 
@@ -81,6 +83,13 @@ import { HealthController } from './health.controller';
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // RBAC global: roda depois do JwtAuthGuard (que popula req.user). Rotas sem
+    // @RequirePermissao passam direto; as com decorator agora são SEMPRE checadas
+    // — antes o guard só valia em controllers que o declaravam localmente.
+    { provide: APP_GUARD, useClass: PermissoesGuard },
+    // Isolamento entre filiais/boxes da mesma empresa: valida qualquer filialId
+    // recebido contra as filiais do usuário. ADMIN passa.
+    { provide: APP_GUARD, useClass: FilialGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantInterceptor },
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],

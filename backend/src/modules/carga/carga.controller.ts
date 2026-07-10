@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Body, Query, Param } from '@nestj
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CargaService } from './carga.service';
 import { CurrentTenant, Modulo } from '../../common/decorators/context.decorator';
+import { RequirePermissao } from '../../common/decorators/permissoes.decorator';
 
 @ApiTags('Controle de Carga')
 @ApiBearerAuth()
@@ -49,6 +50,7 @@ export class CargaController {
   }
 
   @Post('romaneio')
+  @RequirePermissao('PEDIDOS:CREATE')
   @ApiOperation({ summary: 'Cria uma rota (Romaneio) com motorista/veículo e os pedidos selecionados' })
   criarRomaneio(@CurrentTenant() tenantId: string, @Body() body: any) {
     return this.service.criarRomaneio(tenantId, body);
@@ -65,6 +67,7 @@ export class CargaController {
   }
 
   @Patch('romaneio/:id/frete')
+  @RequirePermissao('PEDIDOS:UPDATE')
   @ApiOperation({ summary: 'Lança o valor do frete de uma rota' })
   setFrete(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() body: { valorFrete: number }) {
     return this.service.setFrete(tenantId, id, body.valorFrete);
@@ -77,6 +80,7 @@ export class CargaController {
   }
 
   @Delete('romaneio/:id')
+  @RequirePermissao('PEDIDOS:DELETE')
   @ApiOperation({ summary: 'Exclui a rota (desfaz roteirização)' })
   excluirRomaneio(@CurrentTenant() tenantId: string, @Param('id') id: string) {
     return this.service.excluirRomaneio(tenantId, id);

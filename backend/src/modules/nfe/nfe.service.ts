@@ -272,8 +272,21 @@ export class NFeService {
         });
       }
 
-      // 3. Pedido → FATURADO
+      // 3. Libera a reserva do pedido (a mercadoria saiu de fato) + marca FATURADO.
       if (payload.pedidoId) {
+        const ped = await this.prisma.pedido.findFirst({
+          where: { id: payload.pedidoId },
+          include: { itens: { select: { produtoId: true, quantidade: true } } },
+        });
+        if (ped) {
+          await this.estoque.liberarReserva(
+            payload.tenantId,
+            ped.filialOrigemId,
+            ped.itens
+              .filter((i) => !!i.produtoId)
+              .map((i) => ({ produtoId: i.produtoId as string, quantidade: Number(i.quantidade) })),
+          );
+        }
         await this.prisma.pedido.update({ where: { id: payload.pedidoId }, data: { status: 'FATURADO' } });
       }
 

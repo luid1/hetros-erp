@@ -441,6 +441,12 @@ export class PedidosService {
   async confirmar(tenantId: string, id: string) {
     const pedido = await this.findOne(tenantId, id);
 
+    // Idempotência: só um RASCUNHO pode ser confirmado. Sem isto, confirmar 2×
+    // reservava o estoque em dobro.
+    if (pedido.status !== 'RASCUNHO') {
+      throw new BadRequestException(`Pedido com status ${pedido.status} já foi confirmado (ou não é rascunho).`);
+    }
+
     if (pedido.bloqueioCredito) {
       throw new BadRequestException(
         `Pedido bloqueado por crédito: ${pedido.motivoBloqueio || 'análise pendente'}.`,
@@ -449,48 +455,70 @@ export class PedidosService {
 
     const avisosEstoque: { produtoId: string; descricao: string; disponivelAntes: number; pedido: number; faltam: number }[] = [];
 
-    // Reserva cada item — permitindo o disponível ficar NEGATIVO
-    for (const item of pedido.itens) {
-      let saldo = await this.prisma.estoqueSaldo.findFirst({
-        where: { tenantId, filialId: pedido.filialOrigemId, produtoId: item.produtoId, loteId: null },
-      });
-      if (!saldo) {
-        saldo = await this.prisma.estoqueSaldo.create({
-          data: {
-            tenantId, filialId: pedido.filialOrigemId, produtoId: item.produtoId,
-            quantidade: 0, quantidadeReservada: 0, quantidadeDisponivel: 0,
-          },
+    // Reserva + mudança de status numa ÚNICA transação: se algo falhar no meio,
+    // nada é reservado e o status não muda (antes ficava reserva parcial órfã).
+    const atualizado = await this.prisma.$transaction(async (tx) => {
+      for (const item of pedido.itens) {
+        let saldo = await tx.estoqueSaldo.findFirst({
+          where: { tenantId, filialId: pedido.filialOrigemId, produtoId: item.produtoId, loteId: null },
         });
-      }
-      const disponivelAntes = Number(saldo.quantidade) - Number(saldo.quantidadeReservada);
-      const qtd = Number(item.quantidade);
-      const novaReservada = Number(saldo.quantidadeReservada) + qtd;
-      const novoDisponivel = Number(saldo.quantidade) - novaReservada; // pode ser < 0
+        if (!saldo) {
+          saldo = await tx.estoqueSaldo.create({
+            data: {
+              tenantId, filialId: pedido.filialOrigemId, produtoId: item.produtoId,
+              quantidade: 0, quantidadeReservada: 0, quantidadeDisponivel: 0,
+            },
+          });
+        }
+        const disponivelAntes = Number(saldo.quantidade) - Number(saldo.quantidadeReservada);
+        const qtd = Number(item.quantidade);
+        const novaReservada = Number(saldo.quantidadeReservada) + qtd;
+        const novoDisponivel = Number(saldo.quantidade) - novaReservada; // pode ser < 0
 
-      await this.prisma.estoqueSaldo.update({
-        where: { id: saldo.id },
-        data: { quantidadeReservada: novaReservada, quantidadeDisponivel: novoDisponivel },
-      });
-
-      if (novoDisponivel < 0) {
-        avisosEstoque.push({
-          produtoId: item.produtoId,
-          descricao: item.descricao,
-          disponivelAntes,
-          pedido: qtd,
-          faltam: Math.abs(novoDisponivel),
+        await tx.estoqueSaldo.update({
+          where: { id: saldo.id },
+          data: { quantidadeReservada: novaReservada, quantidadeDisponivel: novoDisponivel },
         });
-      }
-    }
 
-    const atualizado = await this.prisma.pedido.update({
-      where: { id },
-      data: { status: 'CONFIRMADO' as any },
+        if (novoDisponivel < 0) {
+          avisosEstoque.push({
+            produtoId: item.produtoId,
+            descricao: item.descricao,
+            disponivelAntes,
+            pedido: qtd,
+            faltam: Math.abs(novoDisponivel),
+          });
+        }
+      }
+
+      return tx.pedido.update({ where: { id }, data: { status: 'CONFIRMADO' as any } });
     });
+
     return { ...atualizado, avisosEstoque };
   }
 
+  // Cancela o pedido e LIBERA a reserva de estoque se ele estava reservado
+  // (confirmado e ainda não faturado). Se já foi faturado, a reserva já saiu no
+  // faturamento — não mexe.
   async cancelar(tenantId: string, id: string) {
+    const pedido = await this.prisma.pedido.findFirst({
+      where: { id, tenantId },
+      include: { itens: { select: { produtoId: true, quantidade: true } } },
+    });
+    if (!pedido) throw new NotFoundException('Pedido não encontrado.');
+    if (pedido.status === 'CANCELADO') return pedido;
+
+    const estadosReservados = ['CONFIRMADO', 'EM_SEPARACAO', 'SEPARADO'];
+    if (estadosReservados.includes(pedido.status)) {
+      await this.estoque.liberarReserva(
+        tenantId,
+        pedido.filialOrigemId,
+        pedido.itens
+          .filter((i) => !!i.produtoId)
+          .map((i) => ({ produtoId: i.produtoId as string, quantidade: Number(i.quantidade) })),
+      );
+    }
+
     return this.updateStatus(tenantId, id, 'CANCELADO');
   }
 }
