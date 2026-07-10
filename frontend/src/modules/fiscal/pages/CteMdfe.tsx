@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { Truck, Plus, X, FileText, CheckCircle2, Ban } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
+import { PageHeader, btnPrimary } from '../../cadastros/ui';
 
 const R$ = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
@@ -66,19 +67,20 @@ export default function CteMdfe() {
   const lista = docs.filter(d => d.tipo === aba);
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2"><Truck className="h-5 w-5 text-indigo-500" /> CT-e / MDF-e</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Documentos fiscais de transporte (modo teste — mock local)</p>
-        </div>
-        <button onClick={abrirModal} className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg font-bold text-sm">
-          <Plus className="h-4 w-4" /> {aba === 'MDFE' ? 'Simular Manifesto' : 'Novo CT-e'}
-        </button>
-      </div>
+    <div className="flex flex-col h-full">
+      <PageHeader
+        icon={<Truck className="h-4 w-4" />}
+        titulo="CT-e / MDF-e"
+        subtitulo="Documentos fiscais de transporte (modo teste — mock local)"
+        actions={
+          <button onClick={abrirModal} className={btnPrimary + ' bg-indigo-500 hover:bg-indigo-400 shadow-indigo-500/20'}>
+            <Plus className="h-3.5 w-3.5" /> {aba === 'MDFE' ? 'Simular Manifesto' : 'Novo CT-e'}
+          </button>
+        }
+      />
 
       {/* Abas */}
-      <div className="bg-white border-b border-gray-200 px-5 flex gap-1 shrink-0">
+      <div className="bg-white/[0.02] backdrop-blur-xl border-b border-white/[0.06] px-5 flex gap-1 shrink-0">
         {(['MDFE', 'CTE'] as const).map(t => (
           <button key={t} onClick={() => setAba(t)}
             className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px ${aba === t ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>

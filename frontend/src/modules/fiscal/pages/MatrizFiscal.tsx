@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { Scale, Plus, RefreshCw, Trash2, X, Sparkles, Pencil, Building2, Save } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
+import { PageHeader, btnGlass, btnPrimary } from '../../cadastros/ui';
 
 type Regra = {
   id?: string;
@@ -91,26 +92,27 @@ export default function MatrizFiscal() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2"><Scale className="h-5 w-5 text-violet-500" /> Matriz Fiscal</h1>
-          <p className="text-xs text-gray-400 mt-0.5">{regras.length} regra(s) — define CFOP, CST/CSOSN e alíquotas por NCM/UF/operação</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {regras.length === 0 && (
-            <button onClick={semear} className="flex items-center gap-1.5 bg-violet-50 border border-violet-200 hover:bg-violet-100 px-3 py-2 rounded-lg text-violet-700 font-medium text-sm">
-              <Sparkles className="h-4 w-4" /> Regras-padrão
+    <div className="flex flex-col h-full">
+      <PageHeader
+        icon={<Scale className="h-4 w-4" />}
+        titulo="Matriz Fiscal"
+        subtitulo={`${regras.length} regra(s) — CFOP, CST/CSOSN e alíquotas por NCM/UF/operação`}
+        actions={
+          <>
+            {regras.length === 0 && (
+              <button onClick={semear} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-violet-500/15 border border-violet-400/30 text-violet-300 hover:bg-violet-500/25 transition-all duration-300 active:scale-[0.98]">
+                <Sparkles className="h-3.5 w-3.5" /> Regras-padrão
+              </button>
+            )}
+            <button onClick={carregar} className={btnGlass}>
+              <RefreshCw className="h-3.5 w-3.5 text-violet-300" /> Atualizar
             </button>
-          )}
-          <button onClick={carregar} className="flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 px-3 py-2 rounded-lg text-gray-700 font-medium text-sm">
-            <RefreshCw className="h-4 w-4 text-violet-600" /> Atualizar
-          </button>
-          <button onClick={() => setEdit({ ...VAZIA })} className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-500 text-white px-4 py-2 rounded-lg font-bold text-sm">
-            <Plus className="h-4 w-4" /> Nova regra
-          </button>
-        </div>
-      </div>
+            <button onClick={() => setEdit({ ...VAZIA })} className={btnPrimary + ' bg-violet-500 hover:bg-violet-400 shadow-violet-500/20'}>
+              <Plus className="h-3.5 w-3.5" /> Nova regra
+            </button>
+          </>
+        }
+      />
 
       <div className="flex-1 overflow-auto p-4 space-y-4">
         {/* Config fiscal da filial emitente */}

@@ -5,6 +5,7 @@ import { FileText, RefreshCw, Printer, Ban, Mail, Undo2, X, ListChecks, Search }
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { imprimirDanfe } from '../danfe';
+import { PageHeader, btnGlass } from '../../cadastros/ui';
 
 const R$ = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dt = (v: any) => v ? new Date(v).toLocaleDateString('pt-BR') : '—';
@@ -89,23 +90,24 @@ export default function NotasEmitidas() {
   const enviarEmail = (n: any) => toast(`Modo teste: enviaria XML + DANFE para ${n.cliente?.email || 'o e-mail do cliente'}.`);
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2"><FileText className="h-5 w-5 text-sky-500" /> NF-e Emitidas</h1>
-          <p className="text-xs text-gray-400 mt-0.5">{notasFiltradas.length} de {notas.length} nota(s)</p>
-        </div>
-        <button onClick={carregar} className="flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 px-3 py-2 rounded-lg text-gray-700 font-medium text-sm">
-          <RefreshCw className="h-4 w-4 text-sky-600" /> Atualizar
-        </button>
-      </div>
+    <div className="flex flex-col h-full">
+      <PageHeader
+        icon={<FileText className="h-4 w-4" />}
+        titulo="NF-e Emitidas"
+        subtitulo={`${notasFiltradas.length} de ${notas.length} nota(s)`}
+        actions={
+          <button onClick={carregar} className={btnGlass}>
+            <RefreshCw className="h-3.5 w-3.5 text-sky-400" /> Atualizar
+          </button>
+        }
+      />
 
       {/* Barra de filtros */}
-      <div className="bg-white border-b border-gray-200 px-5 py-2.5 flex flex-wrap items-center gap-3 shrink-0">
+      <div className="bg-white/[0.02] backdrop-blur-xl border-b border-white/[0.06] px-5 py-2.5 flex flex-wrap items-center gap-3 shrink-0">
         <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
           <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por chave, nº ou cliente..."
-            className="w-full border border-gray-300 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:border-sky-400" />
+            className="w-full border border-white/[0.08] bg-white/[0.04] text-slate-100 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:border-sky-400/60" />
         </div>
         <label className="flex items-center gap-1.5 text-xs text-gray-500 font-semibold">De
           <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm" />
