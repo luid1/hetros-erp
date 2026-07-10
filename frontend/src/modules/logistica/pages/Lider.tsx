@@ -4,6 +4,7 @@ import { ClipboardList, RefreshCw, Printer, Scale, FileText, PackageCheck, Recei
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { imprimirNotaSeparacao, imprimirCupomFiscal } from '../notaTermica';
+import { PageHeader, btnGlass } from '../../cadastros/ui';
 
 const kg = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const dt = (v: any) => v ? new Date(v).toLocaleDateString('pt-BR') : '—';
@@ -61,23 +62,20 @@ export default function Lider() {
   const abrirSeparacao = (l: any) => navigate(`/logistica/operacional?pedido=${l.id}`);
 
   return (
-    <div className="flex flex-col h-full bg-[#0b1220] text-slate-200 overflow-hidden">
-      {/* Cabeçalho + filtros do líder */}
-      <div className="bg-[#0e1729] border-b border-slate-800 px-5 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center"><ClipboardList className="h-5 w-5" /></div>
-          <div>
-            <h1 className="text-base font-bold text-white leading-tight">Líder — Separação</h1>
-            <p className="text-xs text-slate-500">Imprime as notas e acompanha o status da separação</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 text-sm text-slate-400 font-semibold">Dt. Carregamento
-            <input type="date" value={data} onChange={e => setData(e.target.value)} className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-100" />
-          </label>
-          <button onClick={carregar} className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-200 text-sm"><RefreshCw className="h-4 w-4 text-sky-400" /> Atualizar</button>
-        </div>
-      </div>
+    <div className="flex flex-col h-full text-slate-200 overflow-hidden">
+      <PageHeader
+        icon={<ClipboardList className="h-4 w-4" />}
+        titulo="Líder — Separação"
+        subtitulo="Imprime as notas e acompanha o status da separação"
+        actions={
+          <>
+            <label className="flex items-center gap-2 text-xs text-slate-400 font-semibold">Dt. Carregamento
+              <input type="date" value={data} onChange={e => setData(e.target.value)} className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-sm text-slate-100 font-mono [color-scheme:dark] focus:outline-none focus:border-sky-400/60" />
+            </label>
+            <button onClick={carregar} className={btnGlass}><RefreshCw className="h-3.5 w-3.5 text-sky-400" /> Atualizar</button>
+          </>
+        }
+      />
 
       {/* Chips de status */}
       <div className="bg-[#0e1729] border-b border-slate-800 px-5 py-2 flex items-center gap-2 shrink-0 overflow-x-auto">

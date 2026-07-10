@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, RefreshCw, Truck, Receipt, Percent, Route } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
+import { PageHeader, btnGlass } from '../../cadastros/ui';
 
 const R$ = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -65,23 +66,21 @@ export default function FreteMotoristas() {
   );
 
   return (
-    <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
-      {/* Cabeçalho */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-amber-500" /> Frete por Motorista
-          </h1>
-          <p className="text-xs text-gray-400">Fechamento de frete das rotas do dia</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <input type="date" value={data} onChange={e => setData(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-amber-300" />
-          <button onClick={carregar} className="flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-gray-700 font-medium text-sm">
-            <RefreshCw className="h-4 w-4 text-amber-500" /> Atualizar
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      <PageHeader
+        icon={<DollarSign className="h-4 w-4" />}
+        titulo="Frete por Motorista"
+        subtitulo="Fechamento de frete das rotas do dia"
+        actions={
+          <>
+            <input type="date" value={data} onChange={e => setData(e.target.value)}
+              className="border border-white/[0.08] bg-white/[0.04] text-slate-100 rounded-lg px-3 py-1.5 text-sm font-mono [color-scheme:dark] focus:outline-none focus:border-sky-400/60" />
+            <button onClick={carregar} className={btnGlass}>
+              <RefreshCw className="h-3.5 w-3.5 text-amber-400" /> Atualizar
+            </button>
+          </>
+        }
+      />
 
       <div className="flex-1 overflow-auto p-6 space-y-4">
         {/* KPIs */}
