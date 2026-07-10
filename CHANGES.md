@@ -20,6 +20,43 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-10] — Redesenho de telas densas, dropdowns escuros e camada global anti-claro
+
+### O que mudou
+
+**Dropdowns nativos escuros (global)**
+- A lista aberta do `<select>` herdava o branco do SO. Agora `option`/`optgroup` e `color-scheme: dark`
+  forçam o popup para o canvas escuro (`#0e141f`) em **todas** as telas.
+
+**Camada global anti-claro (`index.css`)**
+- Remap de tints claras legadas (`bg-amber-50`, `bg-blue-50/100`, `bg-yellow-*`, `bg-green-50/100`,
+  `bg-red-50/100`, `bg-purple/violet/cyan/indigo-50/100`, etc.) para versões translúcidas escuras, e
+  clareamento dos textos escuros correspondentes (`text-blue-700`, `text-green-700`…). Garante que
+  nenhuma tela — mesmo não redesenhada — exiba caixas claras fora do padrão. Telas novas usam classes de
+  opacidade (`bg-sky-500/15`) e não são afetadas.
+
+**Análise de Estoque Físico — redesenho completo (padrão de tela densa)**
+- Faixa de KPIs oversized (Itens, Valor do Estoque, Em Falta, Perda/Quebra); grade dentro de card de vidro;
+  ações no header; toolbar de fieldsets → FilterBar limpa + modal "Filtros"; fim das faixas de cor de coluna
+  (cor só no valor); edição inline por clique (número limpo vira input); alerta de reposição colapsado + drawer;
+  colunas Código/Descrição fixas (sticky).
+
+**Controle de Carga — re-tema dark-glass**
+- Toolbars, tabela, inputs, botões (Rotear/Imprimir → sky/glass) e acentos migrados para os tokens de vidro;
+  cabeçalho de vidro; bordas de cristal. (Estrutura de duas colunas + painel inferior preservada.)
+
+### Arquivos modificados
+- `frontend/src/index.css` — dropdowns escuros + remap global de tints claras
+- `frontend/src/modules/estoque/pages/AnaliseEstoqueFisico.tsx` — redesenho completo
+- `frontend/src/modules/logistica/pages/ControleCarga.tsx` — re-tema dark-glass
+
+### Pendente (próximos passos)
+- Redesenho estrutural (cards de vidro/KPIs) das demais telas legadas (PedidosVenda, Operacional,
+  ControladoriaHub, MatrizFiscal, CteMdfe, NotasEmitidas, FreteMotoristas, AppComprador, etc.) — a camada
+  global já garante a consistência de cor; falta o polimento estrutural tela a tela.
+
+---
+
 ## [2026-07-10] — Login split, consolidação do menu, telas Logs/Configurações e padronização visual
 
 ### O que mudou

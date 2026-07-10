@@ -111,8 +111,45 @@
 }
 .animate-pulse-glow { animation: pulseGlow 2.4s ease-in-out infinite; }
 
+/* ============================================================
+   LOGIN — fundo animado (gradiente que respira + orbs flutuantes
+   + grade tech que deriva). Movimento contínuo e vivo.
+   ============================================================ */
+@keyframes loginPan {
+  0%   { background-position: 0% 50%, 100% 50%, 0% 50%; }
+  50%  { background-position: 40% 60%, 60% 40%, 100% 50%; }
+  100% { background-position: 0% 50%, 100% 50%, 0% 50%; }
+}
+.login-canvas {
+  background:
+    radial-gradient(120% 120% at 0% 0%, rgba(56,189,248,0.18), transparent 55%),
+    radial-gradient(120% 120% at 100% 100%, rgba(99,102,241,0.20), transparent 55%),
+    linear-gradient(125deg, #080d16 0%, #0d1a2e 35%, #14133c 65%, #090e18 100%);
+  background-size: 160% 160%, 160% 160%, 320% 320%;
+  animation: loginPan 24s ease-in-out infinite;
+}
+
+@keyframes orbFloat1 { 0%,100% { transform: translate(0,0) scale(1); } 33% { transform: translate(14%,10%) scale(1.18); } 66% { transform: translate(-10%,16%) scale(0.9); } }
+@keyframes orbFloat2 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-16%,-12%) scale(1.22); } }
+@keyframes orbFloat3 { 0%,100% { transform: translate(0,0) scale(1); } 40% { transform: translate(12%,-14%) scale(1.12); } 75% { transform: translate(-8%,8%) scale(0.94); } }
+.login-orb-1 { animation: orbFloat1 17s ease-in-out infinite; }
+.login-orb-2 { animation: orbFloat2 23s ease-in-out infinite; }
+.login-orb-3 { animation: orbFloat3 20s ease-in-out infinite; }
+
+@keyframes gridDrift { from { background-position: 0 0; } to { background-position: 44px 44px; } }
+.login-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  animation: gridDrift 9s linear infinite;
+  -webkit-mask-image: radial-gradient(circle at 30% 38%, #000 0%, transparent 72%);
+          mask-image: radial-gradient(circle at 30% 38%, #000 0%, transparent 72%);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-aurora, .animate-aurora-slow, .animate-pulse-glow, .skeleton::after { animation: none !important; }
+  .animate-aurora, .animate-aurora-slow, .animate-pulse-glow, .skeleton::after,
+  .login-canvas, .login-orb-1, .login-orb-2, .login-orb-3, .login-grid { animation: none !important; }
 }
 
 /* ============================================================
@@ -163,3 +200,63 @@ tbody tr:hover { background-color: rgba(255, 255, 255, 0.025) !important; }
   border-color: rgba(56, 189, 248, 0.55) !important;
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14) !important;
 }
+
+/* ============================================================
+   DROPDOWNS NATIVOS — a lista aberta do <select> herdava o branco
+   do SO. Força o popup e as opções para o canvas escuro.
+   ============================================================ */
+select { color-scheme: dark; }
+option, optgroup {
+  background-color: #0e141f !important;
+  color: #e2e8f0 !important;
+}
+optgroup { color: #94a3b8 !important; }
+
+/* ============================================================
+   TINTS CLARAS LEGADAS → versões escuras. Garante que nenhuma tela
+   (mesmo não redesenhada) mostre caixas claras fora do padrão.
+   As telas novas usam classes de opacidade (bg-sky-500/15) e não
+   são afetadas por estas regras.
+   ============================================================ */
+.bg-amber-50  { background-color: rgba(245,158,11,0.08) !important; }
+.bg-amber-100 { background-color: rgba(245,158,11,0.15) !important; }
+.bg-yellow-50  { background-color: rgba(234,179,8,0.08) !important; }
+.bg-yellow-100 { background-color: rgba(234,179,8,0.12) !important; }
+.bg-yellow-200 { background-color: rgba(234,179,8,0.16) !important; }
+.bg-blue-50   { background-color: rgba(56,189,248,0.06) !important; }
+.bg-blue-100  { background-color: rgba(56,189,248,0.14) !important; }
+.bg-sky-50    { background-color: rgba(56,189,248,0.06) !important; }
+.bg-sky-100   { background-color: rgba(56,189,248,0.14) !important; }
+.bg-green-50  { background-color: rgba(16,185,129,0.08) !important; }
+.bg-green-100 { background-color: rgba(16,185,129,0.14) !important; }
+.bg-emerald-50  { background-color: rgba(16,185,129,0.08) !important; }
+.bg-emerald-100 { background-color: rgba(16,185,129,0.14) !important; }
+.bg-red-50    { background-color: rgba(244,63,94,0.08) !important; }
+.bg-red-100   { background-color: rgba(244,63,94,0.14) !important; }
+.bg-rose-50   { background-color: rgba(244,63,94,0.08) !important; }
+.bg-rose-100  { background-color: rgba(244,63,94,0.14) !important; }
+.bg-orange-50  { background-color: rgba(249,115,22,0.08) !important; }
+.bg-orange-100 { background-color: rgba(249,115,22,0.14) !important; }
+.bg-purple-50  { background-color: rgba(139,92,246,0.08) !important; }
+.bg-purple-100 { background-color: rgba(139,92,246,0.14) !important; }
+.bg-violet-50  { background-color: rgba(139,92,246,0.08) !important; }
+.bg-violet-100 { background-color: rgba(139,92,246,0.14) !important; }
+.bg-cyan-50   { background-color: rgba(6,182,212,0.08) !important; }
+.bg-cyan-100  { background-color: rgba(6,182,212,0.14) !important; }
+.bg-indigo-50  { background-color: rgba(99,102,241,0.08) !important; }
+.bg-indigo-100 { background-color: rgba(99,102,241,0.14) !important; }
+
+/* Textos escuros feitos para tints claras → clareia p/ contraste no dark */
+.text-blue-700, .text-blue-800, .text-blue-900 { color: #7dd3fc !important; }
+.text-sky-700, .text-sky-800 { color: #7dd3fc !important; }
+.text-green-700, .text-green-800, .text-green-900 { color: #6ee7b7 !important; }
+.text-emerald-700, .text-emerald-800 { color: #6ee7b7 !important; }
+.text-red-700, .text-red-800, .text-red-900 { color: #fda4af !important; }
+.text-rose-700, .text-rose-800 { color: #fda4af !important; }
+.text-yellow-700, .text-yellow-800, .text-yellow-900 { color: #fde68a !important; }
+.text-amber-700, .text-amber-800, .text-amber-900 { color: #fcd34d !important; }
+.text-orange-600, .text-orange-700, .text-orange-800 { color: #fdba74 !important; }
+.text-purple-700, .text-purple-800 { color: #c4b5fd !important; }
+.text-violet-700, .text-violet-800 { color: #c4b5fd !important; }
+.text-cyan-700, .text-cyan-800 { color: #67e8f9 !important; }
+.text-indigo-700, .text-indigo-800 { color: #a5b4fc !important; }

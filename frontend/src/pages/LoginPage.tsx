@@ -126,34 +126,37 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F17] flex">
+    <div className="login-canvas relative overflow-hidden min-h-screen flex">
+
+      {/* Fundo animado — página inteira (orbs flutuantes atrás de tudo) */}
+      <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
+        <div className="login-orb-1 absolute -top-40 -left-32 h-[520px] w-[520px] rounded-full bg-sky-500/[0.28] blur-[120px]" />
+        <div className="login-orb-2 absolute top-1/4 left-1/2 -translate-x-1/2 h-[500px] w-[500px] rounded-full bg-indigo-500/[0.22] blur-[130px]" />
+        <div className="login-orb-3 absolute -bottom-32 -right-28 h-[520px] w-[520px] rounded-full bg-violet-500/[0.24] blur-[120px]" />
+        <div className="login-orb-1 absolute top-1/3 right-1/4 h-[360px] w-[360px] rounded-full bg-cyan-500/[0.14] blur-[130px]" />
+      </div>
 
       {/* ═══════════ BANNER LATERAL (esquerda) ═══════════ */}
-      <aside className="hidden lg:flex w-[42%] xl:w-[38%] relative flex-col justify-between overflow-hidden border-r border-white/[0.06] p-10">
-        {/* Aurora de fundo */}
-        <div className="pointer-events-none absolute inset-0" aria-hidden>
-          <div className="absolute -top-32 -left-24 h-[420px] w-[420px] rounded-full bg-sky-500/[0.12] blur-[130px] animate-aurora" />
-          <div className="absolute bottom-0 -right-16 h-[380px] w-[380px] rounded-full bg-indigo-500/[0.10] blur-[130px] animate-aurora-slow" />
-          <div className="absolute top-1/2 left-1/3 h-[300px] w-[300px] rounded-full bg-violet-500/[0.06] blur-[140px] animate-aurora" />
-        </div>
+      <aside className="hidden lg:flex w-[42%] xl:w-[38%] relative z-10 flex-col justify-between overflow-hidden border-r border-white/[0.06] p-10">
 
-        {/* Topo — marca */}
+        {/* Topo — marca (única logo) */}
         <div className="relative flex items-center gap-3">
-          <img src="/logo-hetros-icone.png" alt="Hetros" className="h-10 w-10 object-contain" />
+          <img src="/logo-hetros-icone.png" alt="Hetros" className="h-11 w-11 object-contain drop-shadow-[0_2px_12px_rgba(56,189,248,0.25)]" />
           <div>
-            <p className="text-white text-base font-bold leading-none tracking-tight">Hetros WMS</p>
-            <p className="text-slate-500 text-xs mt-1">Sistema de Gestão Industrial</p>
+            <p className="text-white text-lg font-bold leading-none tracking-tight">Hetros WMS</p>
+            <p className="text-slate-400 text-xs mt-1.5">Sistema de Gestão Industrial</p>
           </div>
         </div>
 
         {/* Centro — frase de impacto */}
         <div className="relative">
-          <div className="bg-white rounded-2xl px-6 py-4 shadow-2xl inline-block mb-8">
-            <img src="/logo-hetros.png" alt="Hetros Importação e Exportação" className="h-12 object-contain" />
+          <div className="inline-flex items-center gap-2 mb-6">
+            <span className="h-1.5 w-1.5 rounded-full bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.9)] animate-pulse" />
+            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-[0.28em]">ERP</span>
           </div>
           <h1 className="text-4xl xl:text-5xl font-extrabold text-white leading-[1.1] tracking-tight">
             Gestão industrial<br />
-            <span className="bg-gradient-to-r from-sky-300 to-indigo-300 bg-clip-text text-transparent">de ponta a ponta.</span>
+            <span className="bg-gradient-to-r from-sky-300 via-cyan-200 to-indigo-300 bg-clip-text text-transparent">de ponta a ponta.</span>
           </h1>
           <p className="text-slate-400 text-base mt-5 max-w-md leading-relaxed">
             Estoque, logística, fiscal e financeiro em um só lugar — do box da Ceagesp à entrega.
@@ -178,7 +181,7 @@ export default function LoginPage() {
       </aside>
 
       {/* ═══════════ ÁREA DE LOGIN (direita) ═══════════ */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 relative">
+      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 relative z-10">
 
         {/* Marca compacta — só aparece quando o banner está escondido (mobile) */}
         <div className="lg:hidden flex items-center gap-2.5 mb-8">
@@ -214,13 +217,15 @@ export default function LoginPage() {
                     <button
                       key={u.id}
                       onClick={() => handleSelect(u)}
-                      className="group flex flex-col items-center gap-3 bg-gray-900 hover:bg-gray-800
-                                 border border-gray-800 hover:border-sky-500/50 rounded-2xl p-5
-                                 transition-all duration-150 hover:scale-105 hover:shadow-lg hover:shadow-sky-500/10"
+                      className="group flex flex-col items-center gap-3 bg-white/[0.02] backdrop-blur-xl hover:bg-white/[0.05]
+                                 border border-white/[0.06] hover:border-sky-400/40 rounded-2xl p-5
+                                 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] transition-all duration-300
+                                 hover:-translate-y-1 hover:shadow-[0_16px_40px_0_rgba(56,189,248,0.12)]"
                     >
                       {/* Avatar */}
                       <div className={`h-16 w-16 rounded-2xl ${color} flex items-center justify-center
-                                      text-white text-xl font-bold shadow-lg group-hover:scale-110 transition-transform`}>
+                                      text-white text-xl font-bold shadow-lg ring-1 ring-white/15
+                                      group-hover:scale-110 group-hover:ring-white/25 transition-all duration-300`}>
                         {getInitials(u.nome)}
                       </div>
 
@@ -235,7 +240,7 @@ export default function LoginPage() {
 
                       {/* Último acesso */}
                       {u.ultimoAcesso && (
-                        <div className="flex items-center gap-1 text-gray-600 text-[10px]">
+                        <div className="flex items-center gap-1 text-slate-500 text-[10px]">
                           <Clock className="h-2.5 w-2.5" />
                           {formatUltimoAcesso(u.ultimoAcesso)}
                         </div>
@@ -253,12 +258,12 @@ export default function LoginPage() {
             {/* Usuário selecionado */}
             <div className="flex flex-col items-center gap-4">
               <div className={`h-20 w-20 rounded-2xl ${ROLE_COLORS[selecionado.role?.nome] || 'bg-gray-600'}
-                               flex items-center justify-center text-white text-2xl font-bold shadow-xl`}>
+                               flex items-center justify-center text-white text-2xl font-bold shadow-xl ring-1 ring-white/15`}>
                 {getInitials(selecionado.nome)}
               </div>
               <div className="text-center">
                 <h2 className="text-xl font-bold text-white">{selecionado.nome}</h2>
-                <p className="text-gray-500 text-sm mt-0.5">
+                <p className="text-slate-500 text-sm mt-0.5">
                   {ROLE_LABELS[selecionado.role?.nome] || selecionado.role?.nome}
                 </p>
               </div>
@@ -321,8 +326,8 @@ export default function LoginPage() {
 
               <button
                 onClick={() => { setSelecionado(null); setPassword(''); setError(''); }}
-                className="w-full flex items-center justify-center gap-2 text-gray-500 hover:text-gray-300
-                           text-xs py-2 rounded-lg hover:bg-gray-800 transition-colors"
+                className="w-full flex items-center justify-center gap-2 text-slate-500 hover:text-slate-200
+                           text-xs py-2 rounded-lg hover:bg-white/[0.05] transition-all duration-300"
               >
                 <ChevronLeft className="h-3.5 w-3.5" /> Trocar usuário
               </button>

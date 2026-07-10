@@ -528,12 +528,12 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
       />
 
       {/* ═══════════ BARRA DE FILTROS ═══════════ */}
-      <div className="bg-gray-200 border-b border-gray-400 px-2 py-1.5 flex flex-wrap items-center gap-2 shrink-0">
+      <div className="bg-white/[0.02] backdrop-blur-xl border-b border-white/[0.06] px-2 py-1.5 flex flex-wrap items-center gap-2 shrink-0">
 
         {/* Segmento */}
         <label className="flex items-center gap-1 text-gray-700 font-semibold">
           Segmento:
-          <select value={segmento} onChange={e => setSegmento(e.target.value)} className="border border-gray-400 bg-white text-[11px] px-1.5 py-0.5 rounded font-normal w-28">
+          <select value={segmento} onChange={e => setSegmento(e.target.value)} className="border border-white/[0.08] bg-white/[0.04] text-[11px] px-1.5 py-0.5 rounded font-normal w-28">
             {SEGMENTOS.map(s => <option key={s}>{s}</option>)}
           </select>
         </label>
@@ -542,11 +542,11 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
 
         {/* Checkboxes */}
         <label className="flex items-center gap-1 cursor-pointer text-gray-700 font-medium">
-          <input type="checkbox" checked={mostrarFinalizados} onChange={e => setMostrarFinalizados(e.target.checked)} className="accent-blue-600 h-3.5 w-3.5" />
+          <input type="checkbox" checked={mostrarFinalizados} onChange={e => setMostrarFinalizados(e.target.checked)} className="accent-sky-500 h-3.5 w-3.5" />
           Mostrar Pedidos Finalizados
         </label>
         <label className="flex items-center gap-1 cursor-pointer text-gray-700 font-medium">
-          <input type="checkbox" checked={mostrarGrade} onChange={e => setMostrarGrade(e.target.checked)} className="accent-blue-600 h-3.5 w-3.5" />
+          <input type="checkbox" checked={mostrarGrade} onChange={e => setMostrarGrade(e.target.checked)} className="accent-sky-500 h-3.5 w-3.5" />
           Mostrar grade de produtos
         </label>
         <label className="flex items-center gap-1 cursor-pointer text-gray-700 font-medium">
@@ -555,36 +555,36 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
           Rota Pendente
         </label>
         <label className="flex items-center gap-1 cursor-pointer text-gray-700">
-          <input type="checkbox" checked={somenteEscolas} onChange={e => setSomenteEscolas(e.target.checked)} className="accent-blue-600 h-3.5 w-3.5" />
+          <input type="checkbox" checked={somenteEscolas} onChange={e => setSomenteEscolas(e.target.checked)} className="accent-sky-500 h-3.5 w-3.5" />
           Somente Escolas
         </label>
 
         <span className="w-px h-5 bg-gray-400" />
 
         {/* Botões de ação da toolbar */}
-        <button onClick={handleRotear} disabled={selecionados.size === 0} className="flex items-center gap-1 bg-white border border-blue-500 hover:bg-blue-50 px-2.5 py-1 rounded text-blue-700 font-bold disabled:opacity-40 disabled:border-gray-300 disabled:text-gray-400">
+        <button onClick={handleRotear} disabled={selecionados.size === 0} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-sky-500 hover:bg-sky-400 text-white shadow-lg shadow-sky-500/20 transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:bg-white/[0.04] disabled:text-slate-500 disabled:shadow-none">
           <RotateCcw className="h-3.5 w-3.5" /> Rotear
         </button>
-        <button onClick={handleImprimirSel} disabled={selecionados.size === 0} className="flex items-center gap-1 bg-white border border-gray-400 hover:bg-gray-50 px-2.5 py-1 rounded text-gray-700 font-medium disabled:opacity-40">
+        <button onClick={handleImprimirSel} disabled={selecionados.size === 0} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/[0.08] text-slate-300 hover:bg-white/[0.08] transition-all duration-300 active:scale-[0.98] disabled:opacity-40">
           <Printer className="h-3.5 w-3.5" /> Imprimir Selecionados
         </button>
         <label className="flex items-center gap-1 cursor-pointer text-gray-700">
-          <input type="checkbox" checked={permitirDesconto} onChange={e => setPermitirDesconto(e.target.checked)} className="accent-blue-600 h-3.5 w-3.5" />
+          <input type="checkbox" checked={permitirDesconto} onChange={e => setPermitirDesconto(e.target.checked)} className="accent-sky-500 h-3.5 w-3.5" />
           Permitir Desconto no Frete
         </label>
       </div>
 
       {/* ═══════════ DATA + LEGENDA ═══════════ */}
-      <div className="bg-gray-200 border-b border-gray-400 px-2 py-1 flex items-center gap-4 shrink-0 text-gray-700">
+      <div className="bg-white/[0.02] backdrop-blur-xl border-b border-white/[0.06] px-2 py-1 flex items-center gap-4 shrink-0 text-gray-700">
 
         <label className="flex items-center gap-1 font-semibold">
           Carga:
-          <input type="date" value={dataCarga} onChange={e => setDataCarga(e.target.value)} className="border border-gray-400 bg-white text-[11px] px-1.5 py-0.5 rounded w-32 font-mono cursor-pointer" />
+          <input type="date" value={dataCarga} onChange={e => setDataCarga(e.target.value)} className="border border-white/[0.08] bg-white/[0.04] text-[11px] px-1.5 py-0.5 rounded w-32 font-mono cursor-pointer" />
         </label>
 
         <label className="flex items-center gap-1 font-semibold">
           Entrega:
-          <input type="date" value={dataEntrega} onChange={e => setDataEntrega(e.target.value)} className="border border-gray-400 bg-white text-[11px] px-1.5 py-0.5 rounded w-32 font-mono cursor-pointer" />
+          <input type="date" value={dataEntrega} onChange={e => setDataEntrega(e.target.value)} className="border border-white/[0.08] bg-white/[0.04] text-[11px] px-1.5 py-0.5 rounded w-32 font-mono cursor-pointer" />
         </label>
 
         {/* Legenda de cores */}
@@ -604,12 +604,12 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
           <div className="flex-1 overflow-auto">
             <table className="w-full border-collapse" style={{ minWidth: 1100 }}>
               <thead className="sticky top-0 z-10">
-                <tr className="bg-gray-300 border-b-2 border-gray-500 text-[10px]">
+                <tr className="bg-[#11161f] border-b border-white/[0.08] text-[10px]">
                   <th className="w-6 px-0.5 py-1 border-r border-gray-400">
-                    <input type="checkbox" checked={selecionados.size === pedidosFiltrados.length && pedidosFiltrados.length > 0} onChange={toggleAll} className="accent-blue-600 h-3 w-3 cursor-pointer" />
+                    <input type="checkbox" checked={selecionados.size === pedidosFiltrados.length && pedidosFiltrados.length > 0} onChange={toggleAll} className="accent-sky-500 h-3 w-3 cursor-pointer" />
                   </th>
                   {['Da.','En.','Nome Fantasia','Referê.','Libe.Sep.','Vols','Peso','Emp.','Tipo de Fatur.','Autor.de','Status','Região','CEP','Bairro','Sub-Região','Onda','Período','Rota','Recebi.','Motorista','Andamento'].map(h => (
-                    <th key={h} className="px-1 py-1 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">{h}</th>
+                    <th key={h} className="px-1 py-1 text-left font-semibold text-slate-400 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -626,36 +626,36 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
                 {pedidosFiltrados.map(p => {
                   const sel = selecionados.has(p.id);
                   return (
-                    <tr key={p.id} className={`border-b border-gray-300/50 cursor-pointer transition-colors ${rowBg(p, sel)}`} onClick={() => toggleSelect(p.id)}>
+                    <tr key={p.id} className={`border-b border-white/[0.04] cursor-pointer transition-colors ${rowBg(p, sel)}`} onClick={() => toggleSelect(p.id)}>
                       <td className="px-0.5 text-center border-r border-gray-400/30" onClick={e => e.stopPropagation()}>
-                        <input type="checkbox" checked={sel} onChange={() => toggleSelect(p.id)} className="accent-blue-400 h-3 w-3 cursor-pointer" />
+                        <input type="checkbox" checked={sel} onChange={() => toggleSelect(p.id)} className="accent-sky-400 h-3 w-3 cursor-pointer" />
                       </td>
-                      <td className="px-1 border-r border-gray-400/20 whitespace-nowrap">{new Date(p.data).getDate()}.</td>
-                      <td className="px-1 border-r border-gray-400/20 whitespace-nowrap">1.</td>
-                      <td className="px-1 border-r border-gray-400/20 max-w-[120px] truncate font-medium">{p.nomeFantasia}</td>
-                      <td className="px-1 border-r border-gray-400/20 whitespace-nowrap">{p.referencia}</td>
-                      <td className="px-1 border-r border-gray-400/20 whitespace-nowrap">{p.liberadoEm}</td>
-                      <td className="px-1 border-r border-gray-400/20 text-right whitespace-nowrap">{p.volumes}</td>
-                      <td className="px-1 border-r border-gray-400/20 text-right whitespace-nowrap">{p.pesoKg}</td>
-                      <td className="px-1 border-r border-gray-400/20 whitespace-nowrap">{p.empresa}</td>
-                      <td className="px-1 border-r border-gray-400/20 whitespace-nowrap">
+                      <td className="px-1 border-r border-white/[0.05] whitespace-nowrap">{new Date(p.data).getDate()}.</td>
+                      <td className="px-1 border-r border-white/[0.05] whitespace-nowrap">1.</td>
+                      <td className="px-1 border-r border-white/[0.05] max-w-[120px] truncate font-medium">{p.nomeFantasia}</td>
+                      <td className="px-1 border-r border-white/[0.05] whitespace-nowrap">{p.referencia}</td>
+                      <td className="px-1 border-r border-white/[0.05] whitespace-nowrap">{p.liberadoEm}</td>
+                      <td className="px-1 border-r border-white/[0.05] text-right whitespace-nowrap">{p.volumes}</td>
+                      <td className="px-1 border-r border-white/[0.05] text-right whitespace-nowrap">{p.pesoKg}</td>
+                      <td className="px-1 border-r border-white/[0.05] whitespace-nowrap">{p.empresa}</td>
+                      <td className="px-1 border-r border-white/[0.05] whitespace-nowrap">
                         <span className={`${sel ? '' : p.tipoFaturamento.includes('NFe') ? 'bg-yellow-200 text-yellow-900 px-0.5 rounded' : ''}`}>{p.tipoFaturamento}</span>
                       </td>
-                      <td className="px-1 border-r border-gray-400/20 whitespace-nowrap">{p.autorizacao}</td>
-                      <td className="px-1 border-r border-gray-400/20 whitespace-nowrap font-bold">{p.status}</td>
-                      <td className="px-1 border-r border-gray-400/20 max-w-[90px] truncate font-semibold">{p.regiao}</td>
-                      <td className="px-1 border-r border-gray-400/20 font-mono whitespace-nowrap">{p.cep}</td>
-                      <td className="px-1 border-r border-gray-400/20 max-w-[80px] truncate">{p.bairro}</td>
-                      <td className="px-1 border-r border-gray-400/20 max-w-[90px] truncate">{p.subRegiao}</td>
-                      <td className="px-1 border-r border-gray-400/20 text-center">{p.onda}</td>
-                      <td className="px-1 border-r border-gray-400/20 whitespace-nowrap">
+                      <td className="px-1 border-r border-white/[0.05] whitespace-nowrap">{p.autorizacao}</td>
+                      <td className="px-1 border-r border-white/[0.05] whitespace-nowrap font-bold">{p.status}</td>
+                      <td className="px-1 border-r border-white/[0.05] max-w-[90px] truncate font-semibold">{p.regiao}</td>
+                      <td className="px-1 border-r border-white/[0.05] font-mono whitespace-nowrap">{p.cep}</td>
+                      <td className="px-1 border-r border-white/[0.05] max-w-[80px] truncate">{p.bairro}</td>
+                      <td className="px-1 border-r border-white/[0.05] max-w-[90px] truncate">{p.subRegiao}</td>
+                      <td className="px-1 border-r border-white/[0.05] text-center">{p.onda}</td>
+                      <td className="px-1 border-r border-white/[0.05] whitespace-nowrap">
                         <span className={sel ? '' : p.periodo === 'MANHA' ? 'text-blue-800 font-bold' : 'text-orange-700 font-bold'}>
                           {p.periodo === 'MANHA' ? 'MANHÃ' : 'TARDE'}
                         </span>
                       </td>
-                      <td className="px-1 border-r border-gray-400/20 whitespace-nowrap">{p.rota}</td>
-                      <td className="px-1 border-r border-gray-400/20 whitespace-nowrap">{p.recebimento}</td>
-                      <td className="px-1 border-r border-gray-400/20 max-w-[100px] truncate">{p.motorista}</td>
+                      <td className="px-1 border-r border-white/[0.05] whitespace-nowrap">{p.rota}</td>
+                      <td className="px-1 border-r border-white/[0.05] whitespace-nowrap">{p.recebimento}</td>
+                      <td className="px-1 border-r border-white/[0.05] max-w-[100px] truncate">{p.motorista}</td>
                       <td className="px-1 text-center whitespace-nowrap">{p.andamento}</td>
                     </tr>
                   );
@@ -736,7 +736,7 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
                       ))}
                     </div>
                     <button onClick={(ev) => { ev.stopPropagation(); imprimirCapaRota(r.id); }}
-                      className="w-full mt-1 bg-blue-600 hover:bg-blue-700 text-white rounded px-2 py-1 font-bold flex items-center justify-center gap-1">
+                      className="w-full mt-1 bg-sky-500 hover:bg-sky-400 text-white rounded px-2 py-1 font-bold flex items-center justify-center gap-1">
                       <Printer className="h-3 w-3" /> Imprimir Capa de Rota
                     </button>
                   </div>
@@ -749,7 +749,7 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
 
       {/* ═══════════ PAINEL INFERIOR: ENTREGAS + KPIs ═══════════ */}
       <div className="shrink-0 border-t-2 border-gray-400" style={{ height: 200 }}>
-        <div className="bg-gray-200 border-b border-gray-400 px-2 py-0.5 font-bold text-gray-800 text-[11px]">
+        <div className="bg-white/[0.02] backdrop-blur-xl border-b border-white/[0.06] px-2 py-0.5 font-bold text-gray-800 text-[11px]">
           Entregas
         </div>
         <div className="flex" style={{ height: 'calc(100% - 22px)' }}>
@@ -1022,7 +1022,7 @@ function ModalNovaEntrega({ dataCarga, filialId, pedidosJaRoteirizados, onClose,
                     <tr>
                       <th className="w-8 px-2 py-1.5 border-b border-gray-200">
                         <input type="checkbox" checked={selecionados.size === pedidosFiltrados.length && pedidosFiltrados.length > 0}
-                          onChange={toggleAll} className="accent-blue-600 h-3 w-3 cursor-pointer" />
+                          onChange={toggleAll} className="accent-sky-500 h-3 w-3 cursor-pointer" />
                       </th>
                       {['Nº', 'Cliente', 'Data Entrega', 'Peso (kg)', 'Valor', 'Status'].map(h => (
                         <th key={h} className="px-2 py-1.5 text-left font-semibold text-gray-600 border-b border-gray-200 whitespace-nowrap">{h}</th>
@@ -1036,7 +1036,7 @@ function ModalNovaEntrega({ dataCarga, filialId, pedidosJaRoteirizados, onClose,
                         <tr key={p.id} onClick={() => toggleSel(p.id)}
                           className={`border-b border-gray-100 cursor-pointer transition-colors ${sel ? 'bg-blue-100 ring-1 ring-inset ring-blue-400' : 'hover:bg-gray-50'}`}>
                           <td className="px-2 py-1.5" onClick={e => e.stopPropagation()}>
-                            <input type="checkbox" checked={sel} onChange={() => toggleSel(p.id)} className="accent-blue-600 h-3 w-3 cursor-pointer" />
+                            <input type="checkbox" checked={sel} onChange={() => toggleSel(p.id)} className="accent-sky-500 h-3 w-3 cursor-pointer" />
                           </td>
                           <td className="px-2 py-1.5 font-bold text-blue-700">{p.numero}</td>
                           <td className="px-2 py-1.5">
@@ -1148,7 +1148,7 @@ function ModalNovaEntrega({ dataCarga, filialId, pedidosJaRoteirizados, onClose,
           <div className="flex gap-2">
             <button onClick={onClose} className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-xs text-gray-700 hover:bg-gray-50 font-medium">Cancelar</button>
             <button onClick={handleRoteirizar} disabled={salvando || selecionados.size === 0 || !veiculoEscolhido}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold disabled:opacity-40 flex items-center gap-1.5 shadow-sm">
+              className="px-4 py-1.5 bg-sky-500 hover:bg-sky-400 text-white rounded-lg text-xs font-bold disabled:opacity-40 flex items-center gap-1.5 shadow-sm">
               <RotateCcw className="h-3.5 w-3.5" /> Roteirizar {selecionados.size} Pedido{selecionados.size !== 1 ? 's' : ''}
             </button>
           </div>

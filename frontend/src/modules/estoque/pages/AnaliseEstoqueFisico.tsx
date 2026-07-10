@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle, Printer, Download, X, ChevronRight, Search, AlertTriangle, TrendingDown, BarChart3 } from 'lucide-react';
+import { CheckCircle, Printer, Download, X, ChevronRight, Search, AlertTriangle, TrendingDown, BarChart3, SlidersHorizontal, Package, Coins, PackageX, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { toast, confirmDialog } from '../../../components/ui/feedback';
-import { PageHeader } from '../../cadastros/ui';
+import { PageHeader, btnGlass, btnPrimary } from '../../cadastros/ui';
 
 // ─── Tipos ───────────────────────────────────────
 interface ProdutoEstoque {
@@ -212,6 +212,11 @@ export default function AnaliseEstoqueFisico() {
   const [semOrdCompra, setSemOrdCompra] = useState(false);
   const [busca, setBusca]           = useState('');
 
+  // UI do redesenho
+  const [editCell, setEditCell]       = useState<{ id: string; campo: string } | null>(null);
+  const [filtrosAberto, setFiltros]   = useState(false);
+  const [drawerRepor, setDrawerRepor] = useState(false);
+
   // Estado da grade
   const [produtos, setProdutos]       = useState<ProdutoEstoque[]>([]);
   const [executado, setExecutado]     = useState(false);
@@ -313,7 +318,35 @@ export default function AnaliseEstoqueFisico() {
       return { ...np, saldoFinal, valorAtualEstoque, diferencaEstoque };
     }));
   };
-  const cellInp = 'w-full text-right font-mono text-[11px] px-1 py-0.5 rounded border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-blue-400';
+  const cellInp = 'w-full text-right font-mono text-[11px] px-1.5 py-0.5 rounded border border-white/[0.08] bg-white/[0.04] text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-400/40 focus:border-sky-400/60';
+
+  // Célula editável por clique: mostra o número limpo; vira input só no clique.
+  const isEditing = (id: string, campo: string) => editCell?.id === id && editCell?.campo === campo;
+  const EditNum = ({ id, campo, valor, commit, placeholder, alerta }: { id: string; campo: string; valor: number | null; commit: (v: string) => void; placeholder?: string; alerta?: boolean }) => {
+    if (isEditing(id, campo)) {
+      return (
+        <input
+          autoFocus type="number" step="0.001"
+          defaultValue={valor ?? ''}
+          placeholder={placeholder}
+          onBlur={(e) => { commit(e.target.value); setEditCell(null); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setEditCell(null); }}
+          className="w-full text-right font-mono text-[11px] px-1.5 py-0.5 rounded bg-sky-400/10 border border-sky-400/60 text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-400/40"
+        />
+      );
+    }
+    const vazio = valor === null || valor === undefined;
+    return (
+      <button
+        onClick={(e) => { e.stopPropagation(); setEditCell({ id, campo }); }}
+        className={`w-full text-right font-mono px-1.5 py-0.5 rounded hover:bg-sky-400/10 hover:ring-1 hover:ring-sky-400/25 transition-all duration-150 ${alerta && (valor || 0) > 0 ? 'text-amber-300 font-semibold' : ''}`}
+      >
+        {vazio ? <span className="text-slate-600">{placeholder || '—'}</span> : fmtN(valor as number)}
+      </button>
+    );
+  };
+
+  const emFalta = useMemo(() => aRepor.filter((p: any) => p.negativo).length, [aRepor]);
 
   // ── Faturar quebra: gera a baixa REAL no estoque (AVARIA) ──────
   // "Delta" = o que foi digitado além do que já estava baixado (quebraReal),
@@ -391,212 +424,106 @@ export default function AnaliseEstoqueFisico() {
         icon={<BarChart3 className="h-4 w-4" />}
         titulo="Análise de Estoque Físico"
         subtitulo="Contagem, quebra e faturamento de perdas"
+        actions={
+          <>
+            <button onClick={() => handleExecutar()} disabled={processando} className={btnPrimary + ' bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/20'}>
+              {processando ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />} Executar
+            </button>
+            <button onClick={() => imprimirRelatorio(produtosFiltrados, dataIni, dataFim)} disabled={!executado} className={btnGlass}>
+              <Printer className="h-3.5 w-3.5" /> Imprimir
+            </button>
+            <button onClick={() => exportarCSV(produtosFiltrados)} disabled={!executado} className={btnGlass}>
+              <Download className="h-3.5 w-3.5" /> Exportar
+            </button>
+            <button
+              onClick={handleFaturarQuebra}
+              disabled={!executado || faturando || pendentes.length === 0}
+              title={pendentes.length === 0 ? 'Digite valores em Quebra para faturar' : `Baixar ${pendentes.length} item(ns) — R$ ${fmtR(valorPendente)} perdido`}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold bg-rose-500 hover:bg-rose-400 text-white shadow-lg shadow-rose-500/20 transition-all duration-300 active:scale-[0.98] disabled:opacity-30 disabled:bg-white/[0.04] disabled:text-slate-500 disabled:shadow-none"
+            >
+              <TrendingDown className="h-3.5 w-3.5" />
+              {faturando ? 'Faturando…' : 'Faturar Quebra'}
+              {pendentes.length > 0 && !faturando && <span className="bg-white/25 rounded-full px-1.5 py-0.5 text-[10px] leading-none">{pendentes.length}</span>}
+            </button>
+          </>
+        }
       />
 
-      {/* ── Aviso: produtos a repor / em falta ── */}
+      {/* ── Alerta colapsado: produtos a repor / em falta ── */}
       {aRepor.length > 0 && (
-        <div className="bg-amber-50 border-b border-amber-300 px-3 py-1.5 shrink-0 flex items-start gap-2">
-          <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <span className="text-[11px] font-bold text-amber-800">
-              {aRepor.filter(p => p.negativo).length > 0
-                ? `${aRepor.filter(p => p.negativo).length} produto(s) em FALTA (estoque negativo) e `
-                : ''}
-              {aRepor.length} produto(s) a repor:
-            </span>
-            <span className="ml-1 inline-flex flex-wrap gap-1.5">
-              {aRepor.slice(0, 14).map(p => (
-                <span key={p.produtoId}
-                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${p.negativo ? 'bg-rose-900/40 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
-                  {p.descricao} · disp. {p.disponivel}{p.negativo && ` · comprar ${p.sugestaoCompra}`}
-                </span>
-              ))}
-              {aRepor.length > 14 && <span className="text-[10px] text-amber-600">+{aRepor.length - 14}</span>}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* ── Barra de filtros ── */}
-      <div className="bg-gray-200 border-b border-gray-400 px-3 py-2 flex flex-wrap items-end gap-3 shrink-0">
-
-        {/* Período */}
-        <fieldset className="border border-gray-400 rounded px-2 pb-1.5 pt-0">
-          <legend className="text-[10px] font-semibold text-gray-700 px-1">Período</legend>
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
-              <span className="text-gray-600 w-6">De:</span>
-              <input
-                type="date"
-                value={dataIni}
-                onChange={e => setDataIni(e.target.value)}
-                className="border border-gray-400 bg-white text-xs px-1.5 py-0.5 rounded w-32 font-mono cursor-pointer"
-              />
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-gray-600 w-6">Até:</span>
-              <input
-                type="date"
-                value={dataFim}
-                onChange={e => setDataFim(e.target.value)}
-                className="border border-gray-400 bg-white text-xs px-1.5 py-0.5 rounded w-32 font-mono cursor-pointer"
-              />
-            </div>
-          </div>
-        </fieldset>
-
-        {/* Seleção */}
-        <fieldset className="border border-gray-400 rounded px-2 pb-1.5 pt-0">
-          <legend className="text-[10px] font-semibold text-gray-700 px-1">Seleção</legend>
-          <div className="space-y-1">
-            <div className="flex items-center gap-1">
-              <span className="text-gray-600">Tipo Item:</span>
-              <select value={tipoItem} onChange={e => setTipoItem(e.target.value)} className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded w-44">
-                {TIPOS_ITEM.map(t => <option key={t}>{t}</option>)}
-              </select>
-            </div>
-            <label className="flex items-center gap-1 cursor-pointer text-gray-600">
-              <input type="checkbox" checked={confFisica} onChange={e => setConfFisica(e.target.checked)} className="accent-blue-600" />
-              Conferência Física
-            </label>
-            <label className="flex items-center gap-1 cursor-pointer text-gray-600">
-              <input type="checkbox" checked={semOrdCompra} onChange={e => setSemOrdCompra(e.target.checked)} className="accent-blue-600" />
-              Não Mostrar Ordens de Compra
-            </label>
-          </div>
-        </fieldset>
-
-        {/* Família + Grupo */}
-        <fieldset className="border border-gray-400 rounded px-2 pb-1.5 pt-0">
-          <legend className="text-[10px] font-semibold text-gray-700 px-1">Selecione uma Família</legend>
-          <select
-            value={familia}
-            onChange={e => handleFamiliaChange(e.target.value)}
-            className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded w-40"
-          >
-            {FAMILIAS.map(f => <option key={f}>{f}</option>)}
-          </select>
-          <div className="mt-1.5">
-            <span className="text-[10px] text-gray-600">Selecione um Grupo</span>
-            <select value={grupo} onChange={e => setGrupo(e.target.value)} className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded w-40 block mt-0.5">
-              {gruposDisponiveis.map(g => <option key={g}>{g}</option>)}
-            </select>
-          </div>
-        </fieldset>
-
-        {/* Centro de Distribuição */}
-        <fieldset className="border border-gray-400 rounded px-2 pb-1.5 pt-0">
-          <legend className="text-[10px] font-semibold text-gray-700 px-1">Centro de Distribuição</legend>
-          <select value={cd} onChange={e => setCd(e.target.value)} className="border border-gray-400 bg-white text-xs px-1 py-0.5 rounded w-28">
-            <option>1 - HETROS</option>
-          </select>
-        </fieldset>
-
-        {/* Unidade de Apuração */}
-        <fieldset className="border border-gray-400 rounded px-2 pb-1.5 pt-0">
-          <legend className="text-[10px] font-semibold text-gray-700 px-1">Unidade de Apuração</legend>
-          <label className="flex items-center gap-1 text-gray-700 cursor-pointer">
-            <input type="radio" name="und" checked={undApuracao === 'Estoque'} onChange={() => setUndApuracao('Estoque')} className="accent-blue-600" />
-            Estoque
-          </label>
-          <label className="flex items-center gap-1 text-gray-700 cursor-pointer">
-            <input type="radio" name="und" checked={undApuracao === 'Principal'} onChange={() => setUndApuracao('Principal')} className="accent-blue-600" />
-            Principal
-          </label>
-        </fieldset>
-
-        {/* Botões de ação */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => handleExecutar()}
-            disabled={processando}
-            className="flex items-center gap-1.5 bg-white border-2 border-green-600 hover:bg-green-50 px-4 py-2 rounded text-green-700 font-bold disabled:opacity-50 shadow-sm"
-          >
-            <CheckCircle className="h-4 w-4" /> Executar
-          </button>
-          <button
-            onClick={() => imprimirRelatorio(produtosFiltrados, dataIni, dataFim)}
-            disabled={!executado}
-            className="flex items-center gap-1.5 bg-white border border-gray-400 hover:bg-gray-50 px-3 py-2 rounded text-gray-700 disabled:opacity-30 shadow-sm"
-          >
-            <Printer className="h-4 w-4" /> Imprimir
-          </button>
-          <button
-            onClick={() => exportarCSV(produtosFiltrados)}
-            disabled={!executado}
-            className="flex items-center gap-1.5 bg-white border border-gray-400 hover:bg-gray-50 px-3 py-2 rounded text-gray-700 disabled:opacity-30 shadow-sm"
-          >
-            <Download className="h-4 w-4" /> Exportar
-          </button>
-          <button
-            onClick={handleFaturarQuebra}
-            disabled={!executado || faturando || pendentes.length === 0}
-            title={pendentes.length === 0 ? 'Digite valores em Quebra para faturar' : `Baixar ${pendentes.length} item(ns) — R$ ${fmtR(valorPendente)} perdido`}
-            className="flex items-center gap-1.5 bg-white border-2 border-rose-600 hover:bg-rose-50 px-3 py-2 rounded text-rose-700 font-bold disabled:opacity-30 disabled:border-gray-400 disabled:text-gray-500 shadow-sm"
-          >
-            <TrendingDown className="h-4 w-4" />
-            {faturando ? 'Faturando...' : 'Faturar Quebra'}
-            {pendentes.length > 0 && !faturando && (
-              <span className="ml-0.5 bg-rose-600 text-white rounded-full px-1.5 py-0.5 text-[10px] leading-none">{pendentes.length}</span>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* ── Busca rápida ── */}
-      {executado && (
-        <div className="bg-gray-100 border-b border-gray-300 px-3 py-1 flex items-center gap-2 shrink-0">
-          <Search className="h-3.5 w-3.5 text-gray-400" />
-          <input
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-            placeholder="Filtrar por código ou descrição..."
-            className="border border-gray-300 bg-white text-xs px-2 py-0.5 rounded w-60"
-          />
-          {busca && (
-            <button onClick={() => setBusca('')} className="text-gray-400 hover:text-gray-600"><X className="h-3 w-3" /></button>
-          )}
-          <span className="text-gray-500 ml-2">
-            {familia !== '<Todas>' && <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-semibold mr-1">{familia}</span>}
-            {grupo !== '<Todas>' && <span className="bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-semibold">{grupo}</span>}
+        <div className="bg-amber-500/[0.06] border-b border-amber-400/15 px-5 py-1.5 shrink-0 flex items-center gap-2 text-[11px]">
+          <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+          <span className="text-amber-300 font-semibold">
+            {emFalta > 0 && <><span className="text-rose-300">{emFalta} em falta</span> · </>}
+            {aRepor.length} produto(s) a repor
           </span>
+          <button onClick={() => setDrawerRepor(true)} className="ml-auto text-amber-300 hover:text-amber-200 font-semibold underline underline-offset-2 decoration-amber-400/40">
+            Ver lista
+          </button>
         </div>
       )}
 
-      {/* ── Grade de produtos ── */}
-      <div className="flex-1 overflow-auto">
+      {/* ── Corpo ── */}
+      <div className="flex-1 flex flex-col overflow-hidden p-5 gap-4">
+
+        {/* KPIs */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+          <KpiCard icon={<Package className="h-4 w-4" />} label="Itens" value={String(totais.count)} />
+          <KpiCard icon={<Coins className="h-4 w-4" />} label="Valor do Estoque" value={`R$ ${fmtR(totais.valorTotal)}`} accent />
+          <KpiCard icon={<PackageX className="h-4 w-4" />} label="Em Falta" value={String(emFalta)} tone={emFalta > 0 ? 'rose' : undefined} />
+          <KpiCard icon={<TrendingDown className="h-4 w-4" />} label="Perda / Quebra" value={`R$ ${fmtR(totais.valorPerdido)}`} tone={totais.valorPerdido > 0 ? 'amber' : undefined} />
+        </div>
+
+        {/* FilterBar — busca + chips + filtros avançados */}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="relative flex-1 min-w-[220px] max-w-md">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Filtrar por código ou descrição..."
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg pl-8 pr-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-400/60 transition-all duration-300" />
+          </div>
+          {familia !== '<Todas>' && <span className="inline-flex items-center gap-1 bg-sky-500/15 text-sky-300 px-2.5 py-1 rounded-lg text-xs font-semibold">{familia}<button onClick={() => handleFamiliaChange('<Todas>')}><X className="h-3 w-3" /></button></span>}
+          {grupo !== '<Todas>' && <span className="inline-flex items-center gap-1 bg-violet-500/15 text-violet-300 px-2.5 py-1 rounded-lg text-xs font-semibold">{grupo}<button onClick={() => setGrupo('<Todas>')}><X className="h-3 w-3" /></button></span>}
+          {confFisica && <span className="bg-amber-500/15 text-amber-300 px-2.5 py-1 rounded-lg text-xs font-semibold">Conferência física</span>}
+          <button onClick={() => setFiltros(true)} className={btnGlass + ' ml-auto'}>
+            <SlidersHorizontal className="h-3.5 w-3.5" /> Filtros
+          </button>
+        </div>
+
+        {/* ── Grade em card de vidro ── */}
+        <div className="flex-1 flex flex-col overflow-hidden bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
+        <div className="flex-1 overflow-auto">
         {!executado && !processando ? (
-          <div className="flex items-center justify-center h-full text-gray-400">
+          <div className="flex items-center justify-center h-full text-slate-500">
             <div className="text-center">
-              <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-200" />
-              <p className="text-sm font-medium">Clique em <strong className="text-green-600">Executar</strong> para carregar a análise de estoque</p>
-              <p className="text-xs text-gray-300 mt-1">Selecione os filtros desejados e clique no botão verde</p>
+              <CheckCircle className="h-12 w-12 mx-auto mb-3 text-slate-700" />
+              <p className="text-sm font-medium">Clique em <strong className="text-emerald-400">Executar</strong> para carregar a análise de estoque</p>
+              <p className="text-xs text-slate-600 mt-1">Selecione os filtros desejados e clique no botão verde</p>
             </div>
           </div>
         ) : (
           <table className="w-full border-collapse text-[11px]" style={{ minWidth: 1300 }}>
             <thead className="sticky top-0 z-10">
-              <tr className="bg-slate-800 border-b-2 border-slate-600">
-                <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Código Produto</th>
-                <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap">Descrição</th>
-                <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-16">Família</th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Saldo Inicial</th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Entrada</th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Chão</th>
+              <tr className="bg-[#11161f] border-b border-white/[0.08]">
+                <th className="sticky left-0 z-20 bg-[#11161f] px-2 py-1.5 text-left font-semibold text-slate-400 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap w-24">Código</th>
+                <th className="sticky left-24 z-20 bg-[#11161f] px-2 py-1.5 text-left font-semibold text-slate-400 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap min-w-[180px]">Descrição</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-slate-400 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap w-16">Família</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-slate-400 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap w-24">Saldo Inicial</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-slate-400 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap w-24">Entrada</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-slate-400 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap w-24">Chão</th>
                 {!semOrdCompra && (
-                  <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24">Ordem de Compra</th>
+                  <th className="px-2 py-1.5 text-right font-semibold text-slate-400 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap w-24">Ordem de Compra</th>
                 )}
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-20 bg-rose-900/40">Quebra</th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24 bg-emerald-900/40">= Saldo Final</th>
-                <th className="px-2 py-1.5 text-left font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-12">Und</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-amber-300/80 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap w-20">Quebra</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-emerald-300/80 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap w-24">Saldo Final</th>
+                <th className="px-2 py-1.5 text-left font-semibold text-slate-400 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap w-12">Und</th>
                 {confFisica && (
                   <>
-                    <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-24 bg-amber-900/40">✎ Contagem Física</th>
-                    <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-28 bg-amber-900/40">⊘ Diferença de Estoque</th>
+                    <th className="px-2 py-1.5 text-right font-semibold text-slate-400 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap w-24">Contagem Física</th>
+                    <th className="px-2 py-1.5 text-right font-semibold text-slate-400 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap w-28">Diferença</th>
                   </>
                 )}
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 border-r border-gray-400 whitespace-nowrap w-20">Preço Custo</th>
-                <th className="px-2 py-1.5 text-right font-semibold text-gray-800 whitespace-nowrap w-28">Valor Atual do Estoque</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-slate-400 uppercase tracking-wide border-r border-white/[0.06] whitespace-nowrap w-20">Preço Custo</th>
+                <th className="px-2 py-1.5 text-right font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap w-28">Valor Estoque</th>
               </tr>
             </thead>
             <tbody>
@@ -607,50 +534,43 @@ export default function AnaliseEstoqueFisico() {
                     key={p.id}
                     onClick={() => setSelId(p.id)}
                     onDoubleClick={() => setDetalheAberto(p)}
-                    className={`border-b border-gray-200 cursor-pointer transition-colors ${sel ? 'bg-blue-600 text-white' : 'bg-white hover:bg-blue-50'}`}
+                    className={`group border-b border-white/[0.04] cursor-pointer transition-colors ${sel ? 'bg-sky-500/15 text-sky-100' : 'hover:bg-white/[0.03]'}`}
                     title="Duplo clique para ver movimentações"
                   >
-                    <td className="px-2 py-1 border-r border-gray-200">
+                    <td className={`sticky left-0 z-10 px-2 py-1 border-r border-white/[0.05] ${sel ? 'bg-sky-500/[0.18]' : 'bg-[#0c1119] group-hover:bg-[#131a26]'}`}>
                       <div className="flex items-center gap-1">
-                        <ChevronRight className={`h-3 w-3 shrink-0 ${sel ? 'text-white/60' : 'text-gray-300'}`} />
-                        <span className={`font-semibold ${sel ? 'text-white' : 'text-blue-700'}`}>{p.codigo}</span>
+                        <ChevronRight className={`h-3 w-3 shrink-0 ${sel ? 'text-sky-200/70' : 'text-slate-600'}`} />
+                        <span className={`font-semibold ${sel ? 'text-sky-100' : 'text-sky-300'}`}>{p.codigo}</span>
                       </div>
                     </td>
-                    <td className={`px-2 py-1 border-r border-gray-200 ${sel ? '' : 'text-blue-600'}`}>{p.descricao}</td>
-                    <td className="px-2 py-1 border-r border-gray-200">{p.familia}</td>
-                    <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${sel ? '' : negClass(p.saldoInicial)}`} title="Calculado pelo sistema (não editável)">{fmtN(p.saldoInicial)}</td>
-                    <td className="px-1 py-0.5 border-r border-gray-200" onClick={e => e.stopPropagation()}>
-                      <input type="number" step="0.001" className={cellInp} value={p.entradas ?? 0} onChange={e => setCampo(p.id, 'entradas', e.target.value)} />
+                    <td className={`sticky left-24 z-10 px-2 py-1 border-r border-white/[0.05] ${sel ? 'bg-sky-500/[0.18] text-sky-100' : 'bg-[#0c1119] group-hover:bg-[#131a26] text-slate-200'}`}>{p.descricao}</td>
+                    <td className="px-2 py-1 border-r border-white/[0.05] text-slate-400">{p.familia}</td>
+                    <td className={`px-2 py-1 border-r border-white/[0.05] text-right font-mono ${sel ? '' : p.saldoInicial < 0 ? 'text-rose-400' : 'text-slate-300'}`} title="Calculado pelo sistema (não editável)">{fmtN(p.saldoInicial)}</td>
+                    <td className="px-1 py-0.5 border-r border-white/[0.05]" onClick={e => e.stopPropagation()}>
+                      <EditNum id={p.id} campo="entradas" valor={p.entradas ?? 0} commit={(v) => setCampo(p.id, 'entradas', v)} />
                     </td>
-                    <td className="px-1 py-0.5 border-r border-gray-200" onClick={e => e.stopPropagation()}>
-                      <input type="number" step="0.001" className={cellInp} value={p.chao ?? 0} onChange={e => setCampo(p.id, 'chao', e.target.value)} />
+                    <td className="px-1 py-0.5 border-r border-white/[0.05]" onClick={e => e.stopPropagation()}>
+                      <EditNum id={p.id} campo="chao" valor={p.chao ?? 0} commit={(v) => setCampo(p.id, 'chao', v)} />
                     </td>
                     {!semOrdCompra && (
-                      <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono ${sel ? '' : 'text-sky-300'}`} title="Já incluído na Entrada (informativo)">{p.ordensCompra ? fmtN(p.ordensCompra) : ''}</td>
+                      <td className={`px-2 py-1 border-r border-white/[0.05] text-right font-mono ${sel ? '' : 'text-slate-500'}`} title="Já incluído na Entrada (informativo)">{p.ordensCompra ? fmtN(p.ordensCompra) : '—'}</td>
                     )}
-                    <td className="px-1 py-0.5 border-r border-gray-200 bg-rose-950/50" onClick={e => e.stopPropagation()}>
-                      <input type="number" step="0.001" min="0" className={cellInp} value={p.quebra ?? 0} onChange={e => setCampo(p.id, 'quebra', e.target.value)} />
+                    <td className="px-1 py-0.5 border-r border-white/[0.05]" onClick={e => e.stopPropagation()}>
+                      <EditNum id={p.id} campo="quebra" valor={p.quebra ?? 0} commit={(v) => setCampo(p.id, 'quebra', v)} alerta />
                     </td>
-                    <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono font-bold bg-emerald-900/30 ${sel ? '' : negClass(p.saldoFinal)}`}>{fmtN(p.saldoFinal)}</td>
-                    <td className="px-2 py-1 border-r border-gray-200">{p.undEstoque}</td>
+                    <td className={`px-2 py-1 border-r border-white/[0.05] text-right font-mono font-bold ${sel ? 'text-white' : p.saldoFinal < 0 ? 'text-rose-400' : 'text-emerald-300'}`}>{fmtN(p.saldoFinal)}</td>
+                    <td className="px-2 py-1 border-r border-white/[0.05] text-slate-400">{p.undEstoque}</td>
                     {confFisica && (
                       <>
-                        <td className="px-2 py-1 border-r border-gray-200 bg-amber-950/40" onClick={e => e.stopPropagation()}>
-                          <input
-                            type="number"
-                            step="0.001"
-                            className="w-full border border-gray-300 text-right text-xs px-1.5 py-0.5 rounded bg-white focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
-                            value={p.contagemFisica ?? ''}
-                            onChange={e => handleContagemChange(p.id, e.target.value)}
-                            placeholder="0,000"
-                          />
+                        <td className="px-1 py-0.5 border-r border-white/[0.05]" onClick={e => e.stopPropagation()}>
+                          <EditNum id={p.id} campo="contagemFisica" valor={p.contagemFisica} commit={(v) => handleContagemChange(p.id, v)} placeholder="0,000" />
                         </td>
-                        <td className={`px-2 py-1 border-r border-gray-200 text-right font-mono font-bold bg-amber-950/40 ${sel ? '' : p.diferencaEstoque < 0 ? 'text-red-600' : p.diferencaEstoque > 0 ? 'text-green-600' : ''}`}>
-                          {p.contagemFisica !== null ? fmtN(p.diferencaEstoque) : ''}
+                        <td className={`px-2 py-1 border-r border-white/[0.05] text-right font-mono font-bold ${sel ? '' : p.diferencaEstoque < 0 ? 'text-rose-400' : p.diferencaEstoque > 0 ? 'text-emerald-300' : 'text-slate-500'}`}>
+                          {p.contagemFisica !== null ? fmtN(p.diferencaEstoque) : '—'}
                         </td>
                       </>
                     )}
-                    <td className="px-2 py-1 border-r border-gray-200 text-right font-mono">{fmtR(p.precoCusto)}</td>
+                    <td className="px-2 py-1 border-r border-white/[0.05] text-right font-mono text-slate-400">{fmtR(p.precoCusto)}</td>
                     <td className={`px-2 py-1 text-right font-mono font-semibold ${sel ? '' : negClass(p.valorAtualEstoque)}`}>{fmtR(p.valorAtualEstoque)}</td>
                   </tr>
                 );
@@ -664,7 +584,7 @@ export default function AnaliseEstoqueFisico() {
       </div>
 
       {/* ── Rodapé com totais ── */}
-      <div className="shrink-0 bg-slate-800 border-t-2 border-slate-600 px-3 py-1.5 flex items-center justify-between text-gray-800">
+      <div className="shrink-0 bg-white/[0.02] backdrop-blur-xl border-t border-white/[0.06] px-4 py-2 flex items-center justify-between text-slate-300">
         <span className="flex items-center gap-3">
           Registros encontrados: <strong>{totais.count}</strong>
           {totais.valorPerdido > 0 && (
@@ -677,6 +597,8 @@ export default function AnaliseEstoqueFisico() {
           <span className={negClass(totais.saldoFinal)}>{fmtN(totais.saldoFinal)}</span>
           <span className={totais.diferenca !== 0 ? (totais.diferenca < 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold') : ''}>{fmtN(totais.diferenca)}</span>
           <span className={`font-bold ${negClass(totais.valorTotal)}`}>{fmtR(totais.valorTotal)}</span>
+        </div>
+      </div>
         </div>
       </div>
 
@@ -710,20 +632,20 @@ export default function AnaliseEstoqueFisico() {
             <div className="px-4 py-2 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center gap-4 shrink-0 text-xs">
               <div className="flex items-center gap-1.5">
                 <span className="text-gray-600">Código do Produto</span>
-                <span className="border border-gray-400 bg-white px-2 py-0.5 rounded font-mono font-bold">{detalheAberto.codigo}</span>
+                <span className="border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 rounded font-mono font-bold">{detalheAberto.codigo}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-gray-600">Descrição do Produto</span>
-                <span className="border border-gray-400 bg-white px-2 py-0.5 rounded font-semibold">{detalheAberto.descricao}</span>
+                <span className="border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 rounded font-semibold">{detalheAberto.descricao}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-gray-600">Quantidade Total</span>
-                <span className="border border-gray-400 bg-white px-2 py-0.5 rounded font-mono">{fmtN(Math.abs(detalheAberto.saidas))}</span>
+                <span className="border border-white/[0.08] bg-white/[0.04] px-2 py-0.5 rounded font-mono">{fmtN(Math.abs(detalheAberto.saidas))}</span>
                 <span className="font-bold">{detalheAberto.undEstoque}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-gray-600">Saldo Atual</span>
-                <span className="bg-blue-600 text-white px-3 py-1 rounded font-bold font-mono text-sm">
+                <span className="bg-sky-500 text-white px-3 py-1 rounded font-bold font-mono text-sm">
                   {fmtN(detalheAberto.saldoFinal)}
                 </span>
               </div>
@@ -740,19 +662,19 @@ export default function AnaliseEstoqueFisico() {
                 </thead>
                 <tbody>
                   {(MOCK_MOVIMENTACOES[detalheAberto.id] || []).map((m, i) => (
-                    <tr key={i} className="border-b border-gray-100 hover:bg-blue-50">
-                      <td className="px-2 py-1 border-r border-gray-200 text-blue-700 whitespace-nowrap">{m.idDfe}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 whitespace-nowrap font-medium">{m.nomeCliente}</td>
-                      <td className="px-2 py-1 border-r border-gray-200">{m.natureza}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 text-orange-600 font-bold">{m.observacoes}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 font-mono whitespace-nowrap">{m.dataHoraVenda}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 font-mono">{m.dataEntrega}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 text-right font-mono font-bold">{fmtN(m.qtdeApuracao)}</td>
-                      <td className="px-2 py-1 border-r border-gray-200">{m.unidadeApuracao}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 text-right font-mono">{fmtR(m.vlrTotalVenda)}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 text-right font-mono">{m.qtdeConvertida.toFixed(3)}</td>
-                      <td className="px-2 py-1 border-r border-gray-200">{m.unidadeConvertida}</td>
-                      <td className="px-2 py-1 border-r border-gray-200 text-right font-mono">{fmtR(m.precoMedio)}</td>
+                    <tr key={i} className="border-b border-gray-100 hover:bg-white/[0.03]">
+                      <td className="px-2 py-1 border-r border-white/[0.05] text-sky-300 whitespace-nowrap">{m.idDfe}</td>
+                      <td className="px-2 py-1 border-r border-white/[0.05] whitespace-nowrap font-medium">{m.nomeCliente}</td>
+                      <td className="px-2 py-1 border-r border-white/[0.05]">{m.natureza}</td>
+                      <td className="px-2 py-1 border-r border-white/[0.05] text-orange-600 font-bold">{m.observacoes}</td>
+                      <td className="px-2 py-1 border-r border-white/[0.05] font-mono whitespace-nowrap">{m.dataHoraVenda}</td>
+                      <td className="px-2 py-1 border-r border-white/[0.05] font-mono">{m.dataEntrega}</td>
+                      <td className="px-2 py-1 border-r border-white/[0.05] text-right font-mono font-bold">{fmtN(m.qtdeApuracao)}</td>
+                      <td className="px-2 py-1 border-r border-white/[0.05]">{m.unidadeApuracao}</td>
+                      <td className="px-2 py-1 border-r border-white/[0.05] text-right font-mono">{fmtR(m.vlrTotalVenda)}</td>
+                      <td className="px-2 py-1 border-r border-white/[0.05] text-right font-mono">{m.qtdeConvertida.toFixed(3)}</td>
+                      <td className="px-2 py-1 border-r border-white/[0.05]">{m.unidadeConvertida}</td>
+                      <td className="px-2 py-1 border-r border-white/[0.05] text-right font-mono">{fmtR(m.precoMedio)}</td>
                       <td className="px-2 py-1 text-center">{m.status}</td>
                     </tr>
                   ))}
@@ -779,7 +701,7 @@ export default function AnaliseEstoqueFisico() {
                 >
                   <Download className="h-3 w-3" /> Exportar
                 </button>
-                <button onClick={() => setDetalheAberto(null)} className="px-4 py-1 bg-blue-600 text-white rounded font-medium hover:bg-blue-700">
+                <button onClick={() => setDetalheAberto(null)} className="px-4 py-1 bg-sky-500 text-white rounded font-medium hover:bg-sky-400">
                   OK
                 </button>
               </div>
@@ -787,6 +709,86 @@ export default function AnaliseEstoqueFisico() {
           </div>
         </div>
       ), document.body)}
+
+      {/* ── Modal Filtros ── */}
+      {filtrosAberto && createPortal((
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4 animate-backdrop" onClick={() => setFiltros(false)}>
+          <div className="bg-[#0E141F]/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_24px_80px_-12px_rgba(0,0,0,0.7)] w-full max-w-lg animate-modal" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06]">
+              <h2 className="font-bold text-white text-sm flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-sky-300" /> Filtros</h2>
+              <button onClick={() => setFiltros(false)} className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/[0.06]"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className={fLbl}>De</label><input type="date" value={dataIni} onChange={e => setDataIni(e.target.value)} className={fInp + ' font-mono [color-scheme:dark]'} /></div>
+                <div><label className={fLbl}>Até</label><input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className={fInp + ' font-mono [color-scheme:dark]'} /></div>
+              </div>
+              <div><label className={fLbl}>Tipo de item</label><select value={tipoItem} onChange={e => setTipoItem(e.target.value)} className={fInp}>{TIPOS_ITEM.map(t => <option key={t}>{t}</option>)}</select></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className={fLbl}>Família</label><select value={familia} onChange={e => handleFamiliaChange(e.target.value)} className={fInp}>{FAMILIAS.map(f => <option key={f}>{f}</option>)}</select></div>
+                <div><label className={fLbl}>Grupo</label><select value={grupo} onChange={e => setGrupo(e.target.value)} className={fInp}>{gruposDisponiveis.map(g => <option key={g}>{g}</option>)}</select></div>
+              </div>
+              <div><label className={fLbl}>Centro de Distribuição</label><select value={cd} onChange={e => setCd(e.target.value)} className={fInp}><option>1 - HETROS</option></select></div>
+              <div>
+                <label className={fLbl}>Unidade de Apuração</label>
+                <div className="flex gap-4 mt-1">
+                  <label className="flex items-center gap-1.5 text-slate-300 text-sm cursor-pointer"><input type="radio" name="undf" checked={undApuracao === 'Estoque'} onChange={() => setUndApuracao('Estoque')} className="accent-sky-500" /> Estoque</label>
+                  <label className="flex items-center gap-1.5 text-slate-300 text-sm cursor-pointer"><input type="radio" name="undf" checked={undApuracao === 'Principal'} onChange={() => setUndApuracao('Principal')} className="accent-sky-500" /> Principal</label>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 pt-1 border-t border-white/[0.06]">
+                <label className="flex items-center gap-2 text-slate-300 text-sm cursor-pointer pt-2"><input type="checkbox" checked={confFisica} onChange={e => setConfFisica(e.target.checked)} className="accent-sky-500" /> Conferência Física (mostra colunas de contagem)</label>
+                <label className="flex items-center gap-2 text-slate-300 text-sm cursor-pointer"><input type="checkbox" checked={semOrdCompra} onChange={e => setSemOrdCompra(e.target.checked)} className="accent-sky-500" /> Não mostrar Ordens de Compra</label>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/[0.06]">
+              <button onClick={() => setFiltros(false)} className={btnGlass}>Fechar</button>
+              <button onClick={() => { setFiltros(false); handleExecutar(); }} className={btnPrimary + ' bg-sky-500 hover:bg-sky-400 shadow-sky-500/20'}>Aplicar filtros</button>
+            </div>
+          </div>
+        </div>
+      ), document.body)}
+
+      {/* ── Drawer Reposição ── */}
+      {drawerRepor && createPortal((
+        <div className="fixed inset-0 z-[70] flex justify-end bg-black/50 animate-fade-in" onClick={() => setDrawerRepor(false)}>
+          <div className="w-full max-w-md h-full bg-[#0E141F]/95 backdrop-blur-2xl border-l border-white/[0.08] shadow-2xl overflow-y-auto animate-fade-in-up" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/[0.06] sticky top-0 bg-[#0E141F]/95 backdrop-blur-xl">
+              <h2 className="font-bold text-white text-sm flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-400" /> Produtos a repor <span className="text-slate-500 font-normal">({aRepor.length})</span></h2>
+              <button onClick={() => setDrawerRepor(false)} className="h-7 w-7 flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/[0.06]"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="p-4 space-y-1.5">
+              {aRepor.map((p: any) => (
+                <div key={p.produtoId} className={`flex items-center gap-3 px-3 py-2 rounded-xl border ${p.negativo ? 'bg-rose-500/[0.08] border-rose-500/20' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-slate-200 text-sm font-medium truncate">{p.descricao}</p>
+                    <p className="text-[11px] text-slate-500">disp. {p.disponivel}{p.negativo && ` · comprar ${p.sugestaoCompra}`}</p>
+                  </div>
+                  {p.negativo && <span className="text-[10px] font-bold text-rose-300 bg-rose-500/15 px-2 py-0.5 rounded-full shrink-0">FALTA</span>}
+                </div>
+              ))}
+              {aRepor.length === 0 && <p className="text-slate-500 text-sm text-center py-8">Nada a repor.</p>}
+            </div>
+          </div>
+        </div>
+      ), document.body)}
     </div>
   );
 }
+
+// Card de KPI — número oversized (padrão do ERP)
+function KpiCard({ icon, label, value, accent, tone }: { icon: React.ReactNode; label: string; value: string; accent?: boolean; tone?: 'rose' | 'amber' }) {
+  const cor = tone === 'rose' ? 'text-rose-300' : tone === 'amber' ? 'text-amber-300' : accent ? 'text-sky-200' : 'text-white';
+  return (
+    <div className="bg-white/[0.02] backdrop-blur-xl rounded-2xl border border-white/[0.06] shadow-[0_8px_32px_0_rgba(0,0,0,0.37)] px-4 py-3">
+      <div className="flex items-center gap-2 text-slate-500">
+        <span className="text-sky-300/70">{icon}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">{label}</span>
+      </div>
+      <p className={`mt-1.5 text-2xl font-extrabold tracking-tight tabular-nums ${cor}`}>{value}</p>
+    </div>
+  );
+}
+
+const fLbl = 'block text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1';
+const fInp = 'w-full border border-white/[0.08] bg-white/[0.04] text-slate-100 text-sm px-2.5 py-1.5 rounded-lg focus:outline-none focus:border-sky-400/60';
