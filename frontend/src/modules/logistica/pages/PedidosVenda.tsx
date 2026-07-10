@@ -8,7 +8,7 @@ import {
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { imprimirComprovanteReposicao } from '../impressos';
-import { SteppedForm, Step } from '../../cadastros/ui';
+import { SteppedForm, Step, PageHeader, btnPrimary } from '../../cadastros/ui';
 
 const R$ = (v: number) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 // Senha para liberar descontos no pedido (trocar aqui conforme política da empresa)
@@ -135,31 +135,27 @@ export default function PedidosVenda() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2">
-            <ClipboardList className="h-5 w-5 text-sky-500" /> Pedidos de Venda
-          </h1>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {filialAtiva?.nome || '—'} · {pedidosFiltrados.length} pedido{pedidosFiltrados.length !== 1 ? 's' : ''}
-            {dataFiltro ? ` · entrega ${new Date(dataFiltro + 'T00:00:00').toLocaleDateString('pt-BR')}` : ' · todas as datas'}
-          </p>
-        </div>
-        <button onClick={abrirNovo} className="btn-primary text-xs py-2">
-          <Plus className="h-3.5 w-3.5" /> Novo Pedido
-        </button>
-      </div>
+      <PageHeader
+        icon={<ClipboardList className="h-4 w-4" />}
+        titulo="Pedidos de Venda"
+        subtitulo={`${filialAtiva?.nome || '—'} · ${pedidosFiltrados.length} pedido${pedidosFiltrados.length !== 1 ? 's' : ''}${dataFiltro ? ` · entrega ${new Date(dataFiltro + 'T00:00:00').toLocaleDateString('pt-BR')}` : ' · todas as datas'}`}
+        actions={
+          <button onClick={abrirNovo} className={btnPrimary + ' bg-sky-500 hover:bg-sky-400 shadow-sky-500/20'}>
+            <Plus className="h-3.5 w-3.5" /> Novo Pedido
+          </button>
+        }
+      />
 
-      <div className="bg-gray-50 border-b border-gray-200 px-5 py-2 flex items-center gap-3 shrink-0">
+      <div className="bg-white/[0.02] backdrop-blur-xl border-b border-white/[0.06] px-5 py-2 flex items-center gap-3 shrink-0">
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar cliente ou nº pedido..."
-            className="w-full border border-gray-300 rounded pl-8 pr-2 py-1.5 text-xs bg-white focus:ring-2 focus:ring-blue-400" />
+            className="w-full border border-white/[0.08] bg-white/[0.04] text-slate-100 rounded-lg pl-8 pr-2 py-1.5 text-xs focus:outline-none focus:border-sky-400/60" />
         </div>
         <div className="flex gap-1">
           {['', 'RASCUNHO', 'CONFIRMADO', 'SEPARADO', 'FATURADO', 'CANCELADO'].map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${statusFilter === s ? 'bg-sky-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${statusFilter === s ? 'bg-sky-600 text-white' : 'bg-white/[0.04] border border-white/[0.08] text-slate-300 hover:bg-white/[0.08]'}`}>
               {s === 'CONFIRMADO' ? 'APROVADO' : (s || 'Todos')}
             </button>
           ))}
@@ -167,13 +163,13 @@ export default function PedidosVenda() {
         <div className="flex items-center gap-1.5 ml-auto">
           <span className="text-xs text-gray-500">Entrega:</span>
           <input type="date" value={dataFiltro} onChange={e => setDataFiltro(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1.5 text-xs bg-white focus:ring-2 focus:ring-blue-400" />
+            className="border border-white/[0.08] bg-white/[0.04] text-slate-100 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-sky-400/60" />
           <button onClick={() => setDataFiltro(hojeISO())}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${dataFiltro === hojeISO() ? 'bg-sky-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${dataFiltro === hojeISO() ? 'bg-sky-600 text-white' : 'bg-white/[0.04] border border-white/[0.08] text-slate-300 hover:bg-white/[0.08]'}`}>
             Hoje
           </button>
           <button onClick={() => setDataFiltro('')}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${!dataFiltro ? 'bg-sky-600 text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${!dataFiltro ? 'bg-sky-600 text-white' : 'bg-white/[0.04] border border-white/[0.08] text-slate-300 hover:bg-white/[0.08]'}`}>
             Todos
           </button>
           <button onClick={carregarPedidos} className="text-xs text-gray-500 hover:text-blue-600 ml-1">↻ Atualizar</button>
@@ -220,19 +216,19 @@ export default function PedidosVenda() {
           </div>
         ) : (
           <table className="w-full text-xs border-collapse">
-            <thead className="bg-gray-100 sticky top-0 z-10">
+            <thead className="bg-[#11161f] sticky top-0 z-10">
               <tr>
                 {['Nº', 'Cliente', 'Itens', 'Subtotal', 'Frete', 'Total', 'Entrega', 'Status', 'Ações'].map(h => (
-                  <th key={h} className="px-3 py-2 text-left font-semibold text-gray-600 border-b border-gray-200 whitespace-nowrap">{h}</th>
+                  <th key={h} className="px-3 py-2 text-left font-semibold text-slate-400 uppercase tracking-wide text-[10px] border-b border-white/[0.08] whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {pedidosFiltrados.map(p => (
-                <tr key={p.id} className="border-b border-gray-100 hover:bg-blue-50/50 transition-colors">
-                  <td className="px-3 py-2 font-bold text-blue-700">{p.numero}</td>
+                <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
+                  <td className="px-3 py-2 font-bold text-sky-300">{p.numero}</td>
                   <td className="px-3 py-2">
-                    <p className="font-semibold text-gray-900 truncate max-w-[200px]">{p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '—'}</p>
+                    <p className="font-semibold text-slate-100 truncate max-w-[200px]">{p.cliente?.nomeFantasia || p.cliente?.razaoSocial || '—'}</p>
                     {p.bloqueioCredito && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] text-red-600 font-bold mt-0.5">
                         <AlertTriangle className="h-3 w-3" /> Crédito bloqueado

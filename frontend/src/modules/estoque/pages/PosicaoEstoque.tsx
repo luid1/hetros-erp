@@ -3,6 +3,7 @@ import { Package, Search, AlertTriangle, Filter, RefreshCw, ArrowUpDown } from '
 import { estoqueApi } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useFetch } from '../../../hooks/useFetch';
+import { PageHeader, btnGlass } from '../../cadastros/ui';
 
 const R$ = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 const N = (v: any) => Number(v || 0);
@@ -63,21 +64,19 @@ export default function PosicaoEstoque() {
   );
 
   return (
-    <div className="p-6 space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Package className="h-5 w-5 text-sky-500" /> Posição de Estoque
-          </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            {filialAtiva ? `${filialAtiva.codigo} — ${filialAtiva.nome}` : 'Selecione uma filial'}
-          </p>
-        </div>
-        <button onClick={refetch} className="btn-secondary text-xs">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Atualizar
-        </button>
-      </div>
+    <div className="flex flex-col h-full">
+      <PageHeader
+        icon={<Package className="h-4 w-4" />}
+        titulo="Posição de Estoque"
+        subtitulo={filialAtiva ? `${filialAtiva.codigo} — ${filialAtiva.nome}` : 'Selecione uma filial'}
+        actions={
+          <button onClick={refetch} className={btnGlass}>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Atualizar
+          </button>
+        }
+      />
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-5">
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -226,6 +225,7 @@ export default function PosicaoEstoque() {
             </table>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

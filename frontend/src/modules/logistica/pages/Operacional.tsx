@@ -5,6 +5,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import SeparacaoPainel from './SeparacaoPesagem';
 import { imprimirNotaSeparacao } from '../notaTermica';
+import { PageHeader, btnGlass } from '../../cadastros/ui';
 
 const kg3 = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 const dtBR = (v: any) => v ? new Date(v).toLocaleDateString('pt-BR') : '';
@@ -80,32 +81,34 @@ export default function Operacional() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-100 overflow-hidden">
-      {/* Cabeçalho */}
-      <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0 relative">
-        <h1 className="text-xl font-black text-slate-800 flex items-center gap-2">
-          <PackageCheck className="h-6 w-6 text-emerald-500" /> Separação
-        </h1>
-        {/* Dia — grande e centralizado */}
-        <label className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
-          <span className="text-xl font-bold text-slate-400">Dia</span>
-          <input type="date" value={data} onChange={e => setData(e.target.value)}
-            className="border-2 border-slate-300 rounded-2xl px-5 py-2.5 text-3xl font-black text-slate-800 focus:ring-2 focus:ring-emerald-400" />
-        </label>
-        <button onClick={carregar} className="flex items-center gap-1.5 bg-white border border-slate-300 hover:bg-slate-50 px-3 py-2 rounded-lg text-slate-700 font-medium text-sm">
-          <RefreshCw className="h-4 w-4 text-emerald-600" /> Atualizar
-        </button>
-      </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      <PageHeader
+        icon={<PackageCheck className="h-4 w-4" />}
+        titulo="Separação"
+        subtitulo="Operacional · separação e pesagem"
+        actions={
+          <>
+            <label className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-400">Dia</span>
+              <input type="date" value={data} onChange={e => setData(e.target.value)}
+                className="border border-white/[0.08] bg-white/[0.04] text-slate-100 rounded-lg px-3 py-1.5 text-sm font-mono [color-scheme:dark] focus:outline-none focus:border-sky-400/60" />
+            </label>
+            <button onClick={carregar} className={btnGlass}>
+              <RefreshCw className="h-3.5 w-3.5 text-emerald-400" /> Atualizar
+            </button>
+          </>
+        }
+      />
 
       {/* Filtros */}
-      <div className="bg-white border-b border-slate-200 px-5 py-2 flex items-center gap-2 shrink-0 overflow-x-auto">
+      <div className="bg-white/[0.02] backdrop-blur-xl border-b border-white/[0.06] px-5 py-2 flex items-center gap-2 shrink-0 overflow-x-auto">
         <button onClick={() => setFiltro('TODOS')}
-          className={`px-3 py-1.5 rounded-full text-sm font-bold border whitespace-nowrap ${filtro === 'TODOS' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white border-slate-300 text-slate-600'}`}>
+          className={`px-3 py-1.5 rounded-full text-sm font-bold border whitespace-nowrap ${filtro === 'TODOS' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white/[0.04] border-white/[0.08] text-slate-300'}`}>
           Todos ({linhas.length})
         </button>
         {ORDEM.map(s => (
           <button key={s} onClick={() => setFiltro(s)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold border whitespace-nowrap ${filtro === s ? st(s).chip : 'bg-white border-slate-300 text-slate-600'}`}>
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold border whitespace-nowrap ${filtro === s ? st(s).chip : 'bg-white/[0.04] border-white/[0.08] text-slate-300'}`}>
             <span className={`h-2.5 w-2.5 rounded-full ${st(s).cor}`} /> {STATUS[s].label} ({contagem[s] || 0})
           </button>
         ))}
