@@ -21,6 +21,8 @@ import ContasPagar from './modules/financeiro/pages/ContasPagar';
 import FluxoCaixa from './modules/financeiro/pages/FluxoCaixa';
 import ControladoriaHub from './modules/financeiro/pages/ControladoriaHub';
 import UsuariosAcessos from './modules/gerencial/pages/UsuariosAcessos';
+import LogsAuditoria from './modules/gerencial/pages/LogsAuditoria';
+import Configuracoes from './modules/gerencial/pages/Configuracoes';
 import Produtos from './modules/cadastros/pages/Produtos';
 import Fornecedores from './modules/cadastros/pages/Fornecedores';
 import Transportadoras from './modules/cadastros/pages/Transportadoras';
@@ -38,18 +40,6 @@ import MatrizFiscal from './modules/fiscal/pages/MatrizFiscal';
 import PainelFaturamento from './modules/fiscal/pages/PainelFaturamento';
 import CteMdfe from './modules/fiscal/pages/CteMdfe';
 import GestaoFiscal from './modules/fiscal/pages/GestaoFiscal';
-
-const Placeholder = ({ title }: { title: string }) => (
-  <div className="flex items-center justify-center h-64">
-    <div className="text-center">
-      <div className="h-12 w-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
-        <span className="text-2xl">🚧</span>
-      </div>
-      <p className="text-gray-700 font-semibold">{title}</p>
-      <p className="text-gray-400 text-sm mt-1">Em desenvolvimento</p>
-    </div>
-  </div>
-);
 
 function Guard({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -116,9 +106,9 @@ export default function App() {
             <Route path="financeiro/custos" element={<Custos />} />
 
             {/* Gerencial */}
-            <Route path="gerencial/auditoria" element={<Placeholder title="Logs de Auditoria" />} />
+            <Route path="gerencial/auditoria" element={<LogsAuditoria />} />
             <Route path="gerencial/usuarios" element={<UsuariosAcessos />} />
-            <Route path="gerencial/configuracoes" element={<Placeholder title="Configurações" />} />
+            <Route path="gerencial/configuracoes" element={<Configuracoes />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -5,6 +5,7 @@ import { Receipt, RefreshCw, FileText, Printer, Check, AlertTriangle, Loader2, S
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { imprimirDanfe } from '../danfe';
+import { PageHeader, btnGlass } from '../../cadastros/ui';
 
 const R$ = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -85,21 +86,21 @@ export default function Faturamento() {
   const totalSel = pedidos.filter(p => sel.has(p.id)).reduce((s, p) => s + Number(p.valorTotal || 0), 0);
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      <div className="bg-white border-b border-gray-200 px-5 py-3 flex items-center justify-between shrink-0">
-        <div>
-          <h1 className="text-base font-bold text-gray-900 flex items-center gap-2"><Receipt className="h-5 w-5 text-emerald-500" /> Faturamento</h1>
-          <p className="text-xs text-gray-400 mt-0.5">{pedidos.length} pedido(s) liberado(s) p/ faturamento</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-gray-600 font-semibold text-sm">Dia:
-            <input type="date" value={data} onChange={e => setData(e.target.value)} className="border border-gray-300 rounded px-2 py-1.5 text-sm" />
-          </label>
-          <button onClick={carregar} className="flex items-center gap-1.5 bg-white border border-gray-300 hover:bg-gray-50 px-3 py-2 rounded-lg text-gray-700 font-medium text-sm">
-            <RefreshCw className="h-4 w-4 text-emerald-600" /> Atualizar
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col h-full">
+      <PageHeader
+        icon={<Receipt className="h-4 w-4" />}
+        titulo="Faturamento"
+        subtitulo={`${pedidos.length} pedido(s) liberado(s) p/ faturamento`}
+        actions={
+          <>
+            <input type="date" value={data} onChange={e => setData(e.target.value)}
+              className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-slate-100 [color-scheme:dark] focus:outline-none focus:border-sky-400/60" />
+            <button onClick={carregar} className={btnGlass}>
+              <RefreshCw className="h-3.5 w-3.5 text-emerald-400" /> Atualizar
+            </button>
+          </>
+        }
+      />
 
       <div className="bg-amber-50 border-b border-amber-200 px-5 py-2 text-xs text-amber-800 flex items-center gap-2 shrink-0">
         <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />

@@ -22,6 +22,7 @@ import {
   Percent,
   DollarSign,
 } from 'lucide-react';
+import { PageHeader, btnGlass, btnPrimary } from '../../cadastros/ui';
 
 /* ══════════════════════════════════════════════════════════════════════════════
    MÓDULO FINANCEIRO & CONTROLADORIA — DRE & Rentabilidade · Hetros WMS
@@ -211,7 +212,7 @@ export default function FinancialHub() {
   const [aba, setAba] = useState<AbaFin>('dashboard');
 
   return (
-    <div className="fin-dark min-h-full bg-[#0B0F17] -m-4 sm:-m-6 p-4 sm:p-6 lg:p-8">
+    <div className="fin-dark flex flex-col h-full">
       {/* Tema dark alinhado ao site — paleta espacial com contraste reforçado */}
       <style>{`
         .fin-dark { color: #e2e8f0; }
@@ -242,30 +243,24 @@ export default function FinancialHub() {
         .fin-dark textarea::placeholder { color: #64748b !important; }
       `}</style>
 
-      <div className="max-w-[1400px] mx-auto">
-      {/* Cabeçalho */}
-      <header className="mb-5">
-        <div className="flex items-center gap-2 text-neutral-400 text-[12px] uppercase tracking-[0.16em] font-semibold">
-          <Scale className="h-4 w-4" /> Controladoria
-        </div>
-        <div className="flex flex-wrap items-end justify-between gap-3 mt-1">
-          <div>
-            <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">Financeiro & DRE</h1>
-            <p className="text-sm text-neutral-500 mt-0.5">
-              Demonstrativo de Resultados, rentabilidade e gestão de títulos — competência Julho/2026.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-neutral-50">
-              <CalendarClock className="h-4 w-4 text-neutral-400" /> Julho / 2026
+      <PageHeader
+        icon={<Scale className="h-4 w-4" />}
+        titulo="Financeiro & DRE"
+        subtitulo="Demonstrativo de Resultados, rentabilidade e gestão de títulos — Julho/2026"
+        actions={
+          <>
+            <button className={btnGlass}>
+              <CalendarClock className="h-3.5 w-3.5 text-slate-400" /> Julho / 2026
             </button>
-            <button className="flex items-center gap-2 rounded-xl bg-slate-900 text-white px-3.5 py-2 text-sm font-semibold hover:bg-black">
-              <Download className="h-4 w-4" /> Exportar DRE
+            <button className={btnPrimary}>
+              <Download className="h-3.5 w-3.5" /> Exportar DRE
             </button>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
+      <div className="flex-1 overflow-y-auto p-6">
+      <div className="max-w-[1400px] mx-auto">
       {/* Tabs */}
       <nav className="flex items-center gap-1 border-b border-neutral-200 mb-6 overflow-x-auto">
         <TabFin ativo={aba === 'dashboard'} icon={LayoutDashboard} label="Dashboard DRE & Caixa" onClick={() => setAba('dashboard')} />
@@ -278,6 +273,7 @@ export default function FinancialHub() {
       {aba === 'clientes' && <RentabilidadeClientes />}
       {aba === 'produtos' && <RentabilidadeProdutos />}
       {aba === 'titulos' && <GestaoTitulos />}
+      </div>
       </div>
     </div>
   );

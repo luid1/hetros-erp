@@ -30,6 +30,7 @@ import api, { rotasApi, pedidosApi } from '../../../services/api';
 import { imprimirEspelho, imprimirCapaDados, imprimirCapaRomaneio, imprimirComprovanteReposicao, type CapaDados } from '../impressos';
 import { useAuth } from '../../../contexts/AuthContext';
 import { toast } from '../../../components/ui/feedback';
+import { PageHeader, btnGlass, btnPrimary } from '../../cadastros/ui';
 
 /**
  * Torre de Controle — despacho com Drag & Drop real.
@@ -516,44 +517,33 @@ export default function TorreControle() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-6 pb-28">
-      {/* Header */}
-      <header className="flex flex-wrap items-end justify-between gap-4 mb-6">
-        <div>
-          <p className="text-[11px] uppercase tracking-[0.25em] text-sky-400/80 font-semibold">
-            Logística · Despacho {usandoMock && '· demonstração'}
-          </p>
-          <h1 className="text-4xl font-light tracking-tight text-white">Torre de Controle</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <input
-            type="date"
-            value={data}
-            onChange={(e) => setData(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 [color-scheme:dark]"
-          />
-          <button
-            onClick={carregar}
-            className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm hover:bg-slate-700"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Atualizar
-          </button>
-          <button
-            onClick={() => setMapaAberto(true)}
-            className="flex items-center gap-2 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm hover:bg-slate-700 hover:border-emerald-500/50"
-          >
-            <Radar className="h-4 w-4 text-emerald-400" /> Ver Mapa de Frotas
-          </button>
-          <button
-            onClick={otimizarIA}
-            disabled={otimizando || pedidos.length === 0}
-            className="flex items-center gap-2 bg-sky-500 text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-sky-400 disabled:opacity-40 shadow-lg shadow-sky-500/20"
-          >
-            <Sparkles className={`h-4 w-4 ${otimizando ? 'animate-pulse' : ''}`} />
-            🤖 Otimizar Rotas com IA
-          </button>
-        </div>
-      </header>
+    <div className="flex flex-col h-full text-slate-100">
+      <PageHeader
+        icon={<Radar className="h-4 w-4" />}
+        titulo="Torre de Controle"
+        subtitulo={`Logística · Despacho${usandoMock ? ' · demonstração' : ''}`}
+        actions={
+          <>
+            <input
+              type="date"
+              value={data}
+              onChange={(e) => setData(e.target.value)}
+              className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-slate-100 [color-scheme:dark] focus:outline-none focus:border-sky-400/60"
+            />
+            <button onClick={carregar} className={btnGlass}>
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} /> Atualizar
+            </button>
+            <button onClick={() => setMapaAberto(true)} className={btnGlass}>
+              <Radar className="h-3.5 w-3.5 text-emerald-400" /> Ver Mapa
+            </button>
+            <button onClick={otimizarIA} disabled={otimizando || pedidos.length === 0} className={btnPrimary}>
+              <Sparkles className={`h-3.5 w-3.5 ${otimizando ? 'animate-pulse' : ''}`} /> Otimizar com IA
+            </button>
+          </>
+        }
+      />
+
+      <div className="flex-1 overflow-y-auto p-6 pb-28">
 
       {/* KPIs oversized */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -742,6 +732,7 @@ export default function TorreControle() {
           onRemoveStop={(s) => removerStop(selectedDriver.id, s)}
         />
       )}
+      </div>
     </div>
   );
 }

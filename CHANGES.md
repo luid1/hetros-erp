@@ -20,6 +20,53 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-10] — Login split, consolidação do menu, telas Logs/Configurações e padronização visual
+
+### O que mudou
+
+**Login redesenhado (split com banner lateral)**
+- Layout em duas colunas: **banner à esquerda** (marca, frase de impacto, relógio/data, aurora de fundo) e
+  **área de acesso isolada à direita**. A etapa de senha virou um **cartão de vidro** destacado (antes
+  `bg-gray-900`), separada do banner. Lógica (seleção de usuário, `login-por-id`) preservada. No mobile o
+  banner some e entra marca compacta + rodapé.
+
+**Menu consolidado — fonte única (`config/telas.ts`)**
+- O menu do `AppShell` deixou de ser lista fixa paralela e passou a **derivar 100% do `telas.ts`**.
+  `TelaDef` ganhou `icon`, `highlight`, `badge` e `oculto`.
+- **Removidas do menu** (marcadas `oculto`, ainda acessíveis por rota/permissão): **NF-e Emitidas** (fundida
+  na Gestão Fiscal), **Controladoria** (tema claro que duplicava Fluxo/Receber/Pagar) e os itens soltos
+  **Fluxo de Caixa / Contas a Receber / Contas a Pagar** (unificados no hub **DRE**). A matriz de permissões
+  (Usuários & Acessos) continua listando todas as telas (`TELAS_POR_GRUPO` = tudo).
+
+**Telas que faltavam — agora reais (padrão dark do kit)**
+- **Logs de Auditoria** (`/gerencial/auditoria`): lê o `AuditLog` real, filtro por módulo, badges por ação,
+  IP e drawer de detalhe com `dadosAntes`/`dadosDepois`. Implementado o backend `AuditoriaService.findAll`
+  (retornava `[]`). Antes: Placeholder.
+- **Configurações** (`/gerencial/configuracoes`): 5 seções (Empresa & Filiais, Fiscal/NF-e, Preferências,
+  Integrações, Sistema) com dados reais do tenant/filial e persistência em `localStorage`. Antes: Placeholder.
+
+**Padronização visual de 5 telas (header + fundo + botões)**
+- Novo `PageHeader` reutilizável + `btnGlass`/`btnPrimary` no kit (`cadastros/ui.tsx`).
+- **Controle de Carga**, **Análise Estoque Físico**, **Torre de Controle**, **Faturamento** e **DRE
+  (FinancialHub)** passaram a usar o mesmo header de vidro, assentam no canvas `#0B0F17` (removidos
+  `bg-slate-900`/`bg-gray-50/100` e o container de margens negativas do DRE) e botões glass/sky. Tabelas,
+  planilhas densas e gráficos internos mantidos (o `fin-dark` do DRE segue temando os internos).
+
+### Arquivos modificados
+- `frontend/src/pages/LoginPage.tsx`
+- `frontend/src/config/telas.ts`
+- `frontend/src/components/layout/AppShell.tsx`
+- `frontend/src/modules/cadastros/ui.tsx`
+- `frontend/src/modules/gerencial/pages/LogsAuditoria.tsx` (**novo**), `Configuracoes.tsx` (**novo**)
+- `frontend/src/App.tsx`
+- `frontend/src/modules/logistica/pages/{TorreControle,ControleCarga}.tsx`
+- `frontend/src/modules/estoque/pages/AnaliseEstoqueFisico.tsx`
+- `frontend/src/modules/fiscal/pages/Faturamento.tsx`
+- `frontend/src/modules/financeiro/pages/FinancialHub.tsx`
+- `backend/src/modules/auditoria/auditoria.service.ts`
+
+---
+
 ## [2026-07-08] — RBAC: `@RequirePermissao` nas ações sensíveis de cadastros, pedidos e estoque
 
 ### O que mudou

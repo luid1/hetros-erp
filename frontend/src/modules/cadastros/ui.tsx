@@ -54,6 +54,26 @@ export function FAB({ onClick, label }: { onClick: () => void; label: string }) 
   );
 }
 
+// Classes de botão padrão (dark tech / glass) — reutilizáveis fora do kit
+export const btnGlass = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/[0.04] border border-white/[0.08] text-slate-300 hover:bg-white/[0.08] transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed';
+export const btnPrimary = 'inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold bg-sky-500 hover:bg-sky-400 text-white shadow-lg shadow-sky-500/20 transition-all duration-300 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed';
+
+// Header de página padrão — barra de vidro (mesma linguagem do TopBar).
+// Usado para padronizar telas fora do módulo de Cadastros.
+export function PageHeader({ icon, titulo, subtitulo, actions }:
+  { icon: ReactNode; titulo: string; subtitulo?: ReactNode; actions?: ReactNode }) {
+  return (
+    <div className="border-b border-white/[0.05] px-5 py-2.5 flex items-center justify-between gap-3 shrink-0 bg-white/[0.02] backdrop-blur-xl">
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="text-sky-300/90 shrink-0">{icon}</span>
+        <h1 className="text-sm font-bold text-white leading-tight tracking-tight shrink-0">{titulo}</h1>
+        {subtitulo && <p className="text-xs text-slate-500 truncate border-l border-white/10 pl-2.5 hidden sm:block">{subtitulo}</p>}
+      </div>
+      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+    </div>
+  );
+}
+
 // Barra de filtros (busca + filtros rápidos)
 export function FilterBar({ busca, onBusca, placeholder = 'Buscar...', children }:
   { busca: string; onBusca: (v: string) => void; placeholder?: string; children?: ReactNode }) {

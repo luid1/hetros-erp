@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
+import { PageHeader } from '../../cadastros/ui';
 
 // ─── Tipos ───────────────────────────────────────
 interface PedidoCarga {
@@ -518,7 +519,13 @@ ${sel.map(p => `<tr><td>${p.nomeFantasia}</td><td>${p.volumes}</td><td>${p.pesoK
   );
 
   return (
-    <div className="flex flex-col h-full bg-gray-100 text-[11px] select-none overflow-hidden">
+    <div className="flex flex-col h-full text-[11px] select-none overflow-hidden">
+
+      <PageHeader
+        icon={<Truck className="h-4 w-4" />}
+        titulo="Controle de Carga"
+        subtitulo="Roteirização e montagem de entregas"
+      />
 
       {/* ═══════════ BARRA DE FILTROS ═══════════ */}
       <div className="bg-gray-200 border-b border-gray-400 px-2 py-1.5 flex flex-wrap items-center gap-2 shrink-0">

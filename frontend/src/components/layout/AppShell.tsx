@@ -1,92 +1,27 @@
 import { useState, useMemo } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { podeVerTela, rotaInicial } from '../../config/telas';
+import { podeVerTela, rotaInicial, TELAS_MENU_POR_GRUPO } from '../../config/telas';
 import { FeedbackHost } from '../ui/feedback';
 import {
-  LayoutDashboard, Users, Package, Warehouse, FileText,
-  DollarSign, Truck, ClipboardList, BarChart3, Settings,
-  ChevronLeft, ChevronRight, LogOut, Building2, AlertTriangle,
-  Receipt, ShieldCheck, Menu, X, MapPin, PackageCheck, ShoppingCart, Coins, Landmark,
+  ChevronLeft, ChevronRight, LogOut, Building2, Menu, X, Circle,
 } from 'lucide-react';
 
 interface NavItem { to: string; icon: React.ElementType; label: string; badge?: string; badgeColor?: string; highlight?: boolean }
 interface NavGroup { group: string; items: NavItem[] }
 
-const navigation: NavGroup[] = [
-  {
-    group: 'Visão Geral',
-    items: [
-      { to: '/dashboard', icon: LayoutDashboard, label: 'Painel Operacional' },
-    ],
-  },
-  {
-    group: 'A · Cadastros',
-    items: [
-      { to: '/cadastros/clientes',       icon: Users,        label: 'Clientes' },
-      { to: '/cadastros/fornecedores',   icon: Building2,    label: 'Fornecedores' },
-      { to: '/cadastros/transportadoras',icon: Truck,        label: 'Transportadoras' },
-      { to: '/cadastros/produtos',       icon: Package,      label: 'Produtos & NCM' },
-      { to: '/cadastros/filiais',        icon: Warehouse,    label: 'Filiais / Boxes' },
-    ],
-  },
-  {
-    group: 'B · Estoque / WMS',
-    items: [
-      { to: '/wms/posicao',       icon: Warehouse,      label: 'Posição de Estoque' },
-      { to: '/wms/pereciveis',    icon: AlertTriangle,  label: 'Perecíveis / FLV', badge: '!', badgeColor: 'bg-red-500' },
-      { to: '/wms/compras',       icon: ShoppingCart,   label: 'Ordens de Compra' },
-      { to: '/compras/app',       icon: ShoppingCart,   label: 'App de Compras', highlight: true },
-      { to: '/wms/entradas',      icon: ClipboardList,  label: 'Entradas (XML NF-e)' },
-      { to: '/wms/movimentacoes', icon: BarChart3,      label: 'Movimentações' },
-      { to: '/wms/inventario',    icon: ClipboardList,  label: 'Inventário' },
-      { to: '/wms/analise-estoque', icon: BarChart3,    label: 'Análise Estoque Físico', highlight: true },
-    ],
-  },
-  {
-    group: 'C · Logística',
-    items: [
-      { to: '/logistica/pedidos',   icon: ClipboardList, label: 'Pedidos de Venda' },
-      { to: '/logistica/carga',     icon: Truck,         label: 'Controle de Carga', highlight: true },
-      { to: '/logistica/torre',     icon: MapPin,        label: 'Torre de Controle', highlight: true },
-      { to: '/logistica/motorista', icon: Truck,         label: 'App do Motorista' },
-      { to: '/logistica/lider',     icon: ClipboardList, label: 'Líder / Separação' },
-      { to: '/logistica/operacional', icon: PackageCheck, label: 'Operacional / Separação' },
-      { to: '/logistica/frete',     icon: DollarSign,    label: 'Frete por Motorista' },
-      { to: '/logistica/romaneios', icon: MapPin,        label: 'Romaneios' },
-      { to: '/logistica/frotas',    icon: Truck,         label: 'Frotas & Veículos' },
-    ],
-  },
-  {
-    group: 'D · Fiscal / DFe',
-    items: [
-      { to: '/fiscal/nfe',    icon: Receipt,   label: 'NF-e Emitidas' },
-      { to: '/fiscal/emitir', icon: Receipt,   label: 'Faturamento', highlight: true },
-      { to: '/fiscal/painel', icon: BarChart3, label: 'Painel de Faturamento' },
-      { to: '/fiscal/matriz', icon: FileText,  label: 'Matriz Fiscal' },
-      { to: '/fiscal/cte',    icon: FileText,  label: 'CT-e / MDF-e' },
-      { to: '/fiscal/gestao', icon: Receipt,   label: 'Gestão Fiscal' },
-    ],
-  },
-  {
-    group: 'E · Financeiro',
-    items: [
-      { to: '/financeiro/fluxo-caixa', icon: Landmark,   label: 'Fluxo de Caixa' },
-      { to: '/financeiro/receber', icon: DollarSign, label: 'Contas a Receber' },
-      { to: '/financeiro/pagar',   icon: DollarSign, label: 'Contas a Pagar' },
-      { to: '/financeiro/dre',     icon: BarChart3,  label: 'DRE & Relatórios' },
-      { to: '/financeiro/custos',  icon: Coins,      label: 'Custos & Margem' },
-    ],
-  },
-  {
-    group: 'F · Gerencial',
-    items: [
-      { to: '/gerencial/auditoria',     icon: ShieldCheck, label: 'Logs de Auditoria' },
-      { to: '/gerencial/usuarios',      icon: Users,       label: 'Usuários & Acessos' },
-      { to: '/gerencial/configuracoes', icon: Settings,    label: 'Configurações' },
-    ],
-  },
-];
+// Menu derivado da FONTE ÚNICA (config/telas.ts) — sem lista paralela.
+const navigation: NavGroup[] = Object.entries(TELAS_MENU_POR_GRUPO).map(([group, items]) => ({
+  group,
+  items: items.map((t) => ({
+    to: t.key,
+    icon: t.icon || Circle,
+    label: t.label,
+    badge: t.badge,
+    badgeColor: t.badgeColor,
+    highlight: t.highlight,
+  })),
+}));
 
 export default function AppShell() {
   const [collapsed,   setCollapsed]   = useState(false);

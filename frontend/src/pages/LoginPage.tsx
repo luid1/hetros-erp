@@ -126,41 +126,72 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col">
+    <div className="min-h-screen bg-[#0B0F17] flex">
 
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-8 py-4 border-b border-gray-800">
-        <div className="flex items-center gap-3">
-          <img src="/logo-hetros-icone.png" alt="Hetros" className="h-9 w-9 object-contain" />
+      {/* ═══════════ BANNER LATERAL (esquerda) ═══════════ */}
+      <aside className="hidden lg:flex w-[42%] xl:w-[38%] relative flex-col justify-between overflow-hidden border-r border-white/[0.06] p-10">
+        {/* Aurora de fundo */}
+        <div className="pointer-events-none absolute inset-0" aria-hidden>
+          <div className="absolute -top-32 -left-24 h-[420px] w-[420px] rounded-full bg-sky-500/[0.12] blur-[130px] animate-aurora" />
+          <div className="absolute bottom-0 -right-16 h-[380px] w-[380px] rounded-full bg-indigo-500/[0.10] blur-[130px] animate-aurora-slow" />
+          <div className="absolute top-1/2 left-1/3 h-[300px] w-[300px] rounded-full bg-violet-500/[0.06] blur-[140px] animate-aurora" />
+        </div>
+
+        {/* Topo — marca */}
+        <div className="relative flex items-center gap-3">
+          <img src="/logo-hetros-icone.png" alt="Hetros" className="h-10 w-10 object-contain" />
           <div>
-            <p className="text-white text-sm font-bold leading-none">Hetros WMS</p>
-            <p className="text-gray-500 text-xs">Sistema de Gestão Industrial</p>
+            <p className="text-white text-base font-bold leading-none tracking-tight">Hetros WMS</p>
+            <p className="text-slate-500 text-xs mt-1">Sistema de Gestão Industrial</p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-white text-xl font-mono font-bold tabular-nums">
-            {hora.toLocaleTimeString('pt-BR')}
-          </p>
-          <p className="text-gray-500 text-xs">
-            {hora.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+
+        {/* Centro — frase de impacto */}
+        <div className="relative">
+          <div className="bg-white rounded-2xl px-6 py-4 shadow-2xl inline-block mb-8">
+            <img src="/logo-hetros.png" alt="Hetros Importação e Exportação" className="h-12 object-contain" />
+          </div>
+          <h1 className="text-4xl xl:text-5xl font-extrabold text-white leading-[1.1] tracking-tight">
+            Gestão industrial<br />
+            <span className="bg-gradient-to-r from-sky-300 to-indigo-300 bg-clip-text text-transparent">de ponta a ponta.</span>
+          </h1>
+          <p className="text-slate-400 text-base mt-5 max-w-md leading-relaxed">
+            Estoque, logística, fiscal e financeiro em um só lugar — do box da Ceagesp à entrega.
           </p>
         </div>
-      </div>
 
-      {/* Conteúdo principal */}
-      <div className="flex-1 flex items-center justify-center p-6">
+        {/* Base — relógio */}
+        <div className="relative flex items-end justify-between">
+          <div>
+            <p className="text-white text-3xl font-mono font-bold tabular-nums leading-none">
+              {hora.toLocaleTimeString('pt-BR')}
+            </p>
+            <p className="text-slate-500 text-sm mt-1.5 capitalize">
+              {hora.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-slate-600 text-xs">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" />
+            Acesso restrito · v1.0.0
+          </div>
+        </div>
+      </aside>
+
+      {/* ═══════════ ÁREA DE LOGIN (direita) ═══════════ */}
+      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 relative">
+
+        {/* Marca compacta — só aparece quando o banner está escondido (mobile) */}
+        <div className="lg:hidden flex items-center gap-2.5 mb-8">
+          <img src="/logo-hetros-icone.png" alt="Hetros" className="h-8 w-8 object-contain" />
+          <p className="text-white text-sm font-bold">Hetros WMS</p>
+        </div>
 
         {/* ── ETAPA 1: Seleção de usuário ── */}
         {!selecionado ? (
-          <div className="w-full max-w-3xl space-y-8">
-            <div className="text-center flex flex-col items-center gap-5">
-              <div className="bg-white rounded-2xl px-7 py-4 shadow-xl">
-                <img src="/logo-hetros.png" alt="Hetros Importação e Exportação" className="h-14 object-contain" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Quem está acessando?</h1>
-                <p className="text-gray-500 text-sm mt-1">Selecione seu nome para continuar</p>
-              </div>
+          <div className="w-full max-w-2xl space-y-8">
+            <div>
+              <h2 className="text-2xl font-bold text-white">Quem está acessando?</h2>
+              <p className="text-slate-500 text-sm mt-1">Selecione seu nome para continuar</p>
             </div>
 
             {loadingUsers ? (
@@ -233,20 +264,21 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Formulário de senha */}
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 space-y-4">
+            {/* Formulário de senha — placa de vidro isolada */}
+            <div className="relative bg-white/[0.02] backdrop-blur-xl border border-white/[0.08] rounded-2xl p-6 space-y-4 shadow-[0_8px_32px_0_rgba(0,0,0,0.37)]">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sky-400/60 to-transparent" aria-hidden />
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">
+                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-[0.1em] mb-1.5">
                     Senha
                   </label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600" />
                     <input
                       ref={inputRef}
                       type={showPwd ? 'text' : 'password'}
-                      className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 pl-9 text-sm
-                                 placeholder:text-gray-600 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                      className="w-full bg-white/[0.04] border border-white/[0.10] text-white rounded-xl px-4 py-3 pl-9 text-sm
+                                 placeholder:text-slate-600 focus:outline-none focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20 transition-all"
                       placeholder="Digite sua senha..."
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
@@ -297,10 +329,11 @@ export default function LoginPage() {
             </div>
           </div>
         )}
-      </div>
 
-      <div className="text-center py-4 text-gray-700 text-xs border-t border-gray-900">
-        Hetros Distribuição · Acesso restrito · v1.0.0
+        {/* Rodapé compacto (aparece no mobile, onde o banner some) */}
+        <p className="lg:hidden absolute bottom-5 text-slate-600 text-[11px]">
+          Hetros Distribuição · Acesso restrito · v1.0.0
+        </p>
       </div>
     </div>
   );

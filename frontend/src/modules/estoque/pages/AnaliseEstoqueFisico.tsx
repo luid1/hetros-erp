@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle, Printer, Download, X, ChevronRight, Search, AlertTriangle, TrendingDown } from 'lucide-react';
+import { CheckCircle, Printer, Download, X, ChevronRight, Search, AlertTriangle, TrendingDown, BarChart3 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { toast, confirmDialog } from '../../../components/ui/feedback';
+import { PageHeader } from '../../cadastros/ui';
 
 // ─── Tipos ───────────────────────────────────────
 interface ProdutoEstoque {
@@ -384,7 +385,13 @@ export default function AnaliseEstoqueFisico() {
   }), [produtosFiltrados]);
 
   return (
-    <div className="flex flex-col h-full bg-gray-100 text-xs select-none overflow-hidden">
+    <div className="flex flex-col h-full text-xs select-none overflow-hidden">
+
+      <PageHeader
+        icon={<BarChart3 className="h-4 w-4" />}
+        titulo="Análise de Estoque Físico"
+        subtitulo="Contagem, quebra e faturamento de perdas"
+      />
 
       {/* ── Aviso: produtos a repor / em falta ── */}
       {aRepor.length > 0 && (
