@@ -249,28 +249,6 @@ export class ComprasService {
       },
     });
 
-    // 2. Entrada no estoque + acumula quantidadeRecebida por item.
-    // OBS: a entrada no estoque usa a transação interna do `movimentar`; torná-la
-    // atômica com o resto exige `movimentar` aceitar um `tx` externo (P1-1 — WMS).
-    for (const l of remessa) {
-      if (l.item.produtoId) {
-        await this.estoque.movimentar(tenantId, {
-          filialId: oc.filialId,
-          produtoId: l.item.produtoId,
-          tipo: TipoMovimentacao.ENTRADA_COMPRA,
-          quantidade: l.qtd,
-          custoUnitario: Number(l.item.precoUnitario),
-          usuarioId,
-          entradaId: entrada.id,
-          observacoes: `Recebimento OC #${oc.numero}`,
-        });
-      }
-      await this.prisma.itemOrdemCompra.update({
-        where: { id: l.item.id },
-        data: { quantidadeRecebida: r2(Number(l.item.quantidadeRecebida) + l.qtd) },
-      });
-    }
-
     // Novo status: ENTREGUE se todos os itens ficaram sem saldo pendente; senão PARCIAL.
     const totalmente = oc.itens.every((item) => {
       const recebidoAgora = remessa.filter((l) => l.item.id === item.id).reduce((s, l) => s + l.qtd, 0);
@@ -278,9 +256,13 @@ export class ComprasService {
     });
     const novoStatus = totalmente ? StatusOrdemCompra.ENTREGUE : StatusOrdemCompra.PARCIAL;
 
-    // 3. Contas a Pagar (da remessa, vinculado à entrada) + status, numa transação:
-    // não pode existir título sem a OC mudar de status (nem o contrário).
-    const [, atualizado] = await this.prisma.$transaction([
+    // 2. Contas a Pagar (da remessa, vinculado à entrada) + quantidadeRecebida + status,
+    //    numa transação. Feito ANTES da baixa de estoque de propósito: a entrada de compra
+    //    dispara o listener `estoque.entrada_compra` (contas-pagar.service) que também gera
+    //    um título — como ele é idempotente por `entradaId`, criar a conta aqui primeiro faz
+    //    o listener pular (senão haveria cobrança dupla, com condição de corrida). Esta conta
+    //    ainda respeita a condição de pagamento da OC, que o listener genérico ignora.
+    const resultados = await this.prisma.$transaction([
       this.prisma.contaPagar.create({
         data: {
           tenantId, filialId: oc.filialId, fornecedorId: oc.fornecedorId,
@@ -291,6 +273,12 @@ export class ComprasService {
           status: 'ABERTO',
         },
       }),
+      ...remessa.map((l) =>
+        this.prisma.itemOrdemCompra.update({
+          where: { id: l.item.id },
+          data: { quantidadeRecebida: r2(Number(l.item.quantidadeRecebida) + l.qtd) },
+        }),
+      ),
       this.prisma.ordemCompra.update({
         where: { id },
         data: {
@@ -300,6 +288,25 @@ export class ComprasService {
         },
       }),
     ]);
+    // A OC atualizada é o último elemento da transação (após conta + N updates de item).
+    const atualizado = resultados[resultados.length - 1];
+
+    // 3. Baixa no estoque (após a conta existir, para o listener idempotente pular).
+    //    OBS: usa a transação interna do `movimentar`; torná-la atômica com o resto
+    //    exige `movimentar` aceitar um `tx` externo (P1-1 — refatoração do núcleo WMS).
+    for (const l of remessa) {
+      if (!l.item.produtoId) continue;
+      await this.estoque.movimentar(tenantId, {
+        filialId: oc.filialId,
+        produtoId: l.item.produtoId,
+        tipo: TipoMovimentacao.ENTRADA_COMPRA,
+        quantidade: l.qtd,
+        custoUnitario: Number(l.item.precoUnitario),
+        usuarioId,
+        entradaId: entrada.id,
+        observacoes: `Recebimento OC #${oc.numero}`,
+      });
+    }
 
     return atualizado;
   }
