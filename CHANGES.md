@@ -20,6 +20,19 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-11] — P2-1: consolidação de telas duplicadas (fiscal + logística)
+### O que mudou
+- **Fiscal:** `Painel de Faturamento` (`/fiscal/painel`) sai do menu (vira `oculto`, rota preservada) — o
+  território de consulta/KPIs fica na `Gestão Fiscal`. Menu fiscal = **Faturamento** (emitir) + **Gestão Fiscal** (consultar).
+- **Logística:** por decisão do luid1 — **Separação mantém as duas** (Líder = imprime/monitora, Operacional =
+  execução touch/pesagem; papéis distintos). **Pátio consolidado na Torre de Controle**; `Controle de Carga`
+  (`/logistica/carga`) sai do menu (rota preservada).
+- Financeiro já estava consolidado (Controladoria/Fluxo/Receber/Pagar `oculto` no hub DRE).
+### Arquivos modificados
+- `frontend/src/config/telas.ts`
+
+---
+
 ## [2026-07-11] — Sprint 3 (higiene sem decisão): P2-7, P2-5, P2-6, P1-6
 ### O que mudou
 - **P2-7 · Auditoria com snapshot "antes" + entidade real:** novo decorator `@AuditEntidade('Model', 'prismaModel')`.

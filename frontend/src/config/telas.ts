@@ -47,8 +47,9 @@ export const TELAS: TelaDef[] = [
 
   // C · Logística
   { key: '/logistica/pedidos', label: 'Pedidos de Venda', grupo: 'C · Logística', icon: ClipboardList },
-  { key: '/logistica/carga', label: 'Controle de Carga', grupo: 'C · Logística', icon: Truck, highlight: true },
   { key: '/logistica/torre', label: 'Torre de Controle', grupo: 'C · Logística', icon: MapPin, highlight: true },
+  // Despacho consolidado na Torre de Controle — Controle de Carga fora do menu, acessível por rota.
+  { key: '/logistica/carga', label: 'Controle de Carga', grupo: 'C · Logística', icon: Truck, oculto: true },
   { key: '/logistica/motorista', label: 'App do Motorista', grupo: 'C · Logística', icon: Truck },
   { key: '/logistica/lider', label: 'Líder / Separação', grupo: 'C · Logística', icon: ClipboardList },
   { key: '/logistica/operacional', label: 'Operacional / Separação', grupo: 'C · Logística', icon: PackageCheck },
@@ -58,10 +59,11 @@ export const TELAS: TelaDef[] = [
 
   // D · Fiscal / DFe
   { key: '/fiscal/emitir', label: 'Faturamento', grupo: 'D · Fiscal / DFe', icon: Receipt, highlight: true },
-  { key: '/fiscal/painel', label: 'Painel de Faturamento', grupo: 'D · Fiscal / DFe', icon: BarChart3 },
+  { key: '/fiscal/gestao', label: 'Gestão Fiscal', grupo: 'D · Fiscal / DFe', icon: Receipt },
   { key: '/fiscal/matriz', label: 'Matriz Fiscal', grupo: 'D · Fiscal / DFe', icon: FileText },
   { key: '/fiscal/cte', label: 'CT-e / MDF-e', grupo: 'D · Fiscal / DFe', icon: FileText },
-  { key: '/fiscal/gestao', label: 'Gestão Fiscal', grupo: 'D · Fiscal / DFe', icon: Receipt },
+  // Painel de Faturamento (dashboard de gráficos) fundido na Gestão Fiscal — fora do menu, acessível por rota.
+  { key: '/fiscal/painel', label: 'Painel de Faturamento', grupo: 'D · Fiscal / DFe', icon: BarChart3, oculto: true },
   // NF-e Emitidas: fundida na Gestão Fiscal — fora do menu, mas acessível.
   { key: '/fiscal/nfe', label: 'NF-e Emitidas', grupo: 'D · Fiscal / DFe', icon: Receipt, oculto: true },
 

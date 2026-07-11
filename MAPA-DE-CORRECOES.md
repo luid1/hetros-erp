@@ -26,10 +26,19 @@ O **esqueleto é bom** (schema maduro, arquitetura event-driven, módulo finance
 - **P2-4** dinheiro em centavos no pedido · **P2-8** migration da tabela `sequencias` · **P2-2 (parcial)** removido o stub morto `movimentacoes`
 - **Bug extra** (achado no teste): cancelamento de NF-e não estornava (FK `usuarioId` inválido) — corrigido.
 
+**✅ Feito (com decisão do luid1):**
+- **P0-5/P2-2 · DRE real**: `dre.service` agora calcula a DRE de competência a partir das NF-e emitidas
+  (receita + impostos) e movimentações de estoque (CMV, perdas). `FinancialHub` consome `/dre/completo`.
+  Despesas fora do CMV seguem dependendo de Plano de Contas alimentado (sinalizado na tela, sem inventar).
+- **P2-1 · Consolidação de telas**: Financeiro já estava (Controladoria/Fluxo/Receber/Pagar `oculto`).
+  Fiscal → `Painel de Faturamento` fundido na `Gestão Fiscal` (menu = Faturamento p/ emitir + Gestão p/ consultar).
+  Logística → Separação mantém as duas (Líder + Operacional, papéis distintos); Pátio consolidado na
+  `Torre de Controle` (`Controle de Carga` fora do menu, rota preservada).
+
 **⏳ Próximos — precisam da SUA decisão antes de mexer:**
-- **P2-2/P2-3 · `invoices`**: módulo fiscal órfão, mas as tabelas têm dados de seed → remover = dropar tabelas + decidir NF-e×Invoice.
-- **P2-2 · `dre`**: stub `return []`; o MAPA pede *implementar* DRE real (depende dos lançamentos financeiros), não remover.
-- **P2-1**: consolidar telas duplicadas (financeiro/fiscal/logística) — mudança de UX, alinhar quais telas manter.
+- **P2-2/P2-3 · `invoices`**: módulo fiscal órfão (camada "Rodada 3" paralela à NF-e), mas as tabelas têm
+  dados de seed → remover = dropar tabelas + decidir NF-e×Invoice. **NF-e é o fluxo real; Invoice não move
+  estoque nem gera Contas a Receber.** Aguardando: mata o `Invoice`?
 
 **✅ Feito (Sprint 3 — sem depender de decisão):**
 - **P2-7** auditoria: snapshot "antes" (via `@AuditEntidade('Model','prisma')` nos mestres) + nome real da entidade derivado da rota, não mais a URL crua.
