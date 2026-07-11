@@ -20,6 +20,17 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## 📍 PONTO DE PARADA (2026-07-11) — continuar de outro PC
+
+> Onde parei e o que vem a seguir estão detalhados no `MAPA-DE-CORRECOES.md`, seção **📍 PONTO DE PARADA**.
+> Último commit no GitHub (`luid1/hetros-erp` / `main`): `853dae4`.
+>
+> **Feito e testado:** P0-4, P0-5, P0-6, P1-3, P1-4, P1-5, P2-4, P2-8, P2-2 (stub `movimentacoes`) + fix do estorno no cancelamento de NF-e.
+> **Aguardando decisão:** `invoices` (dropar tabelas + NF-e×Invoice), DRE real, P2-1 (consolidar telas).
+> **Posso seguir sozinho:** P2-7 (auditoria), P2-5 (recebimento parcial de OC), P2-6 (rastreabilidade de lote), P1-6 (testes).
+
+---
+
 ## [2026-07-10] — Correções do MAPA-DE-CORRECOES (P0/P1): integridade de dados, validação e concorrência
 
 ### O que mudou

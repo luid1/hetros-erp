@@ -14,6 +14,32 @@ O **esqueleto é bom** (schema maduro, arquitetura event-driven, módulo finance
 
 ---
 
+## 📍 PONTO DE PARADA — atualizado 2026-07-11 (continuar daqui em outro PC)
+
+> Detalhe de cada correção no `CHANGES.md` (entrada `[2026-07-10] — Correções do MAPA...`).
+> Último commit: `853dae4` em `main` (já no GitHub `luid1/hetros-erp`).
+
+**✅ Feito e verificado no localhost (ciclo confirma→fatura→cancela testado):**
+- P0-1, P0-2, P0-3 (Sprint 1 — commit anterior `db7d7af`)
+- **P0-4** faturamento transacional · **P0-5** DRE rotulado como demonstração · **P0-6** DTOs em 17 endpoints
+- **P1-3** máquina de estados do pedido · **P1-4** numeração sequencial atômica · **P1-5** soft-delete em dados-mestre
+- **P2-4** dinheiro em centavos no pedido · **P2-8** migration da tabela `sequencias` · **P2-2 (parcial)** removido o stub morto `movimentacoes`
+- **Bug extra** (achado no teste): cancelamento de NF-e não estornava (FK `usuarioId` inválido) — corrigido.
+
+**⏳ Próximos — precisam da SUA decisão antes de mexer:**
+- **P2-2/P2-3 · `invoices`**: módulo fiscal órfão, mas as tabelas têm dados de seed → remover = dropar tabelas + decidir NF-e×Invoice.
+- **P2-2 · `dre`**: stub `return []`; o MAPA pede *implementar* DRE real (depende dos lançamentos financeiros), não remover.
+- **P2-1**: consolidar telas duplicadas (financeiro/fiscal/logística) — mudança de UX, alinhar quais telas manter.
+
+**⏳ Próximos — dá para eu seguir sozinho (sem decisão):**
+- **P2-7** auditoria (snapshot "antes" + nome real da entidade) · **P2-5** recebimento parcial de OC + gerar `EntradaMercadoria` · **P2-6** rastreabilidade de lote no FLV.
+- **P1-6** primeiros testes automatizados (nenhum ainda).
+
+**Setup local para retomar:** Docker (`docker compose up -d` → Postgres 5433 + Redis 6380) · backend `cd backend && npm run start:dev` (3002) · frontend `cd frontend && npm run dev` (3000) · login `luid@hetros.com.br` / `admin123`.
+> Obs: em dev preenchi CNPJ/IE na filial 1001 (estavam vazios e travavam o faturamento) — isso é dado do banco local, **não** está no código/seed.
+
+---
+
 ## 🚦 Legenda
 
 | Severidade | Significado |
