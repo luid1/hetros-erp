@@ -117,16 +117,6 @@ export const fluxoCaixaApi = {
   consolidado: (params?: object) => api.get('/fluxo-caixa', { params }),
 };
 
-// Notas Fiscais (Invoices — camada fiscal Rodada 3)
-export const invoicesApi = {
-  list: (params?: object) => api.get('/invoices', { params }),
-  resumo: (params?: object) => api.get('/invoices/resumo', { params }),
-  get: (id: string) => api.get(`/invoices/${id}`),
-  gerar: (data: object) => api.post('/invoices', data),
-  transmitir: (id: string) => api.patch(`/invoices/${id}/transmitir`),
-  marcarErro: (id: string, motivo?: string) => api.patch(`/invoices/${id}/erro`, { motivo }),
-  cancelar: (id: string, motivo?: string) => api.patch(`/invoices/${id}/cancelar`, { motivo }),
-};
 
 // Rotas / Logística avançada (Torre de Controle + App do Motorista)
 export const rotasApi = {

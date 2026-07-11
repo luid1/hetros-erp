@@ -147,7 +147,6 @@ model Tenant {
   auditLogs         AuditLog[]
   planoContas       PlanoContas[]
   roles             Role[]
-  invoices          Invoice[]
 
   @@index([cnpj])
 }
@@ -1251,90 +1250,6 @@ model AuditLog {
   @@index([tenantId, modulo, createdAt])
   @@index([tenantId, usuarioId])
   @@index([entidade, entidadeId])
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Rodada 3 — Camada Fiscal consolidada (Invoice / Nota Fiscal simplificada)
-// Valores monetários em CENTAVOS (Int) para precisão exata; alíquotas em
-// pontos-base (percentual × 100). Multi-tenant + audit trail imutável.
-// ─────────────────────────────────────────────────────────────────────────────
-
-enum InvoiceStatus {
-  DRAFT
-  ISSUED // Emitida / Autorizada
-  CANCELED
-  ERRONEOUS // Erro / rejeição da SEFAZ / API Fiscal
-}
-
-enum TaxType {
-  ICMS
-  ISS
-  PIS
-  COFINS
-  IPI
-}
-
-model Invoice {
-  id            String        @id @default(uuid())
-  tenantId      String
-  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  invoiceNumber String // Número da Nota Fiscal (ex: 000.123.456)
-  series        String // Série da nota (ex: 1)
-  status        InvoiceStatus @default(DRAFT)
-
-  // Amarrações do ecossistema ERP
-  orderId    String // ID do Pedido de Venda de origem (Estoque/Vendas)
-  customerId String // ID do Cliente comprador
-
-  // Valores consolidados (em centavos)
-  netValue   Int // Valor líquido dos produtos
-  taxValue   Int // Valor total dos impostos somados
-  grossValue Int // Valor bruto total (líquido + impostos)
-
-  // Auditoria e datas
-  issuedAt    DateTime? // Data de emissão autorizada
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  createdById String
-
-  // Relações
-  taxes     InvoiceTax[]
-  auditLogs InvoiceAuditLog[]
-
-  @@unique([tenantId, invoiceNumber])
-  @@index([tenantId, status])
-  @@index([tenantId, orderId])
-  @@index([tenantId, customerId])
-  @@map("invoices")
-}
-
-model InvoiceTax {
-  id        String  @id @default(uuid())
-  invoiceId String
-  type      TaxType
-  rate      Int // Alíquota em percentual × 100 (ex: 18% → 1800)
-  value     Int // Valor retido do imposto em centavos
-
-  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-
-  @@index([invoiceId])
-  @@map("invoice_taxes")
-}
-
-model InvoiceAuditLog {
-  id        String         @id @default(uuid())
-  invoiceId String
-  action    String // ex: "GENERATE", "TRANSMIT_SEFAZ", "CANCEL"
-  oldStatus InvoiceStatus?
-  newStatus InvoiceStatus
-  userId    String
-  changedAt DateTime       @default(now())
-  message   String?
-
-  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-
-  @@index([invoiceId, changedAt])
-  @@map("invoice_audit_logs")
 }
 
 // ─────────────────────────────────────────

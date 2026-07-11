@@ -25,7 +25,6 @@ import { RomaneiosModule } from './modules/romaneios/romaneios.module';
 import { ContasReceberModule } from './modules/contas-receber/contas-receber.module';
 import { ContasPagarModule } from './modules/contas-pagar/contas-pagar.module';
 import { FluxoCaixaModule } from './modules/fluxo-caixa/fluxo-caixa.module';
-import { InvoicesModule } from './modules/invoices/invoices.module';
 import { DreModule } from './modules/dre/dre.module';
 import { AuditoriaModule } from './modules/auditoria/auditoria.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -69,7 +68,6 @@ import { HealthController } from './health.controller';
     ContasReceberModule,
     ContasPagarModule,
     FluxoCaixaModule,
-    InvoicesModule,
     RotasModule,
     DreModule,
     AuditoriaModule,

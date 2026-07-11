@@ -20,6 +20,25 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-11] — Dashboard: filtros de data (dia/mês/ano/personalizado) · remove Invoice · renomeia filial
+### O que mudou
+- **Dashboard — períodos e intervalo personalizado:** presets **Ano** e **Personalizado** (De/Até) além de
+  Hoje/7d/Mês. O backend aceita `periodo=custom&dataInicio&dataFim` (parse como data LOCAL, sem deslocamento de
+  fuso) e `periodo=ano`. A série vira **mensal** automaticamente em janelas longas (>45 dias). Agora dá pra ver o
+  **faturamento e os produtos mais vendidos de um dia, mês ou ano específico**. Verificado: junho/2026, dia único
+  e ano inteiro batem com os dados.
+- **Invoice removido (P2-2/P2-3):** módulo backend (`invoices/`), models `Invoice`/`InvoiceTax`/`InvoiceAuditLog`
+  + enums `InvoiceStatus`/`TaxType`, a relação `Tenant.invoices`, o bloco de seed e a `invoicesApi` do frontend.
+  Migration `20260711130000_remove_invoices` dropa as tabelas. NF-e passa a ser a **fonte única** de nota fiscal.
+- **Filial renomeada:** "Hetros — CEAGESP Box 42" → **"Hetros - CEAGESP"** (seed + registro no banco).
+### Arquivos modificados
+- `backend/src/modules/dashboard/{dashboard.service,dashboard.controller}.ts`
+- `backend/prisma/{schema.prisma,seed.ts,seed-teste.ts}`, `backend/prisma/migrations/20260711130000_remove_invoices/`
+- `backend/src/app.module.ts` (remove InvoicesModule), `frontend/src/services/api.ts`
+- `frontend/src/pages/DashboardPage.tsx`
+
+---
+
 ## [2026-07-11] — Dashboard completo (ex-"Painel Operacional") com dados reais
 ### O que mudou
 - **Menu renomeado** "Painel Operacional" → **Dashboard**.

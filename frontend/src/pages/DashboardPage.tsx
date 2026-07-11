@@ -5,7 +5,7 @@ import api from '../services/api';
 import {
   Package, AlertTriangle, TrendingUp, TrendingDown, Receipt, Activity, RefreshCw,
   PackageCheck, Wallet, Scale, Users, Boxes, ArrowUpRight, ArrowDownRight, ChevronRight,
-  CircleDollarSign, Landmark, Percent, ShoppingCart,
+  CircleDollarSign, Landmark, Percent, ShoppingCart, CalendarRange,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid,
@@ -42,8 +42,10 @@ interface Dash {
   fluxoDia: { entradas: number; faturados: number; romaneios: number; entregues: number };
 }
 
-const PERIODOS: { key: 'hoje' | 'semana' | 'mes'; label: string }[] = [
-  { key: 'hoje', label: 'Hoje' }, { key: 'semana', label: '7 dias' }, { key: 'mes', label: 'Mês' },
+type PeriodoKey = 'hoje' | 'semana' | 'mes' | 'ano' | 'custom';
+const PERIODOS: { key: PeriodoKey; label: string }[] = [
+  { key: 'hoje', label: 'Hoje' }, { key: 'semana', label: '7 dias' },
+  { key: 'mes', label: 'Mês' }, { key: 'ano', label: 'Ano' },
 ];
 
 const STATUS_INFO: Record<string, { label: string; cor: string; rota: string }> = {
@@ -119,14 +121,19 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [d, setD] = useState<Dash | null>(null);
   const [loading, setLoading] = useState(true);
-  const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes'>('hoje');
+  const [periodo, setPeriodo] = useState<PeriodoKey>('hoje');
   const [ordProduto, setOrdProduto] = useState<'custo' | 'qtd'>('custo');
+  const hojeISO = new Date().toISOString().slice(0, 10);
+  const [dataInicio, setDataInicio] = useState(hojeISO);
+  const [dataFim, setDataFim] = useState(hojeISO);
 
   const carregar = useCallback(() => {
     setLoading(true);
-    api.get('/dashboard', { params: { filialId: filialAtiva?.id, periodo } })
+    const params: any = { filialId: filialAtiva?.id, periodo };
+    if (periodo === 'custom') { params.dataInicio = dataInicio; params.dataFim = dataFim; }
+    api.get('/dashboard', { params })
       .then(r => setD(r.data)).catch(() => setD(null)).finally(() => setLoading(false));
-  }, [filialAtiva?.id, periodo]);
+  }, [filialAtiva?.id, periodo, dataInicio, dataFim]);
   useEffect(() => { carregar(); }, [carregar]);
 
   const f = d?.financeiro;
@@ -155,7 +162,7 @@ export default function DashboardPage() {
             {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-lg border border-white/[0.08] bg-white/[0.03] p-0.5">
             {PERIODOS.map(p => (
               <button key={p.key} onClick={() => setPeriodo(p.key)}
@@ -163,7 +170,21 @@ export default function DashboardPage() {
                 {p.label}
               </button>
             ))}
+            <button onClick={() => setPeriodo('custom')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all flex items-center gap-1 ${periodo === 'custom' ? 'bg-sky-500/20 text-sky-200' : 'text-slate-400 hover:text-slate-200'}`}>
+              <CalendarRange className="h-3.5 w-3.5" /> Personalizado
+            </button>
           </div>
+          {periodo === 'custom' && (
+            <div className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-1">
+              <span className="text-[10px] text-slate-500 uppercase">De</span>
+              <input type="date" value={dataInicio} max={dataFim} onChange={e => setDataInicio(e.target.value)}
+                className="bg-transparent text-xs text-slate-200 outline-none [color-scheme:dark]" />
+              <span className="text-[10px] text-slate-500 uppercase">Até</span>
+              <input type="date" value={dataFim} min={dataInicio} onChange={e => setDataFim(e.target.value)}
+                className="bg-transparent text-xs text-slate-200 outline-none [color-scheme:dark]" />
+            </div>
+          )}
           <button onClick={carregar} className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 hover:bg-slate-700 px-3 py-2 rounded-lg text-slate-200 text-sm">
             <RefreshCw className={`h-4 w-4 text-sky-400 ${loading ? 'animate-spin' : ''}`} /> Atualizar
           </button>

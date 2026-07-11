@@ -13,8 +13,10 @@ export class DashboardController {
   findAll(
     @CurrentTenant() tenantId: string,
     @Query('filialId') filialId?: string,
-    @Query('periodo') periodo?: 'hoje' | 'semana' | 'mes',
+    @Query('periodo') periodo?: 'hoje' | 'semana' | 'mes' | 'ano' | 'custom',
+    @Query('dataInicio') dataInicio?: string,
+    @Query('dataFim') dataFim?: string,
   ) {
-    return this.service.findAll(tenantId, filialId, periodo || 'hoje');
+    return this.service.findAll(tenantId, filialId, periodo || 'hoje', dataInicio, dataFim);
   }
 }

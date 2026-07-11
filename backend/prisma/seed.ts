@@ -51,7 +51,7 @@ async function main() {
       data: {
         tenantId: tenant.id,
         codigo:   '1001',
-        nome:     'Hetros — CEAGESP Box 42',
+        nome:     'Hetros - CEAGESP',
         tipo:     'MATRIZ',
         endereco: {
           rua:    'Av. Dr. Gastão Vidigal',

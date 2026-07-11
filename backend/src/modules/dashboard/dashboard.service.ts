@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DreService } from '../dre/dre.service';
 
-type Periodo = 'hoje' | 'semana' | 'mes';
+type Periodo = 'hoje' | 'semana' | 'mes' | 'ano' | 'custom';
+interface Filtros { filialId?: string; periodo?: Periodo; dataInicio?: string; dataFim?: string }
 
 const n = (v: any) => Number(v) || 0;
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -13,37 +14,64 @@ const delta = (atual: number, ant: number) =>
 export class DashboardService {
   constructor(private prisma: PrismaService, private dre: DreService) {}
 
-  async findAll(tenantId: string, filialId?: string, periodo: Periodo = 'hoje') {
-    return this.getDashboard(tenantId, filialId, periodo);
+  async findAll(tenantId: string, filialId?: string, periodo: Periodo = 'hoje', dataInicio?: string, dataFim?: string) {
+    return this.getDashboard(tenantId, { filialId, periodo, dataInicio, dataFim });
   }
 
-  /** Janela do período atual + a janela anterior de mesmo tamanho + nº de dias da série. */
-  private janela(periodo: Periodo) {
+  /**
+   * Janela do período atual + a janela anterior de mesmo tamanho.
+   * `modo` define a granularidade da série ('dia' p/ períodos curtos, 'mes' p/ longos).
+   * Aceita intervalo personalizado (dataInicio/dataFim) — permite ver um dia, mês ou
+   * ano específico (faturamento, produtos mais vendidos, etc.).
+   */
+  private janela(periodo: Periodo, dataInicio?: string, dataFim?: string) {
     const agora = new Date();
-    const fim = new Date(agora); fim.setHours(23, 59, 59, 999);
-    let inicio: Date, inicioAnt: Date, fimAnt: Date, serieDias: number, label: string;
+    let inicio: Date, fim: Date, label: string;
 
-    if (periodo === 'mes') {
+    if ((periodo === 'custom' || dataInicio || dataFim) && (dataInicio || dataFim)) {
+      // Parse de 'YYYY-MM-DD' como data LOCAL (evita o deslocamento de fuso do `new Date(iso)`).
+      const local = (s: string, endOfDay = false) => {
+        const [y, m, d] = s.slice(0, 10).split('-').map(Number);
+        return new Date(y, (m || 1) - 1, d || 1, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+      };
+      inicio = local(dataInicio || dataFim!);
+      fim = local(dataFim || dataInicio!, true);
+      label = inicio.toDateString() === fim.toDateString()
+        ? inicio.toLocaleDateString('pt-BR')
+        : `${inicio.toLocaleDateString('pt-BR')} – ${fim.toLocaleDateString('pt-BR')}`;
+    } else if (periodo === 'ano') {
+      inicio = new Date(agora.getFullYear(), 0, 1, 0, 0, 0, 0);
+      fim = new Date(agora.getFullYear(), 11, 31, 23, 59, 59, 999);
+      label = String(agora.getFullYear());
+    } else if (periodo === 'mes') {
       inicio = new Date(agora.getFullYear(), agora.getMonth(), 1, 0, 0, 0, 0);
-      inicioAnt = new Date(agora.getFullYear(), agora.getMonth() - 1, 1, 0, 0, 0, 0);
-      fimAnt = new Date(agora.getFullYear(), agora.getMonth(), 0, 23, 59, 59, 999);
-      serieDias = 30; label = 'Mês';
+      fim = new Date(agora.getFullYear(), agora.getMonth() + 1, 0, 23, 59, 59, 999);
+      label = inicio.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
     } else if (periodo === 'semana') {
       inicio = new Date(agora); inicio.setDate(inicio.getDate() - 6); inicio.setHours(0, 0, 0, 0);
-      inicioAnt = new Date(inicio); inicioAnt.setDate(inicioAnt.getDate() - 7);
-      fimAnt = new Date(inicio); fimAnt.setMilliseconds(-1);
-      serieDias = 7; label = '7 dias';
+      fim = new Date(agora); fim.setHours(23, 59, 59, 999);
+      label = '7 dias';
     } else {
       inicio = new Date(agora); inicio.setHours(0, 0, 0, 0);
-      inicioAnt = new Date(inicio); inicioAnt.setDate(inicioAnt.getDate() - 1);
-      fimAnt = new Date(inicio); fimAnt.setMilliseconds(-1);
-      serieDias = 7; label = 'Hoje';
+      fim = new Date(agora); fim.setHours(23, 59, 59, 999);
+      label = 'Hoje';
     }
-    return { inicio, fim, inicioAnt, fimAnt, serieDias, label };
+
+    // Janela anterior de mesmo tamanho (para o Δ%).
+    const durMs = fim.getTime() - inicio.getTime();
+    const fimAnt = new Date(inicio.getTime() - 1);
+    const inicioAnt = new Date(inicio.getTime() - durMs - 1);
+
+    // Granularidade da série: por dia até ~45 dias; por mês acima disso (ano etc.).
+    const dias = Math.ceil(durMs / 86400000) + 1;
+    const modo: 'dia' | 'mes' = dias > 45 ? 'mes' : 'dia';
+
+    return { inicio, fim, inicioAnt, fimAnt, modo, label };
   }
 
-  async getDashboard(tenantId: string, filialId?: string, periodo: Periodo = 'hoje') {
-    const { inicio, fim, inicioAnt, fimAnt, serieDias, label } = this.janela(periodo);
+  async getDashboard(tenantId: string, filtros: Filtros = {}) {
+    const { filialId, periodo = 'hoje', dataInicio, dataFim } = filtros;
+    const { inicio, fim, inicioAnt, fimAnt, modo, label } = this.janela(periodo, dataInicio, dataFim);
     const agora = new Date();
     const em3 = new Date(agora); em3.setDate(em3.getDate() + 3);
     const em7 = new Date(agora); em7.setDate(em7.getDate() + 7);
@@ -67,7 +95,7 @@ export class DashboardService {
       this.prisma.movimentacaoEstoque.findMany({ where: { tenantId, ...filF, tipo: { in: ['PERDA', 'AVARIA'] }, dataMovimento: { gte: inicio, lte: fim } }, select: { quantidade: true, custoUnitario: true } }),
       this.prisma.contaReceber.findMany({ where: { tenantId, ...(filialId && { filialId }), status: { in: ['ABERTO', 'PARCIAL', 'VENCIDO'] } }, select: { valorOriginal: true, valorPago: true, dataVencimento: true } }),
       this.prisma.contaPagar.findMany({ where: { tenantId, ...(filialId && { filialId }), status: { in: ['ABERTO', 'PARCIAL', 'VENCIDO'] } }, select: { valorOriginal: true, valorPago: true, dataVencimento: true } }),
-      this.prisma.nFe.findMany({ where: { tenantId, ...filF, status: 'EMITIDO', dataEmissao: { gte: new Date(new Date().setHours(0, 0, 0, 0) - (serieDias - 1) * 86400000) } }, select: { dataEmissao: true, valorNfe: true } }),
+      this.prisma.nFe.findMany({ where: { tenantId, ...filF, status: 'EMITIDO', dataEmissao: { gte: inicio, lte: fim } }, select: { dataEmissao: true, valorNfe: true } }),
       this.prisma.nFe.groupBy({ by: ['clienteId'], where: { tenantId, ...filF, status: 'EMITIDO', dataEmissao: { gte: inicio, lte: fim }, clienteId: { not: null } }, _sum: { valorNfe: true }, _count: true }),
       this.prisma.movimentacaoEstoque.count({ where: { tenantId, ...filF, dataMovimento: { gte: inicio, lte: fim } } }),
       this.prisma.entradaMercadoria.count({ where: { tenantId, dataEntrada: { gte: inicio, lte: fim } } }),
@@ -150,17 +178,28 @@ export class DashboardService {
       .sort((a, b) => b.valor - a.valor)
       .slice(0, 8);
 
-    // ── Série de faturamento (por dia) ──
-    const base = new Date(); base.setHours(0, 0, 0, 0);
+    // ── Série de faturamento — buckets por dia ou por mês, cobrindo [inicio, fim] ──
+    const chaveBucket = (dt: Date) => modo === 'mes'
+      ? `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
+      : dt.toISOString().slice(0, 10);
+    const labelBucket = (dt: Date) => modo === 'mes'
+      ? dt.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })
+      : `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
+
     const serie: { dia: string; label: string; valor: number }[] = [];
-    for (let i = serieDias - 1; i >= 0; i--) {
-      const d = new Date(base.getTime() - i * 86400000);
-      serie.push({ dia: d.toISOString().slice(0, 10), label: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`, valor: 0 });
+    const cursor = new Date(inicio);
+    if (modo === 'mes') cursor.setDate(1);
+    cursor.setHours(0, 0, 0, 0);
+    while (cursor <= fim) {
+      serie.push({ dia: chaveBucket(cursor), label: labelBucket(cursor), valor: 0 });
+      if (modo === 'mes') cursor.setMonth(cursor.getMonth() + 1);
+      else cursor.setDate(cursor.getDate() + 1);
     }
+    const idx = new Map(serie.map((s, i) => [s.dia, i]));
     for (const nf of nfesSerie) {
-      const iso = nf.dataEmissao?.toISOString().slice(0, 10);
-      const item = serie.find((s) => s.dia === iso);
-      if (item) item.valor = r2(item.valor + n(nf.valorNfe));
+      if (!nf.dataEmissao) continue;
+      const i = idx.get(chaveBucket(nf.dataEmissao));
+      if (i !== undefined) serie[i].valor = r2(serie[i].valor + n(nf.valorNfe));
     }
 
     return {

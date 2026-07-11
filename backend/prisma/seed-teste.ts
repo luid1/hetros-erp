@@ -9,12 +9,11 @@
  *
  * Rodar: npx ts-node prisma/seed-teste.ts
  */
-import { PrismaClient, InvoiceStatus, TaxType } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 const reais = (n: number) => n.toFixed(2);
-const toCents = (n: number) => Math.round(n * 100);
 
 async function main() {
   console.log('🌱 Seed de TESTE — dados operacionais...\n');
@@ -218,51 +217,6 @@ async function main() {
     });
   }
   console.log(`✅ ${pedidosFaturaveis.length} NF-es emitidas`);
-
-  // ── 7. Invoices (camada fiscal Rodada 3) ───────────────────────
-  // Gera notas fiscais a partir dos pedidos faturáveis, com impostos em centavos.
-  const impostosDef = [
-    { type: TaxType.ICMS, ratePct: 18 },
-    { type: TaxType.PIS, ratePct: 1.65 },
-    { type: TaxType.COFINS, ratePct: 7.6 },
-  ];
-  let invoiceSeq = (await prisma.invoice.count({ where: { tenantId: tenant.id } }));
-  for (const [i, pedido] of pedidosFaturaveis.entries()) {
-    const jaTem = await prisma.invoice.count({
-      where: { tenantId: tenant.id, orderId: pedido.id, status: { not: InvoiceStatus.CANCELED } },
-    });
-    if (jaTem > 0) continue;
-
-    const netCents = toCents(Number(pedido.valorTotal));
-    const taxRows = impostosDef.map((t) => ({
-      type: t.type,
-      rate: Math.round(t.ratePct * 100), // pontos-base
-      value: Math.round((netCents * t.ratePct) / 100),
-    }));
-    const taxCents = taxRows.reduce((a, t) => a + t.value, 0);
-    const grossCents = netCents + taxCents;
-    invoiceSeq++;
-    const padded = String(invoiceSeq).padStart(9, '0');
-    const invoiceNumber = `${padded.slice(0, 3)}.${padded.slice(3, 6)}.${padded.slice(6)}`;
-    const status = i === 0 ? InvoiceStatus.ISSUED : InvoiceStatus.DRAFT;
-
-    await prisma.invoice.create({
-      data: {
-        tenantId: tenant.id, invoiceNumber, series: '1', status,
-        orderId: pedido.id, customerId: pedido.clienteId,
-        netValue: netCents, taxValue: taxCents, grossValue: grossCents,
-        createdById: admin.id, issuedAt: status === InvoiceStatus.ISSUED ? new Date() : null,
-        taxes: { create: taxRows },
-        auditLogs: {
-          create: {
-            action: 'GENERATE', oldStatus: null, newStatus: InvoiceStatus.DRAFT,
-            userId: admin.id, message: `Nota ${invoiceNumber} gerada (seed de teste) a partir do pedido ${pedido.numero}.`,
-          },
-        },
-      },
-    });
-  }
-  console.log(`✅ Notas fiscais (Invoices) geradas para os pedidos faturáveis`);
 
   console.log('\n🎉 Seed de teste concluído!\n');
   console.log('─────────────────────────────────────');
