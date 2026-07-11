@@ -9,12 +9,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import {
-  ContasReceberService,
-  ListarReceberDto,
-  CriarReceberDto,
-  BaixarReceberDto,
-} from './contas-receber.service';
+import { ContasReceberService, ListarReceberDto } from './contas-receber.service';
+import { CriarReceberDto, BaixarReceberDto, CancelarReceberDto } from './dto/contas-receber.dto';
 import { CurrentTenant, CurrentUser } from '../../common/decorators/context.decorator';
 import { PermissoesGuard } from '../../common/guards/permissoes.guard';
 import { RequirePermissao } from '../../common/decorators/permissoes.decorator';
@@ -80,7 +76,7 @@ export class ContasReceberController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: ReqUser,
     @Param('id') id: string,
-    @Body() body: { motivo?: string },
+    @Body() body: CancelarReceberDto,
   ) {
     return this.service.cancelar(tenantId, { id: user.id, nome: user.nome }, id, body?.motivo);
   }

@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, Query, Patch } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { NFeService } from './nfe.service';
+import { GerarNfeDto } from './dto/gerar-nfe.dto';
 import { CurrentTenant, CurrentUser, Modulo } from '../../common/decorators/context.decorator';
 
 @ApiTags('NF-e')
@@ -38,9 +39,9 @@ export class NFeController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('pedidoId') pedidoId: string,
-    @Body('filialId') filialId: string,
+    @Body() body: GerarNfeDto,
   ) {
-    return this.service.gerarDesPedido(tenantId, pedidoId, filialId, user.id);
+    return this.service.gerarDesPedido(tenantId, pedidoId, body.filialId, user.id);
   }
 
   @Post(':id/emitir')
