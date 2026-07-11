@@ -112,7 +112,7 @@ export function TableCard({ children }: { children: ReactNode }) {
     </div>
   );
 }
-export function Th({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Th({ children, className = '' }: { children?: ReactNode; className?: string }) {
   return <th className={`px-3 py-1.5 text-left font-semibold text-slate-500 text-[10px] uppercase tracking-[0.08em] bg-white/[0.02] ${className}`}>{children}</th>;
 }
 
