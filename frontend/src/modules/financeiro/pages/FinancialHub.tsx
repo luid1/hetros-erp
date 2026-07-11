@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { financeiroApi } from '../../../services/api';
 import {
   LayoutDashboard,
   Users,
@@ -66,30 +67,16 @@ interface DreLinha {
   destaque?: boolean;
 }
 
-const DRE_MES: DreLinha[] = [
-  { chave: 'receita_bruta', label: 'Receita Bruta de Vendas', valor: 1_482_350, tipo: 'receita', destaque: true },
-  { chave: 'impostos', label: '(-) Impostos sobre Vendas (ICMS/PIS/COFINS)', valor: -274_230, tipo: 'deducao' },
-  { chave: 'devolucoes', label: '(-) Devoluções e Abatimentos', valor: -38_910, tipo: 'deducao' },
-  { chave: 'receita_liquida', label: '(=) Receita Líquida', valor: 1_169_210, tipo: 'resultado', destaque: true },
-  { chave: 'cmv', label: '(-) CMV — Custo da Mercadoria Vendida', valor: -742_540, tipo: 'custo' },
-  { chave: 'lucro_bruto', label: '(=) Lucro Bruto', valor: 426_670, tipo: 'resultado', destaque: true },
-  { chave: 'desp_operacionais', label: '(-) Despesas Operacionais', valor: -198_320, tipo: 'custo' },
-  { chave: 'desp_logistica', label: '(-) Despesas com Frete & Logística', valor: -71_450, tipo: 'custo' },
-  { chave: 'desp_admin', label: '(-) Despesas Administrativas', valor: -54_180, tipo: 'custo' },
-  { chave: 'lucro_liquido', label: '(=) Lucro Líquido do Mês', valor: 102_720, tipo: 'resultado', destaque: true },
-];
-
-/* KPIs macro derivados do DRE. */
-const KPI_MACRO = {
-  receitaBruta: 1_482_350,
-  impostos: -274_230,
-  receitaLiquida: 1_169_210,
-  cmv: -742_540,
-  despesasOperacionais: -323_950,
-  lucroLiquido: 102_720,
-  margemLiquida: 6.93,
-  vsMesAnterior: 12.4,
-};
+interface DreKpis {
+  receitaBruta: number; deducoes: number; receitaLiquida: number;
+  cmv: number; lucroBruto: number; perdas: number; resultado: number; margemBruta: number;
+}
+interface DreCompleto {
+  periodo: { inicio: string; fim: string; label: string };
+  linhas: DreLinha[];
+  kpis: DreKpis;
+  cobertura: { nfesEmitidas: number; movimentacoesVenda: number; observacao: string };
+}
 
 interface ContaResumo {
   id: string;
@@ -265,9 +252,10 @@ export default function FinancialHub() {
       <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-800">
         <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
         <div className="text-[13px] leading-snug">
-          <b>Dados de demonstração.</b> Os valores desta tela (DRE, KPIs, rentabilidade e títulos)
-          são ilustrativos e <b>não</b> refletem o financeiro real da operação. Não utilize para
-          tomada de decisão — a integração com os lançamentos reais (contas a pagar/receber) está em desenvolvimento.
+          <b>DRE & KPIs já são reais</b> (Dashboard DRE, calculado das NF-e emitidas e movimentações
+          de estoque do período). As abas <b>Rentabilidade por Cliente/Produto</b> e os painéis de
+          <b> Contas a Pagar/Receber</b> desta tela ainda são ilustrativos — não use esses para decisão
+          até a integração completa dos lançamentos.
         </div>
       </div>
       {/* Tabs */}
@@ -292,49 +280,78 @@ export default function FinancialHub() {
    ABA 1 — DASHBOARD DRE & CAIXA
    ════════════════════════════════════════════════════════════════════════════ */
 function DashboardDRE() {
+  const [dre, setDre] = useState<DreCompleto | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    setCarregando(true);
+    financeiroApi
+      .dreCompleto()
+      .then((res) => { if (vivo) { setDre(res.data); setErro(null); } })
+      .catch((e) => { if (vivo) setErro(e?.response?.data?.message || 'Falha ao carregar o DRE.'); })
+      .finally(() => { if (vivo) setCarregando(false); });
+    return () => { vivo = false; };
+  }, []);
+
+  if (carregando) {
+    return <div className="py-16 text-center text-[13px] text-neutral-400">Carregando DRE do período…</div>;
+  }
+  if (erro || !dre) {
+    return (
+      <div className="py-16 text-center text-[13px] text-rose-400">
+        {erro || 'Sem dados de DRE.'}
+      </div>
+    );
+  }
+
+  const k = dre.kpis;
+  const linhas = dre.linhas;
+
   return (
     <div className="space-y-6">
-      {/* KPIs gigantes */}
+      {/* KPIs gigantes — reais, do período corrente */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <KpiGigante
           label="Receita Bruta"
-          valor={KPI_MACRO.receitaBruta}
-          hint="Faturamento total do mês"
+          valor={k.receitaBruta}
+          hint={`Faturamento — ${dre.periodo.label}`}
           icon={ArrowUpRight}
           tom="neutro"
         />
         <KpiGigante
           label="(–) Impostos s/ Vendas"
-          valor={KPI_MACRO.impostos}
-          hint="ICMS · PIS · COFINS"
+          valor={-k.deducoes}
+          hint="ICMS · ICMS-ST · PIS · COFINS"
           icon={ArrowDownRight}
           tom="deducao"
         />
         <KpiGigante
           label="(=) Receita Líquida"
-          valor={KPI_MACRO.receitaLiquida}
+          valor={k.receitaLiquida}
           hint="Após deduções fiscais"
           icon={Wallet}
           tom="neutro"
         />
         <KpiGigante
           label="(–) CMV"
-          valor={KPI_MACRO.cmv}
+          valor={-k.cmv}
           hint="Custo da mercadoria vendida"
           icon={ArrowDownRight}
           tom="deducao"
         />
         <KpiGigante
-          label="(–) Despesas Operacionais"
-          valor={KPI_MACRO.despesasOperacionais}
-          hint="Operação · logística · administrativo"
+          label="(–) Perdas e Quebras"
+          valor={-k.perdas}
+          hint="Movimentações de perda/avaria"
           icon={ArrowDownRight}
           tom="deducao"
         />
         <KpiGigante
-          label="(=) Lucro Líquido do Mês"
-          valor={KPI_MACRO.lucroLiquido}
-          hint={`Margem líquida ${pct(KPI_MACRO.margemLiquida)} · +${pct(KPI_MACRO.vsMesAnterior)} vs. mês anterior`}
+          label="(=) Resultado Operacional"
+          valor={k.resultado}
+          hint={`Margem bruta ${pct(k.margemBruta)} · ${dre.cobertura.nfesEmitidas} NF-e no período`}
           icon={TrendingUp}
           tom="lucro"
         />
@@ -348,11 +365,11 @@ function DashboardDRE() {
             <Scale className="h-3.5 w-3.5 text-neutral-400" /> Demonstrativo de Resultados
           </h2>
           <div>
-            {DRE_MES.map((l, i) => (
+            {linhas.map((l, i) => (
               <div
                 key={l.chave}
                 className={`flex items-center justify-between gap-4 py-4 ${
-                  i < DRE_MES.length - 1 ? 'border-b border-neutral-100' : ''
+                  i < linhas.length - 1 ? 'border-b border-neutral-100' : ''
                 }`}
               >
                 <span

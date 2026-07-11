@@ -109,6 +109,7 @@ export const financeiroApi = {
     api.patch(`/contas-pagar/${id}/cancelar`, { motivo }),
   // Relatórios
   dre: (params?: object) => api.get('/dre', { params }),
+  dreCompleto: (params?: object) => api.get('/dre/completo', { params }),
 };
 
 // Fluxo de Caixa (consolidado realizado)
