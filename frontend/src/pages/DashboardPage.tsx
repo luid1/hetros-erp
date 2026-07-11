@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
+import DetalheModal, { DetalheCard } from '../components/dashboard/DetalheModal';
 import {
   Package, AlertTriangle, TrendingUp, TrendingDown, Receipt, Activity, RefreshCw,
   PackageCheck, Wallet, Scale, Users, Boxes, ArrowUpRight, ArrowDownRight, ChevronRight,
@@ -126,6 +127,7 @@ export default function DashboardPage() {
   const hojeISO = new Date().toISOString().slice(0, 10);
   const [dataInicio, setDataInicio] = useState(hojeISO);
   const [dataFim, setDataFim] = useState(hojeISO);
+  const [detalhe, setDetalhe] = useState<DetalheCard | null>(null);
 
   const carregar = useCallback(() => {
     setLoading(true);
@@ -150,6 +152,145 @@ export default function DashboardPage() {
     [d?.pedidosPorStatus]);
 
   const maxCliente = Math.max(1, ...(d?.topClientes || []).map(c => c.valor));
+
+  /* ─────────── Construtores dos modais de detalhe ─────────── */
+  const agingLinhas = (ag?: Aging) => ag ? [
+    { label: 'Vencido', valor: R$c(ag.vencido), cor: ag.vencido ? 'text-rose-400' : undefined },
+    { label: '0–7 dias', valor: R$c(ag.ate7) },
+    { label: '8–30 dias', valor: R$c(ag.ate30) },
+    { label: '+30 dias', valor: R$c(ag.mais30) },
+    { label: 'Total', valor: R$c(ag.total) },
+    { label: 'Títulos', valor: num(ag.qtd) },
+  ] : [];
+
+  const abrir = (key: string): DetalheCard | null => {
+    switch (key) {
+      case 'faturamento': return {
+        icon: TrendingUp, tone: 'emerald', titulo: 'Faturamento', valorPrincipal: R$c(f?.faturamento ?? 0),
+        subtitulo: d?.periodoLabel, delta: f?.faturamentoDelta,
+        serie: d?.serieFaturamento,
+        linhas: [
+          { label: 'NF-e emitidas', valor: num(f?.nfes ?? 0) },
+          { label: 'Ticket médio', valor: R$c(f?.ticketMedio ?? 0) },
+          { label: 'Período anterior', valor: R$c(f?.faturamentoAnterior ?? 0) },
+        ],
+        rota: '/fiscal/gestao', verMaisLabel: 'Ver gestão fiscal',
+        atalhos: [{ label: 'Emitir NF-e', rota: '/fiscal/emitir' }, { label: 'Notas emitidas', rota: '/fiscal/nfe' }],
+      };
+      case 'ticket': return {
+        icon: Receipt, tone: 'teal', titulo: 'Ticket Médio', valorPrincipal: R$c(f?.ticketMedio ?? 0), subtitulo: 'valor médio por nota',
+        linhas: [
+          { label: 'Faturamento', valor: R$c(f?.faturamento ?? 0) },
+          { label: 'NF-e emitidas', valor: num(f?.nfes ?? 0) },
+        ],
+        rota: '/fiscal/gestao', verMaisLabel: 'Ver gestão fiscal',
+      };
+      case 'margem': return {
+        icon: Percent, tone: (f?.margemBruta ?? 0) >= 0 ? 'emerald' : 'rose', titulo: 'Margem Bruta', valorPrincipal: pct(f?.margemBruta ?? 0), subtitulo: 'do DRE realizado',
+        linhas: [
+          { label: 'CMV', valor: R$c(f?.cmv ?? 0) },
+          { label: 'Resultado operacional', valor: R$c(f?.resultadoOperacional ?? 0), cor: (f?.resultadoOperacional ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400' },
+          { label: 'Faturamento', valor: R$c(f?.faturamento ?? 0) },
+        ],
+        rota: '/financeiro/dre', verMaisLabel: 'Ver DRE',
+      };
+      case 'receber': return {
+        icon: Wallet, tone: 'blue', titulo: 'A Receber', valorPrincipal: R$c(f?.receber.total ?? 0), subtitulo: `${num(f?.receber.qtd ?? 0)} títulos`,
+        linhas: [...agingLinhas(f?.receber), { label: 'Inadimplência', valor: pct(f?.inadimplenciaPct ?? 0), cor: (f?.inadimplenciaPct ?? 0) > 0 ? 'text-rose-400' : 'text-emerald-400' }],
+        rota: '/financeiro/receber', verMaisLabel: 'Ver contas a receber',
+        atalhos: [{ label: 'Fluxo de caixa', rota: '/financeiro/fluxo-caixa' }],
+      };
+      case 'pagar': return {
+        icon: Landmark, tone: 'amber', titulo: 'A Pagar', valorPrincipal: R$c(f?.pagar.total ?? 0), subtitulo: `${num(f?.pagar.qtd ?? 0)} títulos`,
+        linhas: agingLinhas(f?.pagar),
+        rota: '/financeiro/pagar', verMaisLabel: 'Ver contas a pagar',
+        atalhos: [{ label: 'Fluxo de caixa', rota: '/financeiro/fluxo-caixa' }],
+      };
+      case 'saldo': return {
+        icon: Scale, tone: (f?.saldoProjetado ?? 0) >= 0 ? 'emerald' : 'rose', titulo: 'Saldo Projetado', valorPrincipal: R$c(f?.saldoProjetado ?? 0), subtitulo: 'receber − pagar',
+        linhas: [
+          { label: 'A receber', valor: R$c(f?.receber.total ?? 0), cor: 'text-emerald-400' },
+          { label: 'A pagar', valor: R$c(f?.pagar.total ?? 0), cor: 'text-rose-400' },
+        ],
+        rota: '/financeiro/fluxo-caixa', verMaisLabel: 'Ver fluxo de caixa',
+      };
+      case 'itens': return {
+        icon: Package, tone: 'sky', titulo: 'Itens c/ Saldo', valorPrincipal: num(e?.itensComSaldo ?? 0), subtitulo: `de ${num(e?.produtosAtivos ?? 0)} ativos`,
+        linhas: [
+          { label: 'Produtos ativos', valor: num(e?.produtosAtivos ?? 0) },
+          { label: 'Valor do estoque', valor: R$c(e?.valorEstoque ?? 0) },
+        ],
+        rota: '/wms/posicao', verMaisLabel: 'Ver posição de estoque',
+      };
+      case 'valorEstoque': return {
+        icon: CircleDollarSign, tone: 'emerald', titulo: 'Valor do Estoque', valorPrincipal: R$c(e?.valorEstoque ?? 0), subtitulo: 'a custo médio',
+        linhas: [
+          { label: 'Itens c/ saldo', valor: num(e?.itensComSaldo ?? 0) },
+          { label: 'Produtos ativos', valor: num(e?.produtosAtivos ?? 0) },
+        ],
+        rota: '/wms/posicao', verMaisLabel: 'Ver posição de estoque',
+      };
+      case 'validade': return {
+        icon: AlertTriangle, tone: (e?.validade.vencido ?? 0) ? 'rose' : 'amber', titulo: 'Validade', valorPrincipal: num((e?.validade.vencido ?? 0) + (e?.validade.ate3 ?? 0) + (e?.validade.ate7 ?? 0)), subtitulo: 'itens em atenção',
+        linhas: [
+          { label: 'Vencidos', valor: num(e?.validade.vencido ?? 0), cor: (e?.validade.vencido ?? 0) ? 'text-rose-400' : undefined },
+          { label: 'Vencem em 3 dias', valor: num(e?.validade.ate3 ?? 0), cor: 'text-amber-400' },
+          { label: 'Vencem em 7 dias', valor: num(e?.validade.ate7 ?? 0) },
+        ],
+        rota: '/wms/pereciveis', verMaisLabel: 'Ver perecíveis',
+      };
+      case 'perdas': return {
+        icon: TrendingDown, tone: (e?.perdaValor ?? 0) ? 'rose' : 'slate', titulo: 'Perdas/Quebras', valorPrincipal: R$c(e?.perdaValor ?? 0), subtitulo: 'no período',
+        linhas: [{ label: 'Quantidade', valor: kg(e?.perdaQtd ?? 0) }],
+        rota: '/wms/movimentacoes', verMaisLabel: 'Ver movimentações',
+      };
+      case 'ruptura': return {
+        icon: ShoppingCart, tone: (e?.rupturas ?? 0) ? 'amber' : 'slate', titulo: 'Ruptura', valorPrincipal: num(e?.rupturas ?? 0), subtitulo: 'produtos zerados',
+        linhas: [
+          { label: 'Produtos ativos', valor: num(e?.produtosAtivos ?? 0) },
+          { label: 'Itens c/ saldo', valor: num(e?.itensComSaldo ?? 0) },
+        ],
+        rota: '/wms/analise-estoque', verMaisLabel: 'Ver análise de estoque',
+      };
+      case 'movimentacoes': return {
+        icon: Activity, tone: 'indigo', titulo: 'Movimentações', valorPrincipal: num(d?.kpis.movimentacoesHoje ?? 0), subtitulo: 'no período',
+        linhas: [
+          { label: 'Perdas/quebras', valor: R$c(e?.perdaValor ?? 0), cor: (e?.perdaValor ?? 0) ? 'text-rose-400' : undefined },
+        ],
+        rota: '/wms/movimentacoes', verMaisLabel: 'Ver movimentações',
+      };
+      default: return null;
+    }
+  };
+
+  const abrirCliente = (c: { clienteId: string; nome: string; valor: number; pedidos: number }): DetalheCard => ({
+    icon: Users, tone: 'violet', titulo: c.nome, valorPrincipal: R$c(c.valor), subtitulo: 'faturamento no período',
+    linhas: [{ label: 'Pedidos', valor: num(c.pedidos) }, { label: 'Ticket médio', valor: R$c(c.pedidos ? c.valor / c.pedidos : 0) }],
+    rota: '/fiscal/gestao', verMaisLabel: 'Ver gestão fiscal',
+  });
+
+  const abrirProduto = (p: { codigo: string; descricao: string; qtd: number; custo: number }): DetalheCard => ({
+    icon: Boxes, tone: 'teal', titulo: p.descricao, valorPrincipal: R$c(p.custo), subtitulo: `Código ${p.codigo}`,
+    linhas: [{ label: 'Quantidade (saída)', valor: kg(p.qtd) }, { label: 'Valor (custo)', valor: R$c(p.custo) }],
+    rota: '/wms/posicao', verMaisLabel: 'Ver posição de estoque',
+  });
+
+  const abrirStatus = (s: { status: string; label: string; valor: number }): DetalheCard => ({
+    icon: PackageCheck, tone: 'sky', titulo: `Pedidos — ${s.label}`, valorPrincipal: num(s.valor), subtitulo: 'pedidos neste status',
+    linhas: Object.entries(d?.pedidosPorStatus || {}).filter(([, v]) => v > 0).map(([k, v]) => ({ label: STATUS_INFO[k]?.label || k, valor: num(v), cor: k === s.status ? 'text-sky-300' : undefined })),
+    rota: STATUS_INFO[s.status]?.rota || '/logistica/pedidos', verMaisLabel: 'Ver pedidos',
+  });
+
+  const abrirFluxo = (item: { titulo: string; valor: string; rota: string }): DetalheCard => ({
+    icon: Activity, tone: 'sky', titulo: item.titulo, valorPrincipal: item.valor, subtitulo: 'fluxo do dia',
+    linhas: [
+      { label: 'Entradas recebidas', valor: num(d?.fluxoDia.entradas ?? 0) },
+      { label: 'Pedidos faturados', valor: num(d?.fluxoDia.faturados ?? 0) },
+      { label: 'Romaneios na rota', valor: num(d?.fluxoDia.romaneios ?? 0) },
+      { label: 'Entregas concluídas', valor: num(d?.fluxoDia.entregues ?? 0) },
+    ],
+    rota: item.rota, verMaisLabel: 'Ver mais',
+  });
 
   return (
     <div className="p-6 space-y-7">
@@ -195,18 +336,18 @@ export default function DashboardPage() {
       <Secao icon={CircleDollarSign} titulo={`Financeiro · ${d?.periodoLabel || ''}`} cor="#34d399">
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
           <Kpi icon={TrendingUp} label="Faturamento" value={R$c(f?.faturamento ?? 0)} tone="emerald" delta={f?.faturamentoDelta}
-            sub={`${num(f?.nfes ?? 0)} NF-e emitidas`} onClick={() => navigate('/fiscal/gestao')} />
-          <Kpi icon={Receipt} label="Ticket Médio" value={R$c(f?.ticketMedio ?? 0)} tone="teal" sub="por nota" />
+            sub={`${num(f?.nfes ?? 0)} NF-e emitidas`} onClick={() => setDetalhe(abrir('faturamento'))} />
+          <Kpi icon={Receipt} label="Ticket Médio" value={R$c(f?.ticketMedio ?? 0)} tone="teal" sub="por nota" onClick={() => setDetalhe(abrir('ticket'))} />
           <Kpi icon={Percent} label="Margem Bruta" value={pct(f?.margemBruta ?? 0)} tone={(f?.margemBruta ?? 0) >= 0 ? 'emerald' : 'rose'}
-            sub="do DRE realizado" onClick={() => navigate('/financeiro/dre')} />
+            sub="do DRE realizado" onClick={() => setDetalhe(abrir('margem'))} />
           <Kpi icon={Wallet} label="A Receber" value={R$c(f?.receber.total ?? 0)} tone="blue"
             sub={<span className={f?.receber.vencido ? 'text-rose-400' : ''}>{f?.receber.vencido ? `${R$c(f.receber.vencido)} vencido` : `${num(f?.receber.qtd ?? 0)} títulos`}</span>}
-            onClick={() => navigate('/financeiro/receber')} />
+            onClick={() => setDetalhe(abrir('receber'))} />
           <Kpi icon={Landmark} label="A Pagar" value={R$c(f?.pagar.total ?? 0)} tone="amber"
             sub={<span className={f?.pagar.vencido ? 'text-rose-400' : ''}>{f?.pagar.vencido ? `${R$c(f.pagar.vencido)} vencido` : `${num(f?.pagar.qtd ?? 0)} títulos`}</span>}
-            onClick={() => navigate('/financeiro/pagar')} />
+            onClick={() => setDetalhe(abrir('pagar'))} />
           <Kpi icon={Scale} label="Saldo Projetado" value={R$c(f?.saldoProjetado ?? 0)} tone={(f?.saldoProjetado ?? 0) >= 0 ? 'emerald' : 'rose'}
-            sub="receber − pagar" />
+            sub="receber − pagar" onClick={() => setDetalhe(abrir('saldo'))} />
         </div>
 
         {/* Faturamento + aging */}
@@ -245,7 +386,7 @@ export default function DashboardPage() {
                 { k: 'mais30', label: '+30 dias', v: ag.mais30, cor: '#64748b' },
               ];
               return (
-                <div key={tipo} className="mb-4 last:mb-0 cursor-pointer" onClick={() => navigate(tipo === 'receber' ? '/financeiro/receber' : '/financeiro/pagar')}>
+                <div key={tipo} className="mb-4 last:mb-0 cursor-pointer" onClick={() => setDetalhe(abrir(tipo === 'receber' ? 'receber' : 'pagar'))}>
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{tipo === 'receber' ? 'A Receber' : 'A Pagar'}</span>
                     <span className="text-xs font-bold text-slate-200 tabular-nums">{R$c(ag.total)}</span>
@@ -276,13 +417,13 @@ export default function DashboardPage() {
       {/* ═══ ESTOQUE / WMS ═══ */}
       <Secao icon={Boxes} titulo="Estoque & WMS" cor="#38bdf8">
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-          <Kpi icon={Package} label="Itens c/ Saldo" value={num(e?.itensComSaldo ?? 0)} tone="sky" sub={`de ${num(e?.produtosAtivos ?? 0)} ativos`} onClick={() => navigate('/wms/posicao')} />
-          <Kpi icon={CircleDollarSign} label="Valor do Estoque" value={R$c(e?.valorEstoque ?? 0)} tone="emerald" sub="a custo médio" onClick={() => navigate('/wms/posicao')} />
+          <Kpi icon={Package} label="Itens c/ Saldo" value={num(e?.itensComSaldo ?? 0)} tone="sky" sub={`de ${num(e?.produtosAtivos ?? 0)} ativos`} onClick={() => setDetalhe(abrir('itens'))} />
+          <Kpi icon={CircleDollarSign} label="Valor do Estoque" value={R$c(e?.valorEstoque ?? 0)} tone="emerald" sub="a custo médio" onClick={() => setDetalhe(abrir('valorEstoque'))} />
           <Kpi icon={AlertTriangle} label="Validade" value={num((e?.validade.vencido ?? 0) + (e?.validade.ate3 ?? 0) + (e?.validade.ate7 ?? 0))} tone={(e?.validade.vencido ?? 0) ? 'rose' : 'amber'}
-            sub={`${e?.validade.vencido ?? 0} venc · ${e?.validade.ate3 ?? 0} em 3d`} onClick={() => navigate('/wms/pereciveis')} />
-          <Kpi icon={TrendingDown} label="Perdas/Quebras" value={R$c(e?.perdaValor ?? 0)} tone={(e?.perdaValor ?? 0) ? 'rose' : 'slate'} sub={kg(e?.perdaQtd ?? 0)} onClick={() => navigate('/wms/movimentacoes')} />
-          <Kpi icon={ShoppingCart} label="Ruptura" value={num(e?.rupturas ?? 0)} tone={(e?.rupturas ?? 0) ? 'amber' : 'slate'} sub="produtos zerados" onClick={() => navigate('/wms/analise-estoque')} />
-          <Kpi icon={Activity} label="Movimentações" value={num(d?.kpis.movimentacoesHoje ?? 0)} tone="indigo" sub="no período" onClick={() => navigate('/wms/movimentacoes')} />
+            sub={`${e?.validade.vencido ?? 0} venc · ${e?.validade.ate3 ?? 0} em 3d`} onClick={() => setDetalhe(abrir('validade'))} />
+          <Kpi icon={TrendingDown} label="Perdas/Quebras" value={R$c(e?.perdaValor ?? 0)} tone={(e?.perdaValor ?? 0) ? 'rose' : 'slate'} sub={kg(e?.perdaQtd ?? 0)} onClick={() => setDetalhe(abrir('perdas'))} />
+          <Kpi icon={ShoppingCart} label="Ruptura" value={num(e?.rupturas ?? 0)} tone={(e?.rupturas ?? 0) ? 'amber' : 'slate'} sub="produtos zerados" onClick={() => setDetalhe(abrir('ruptura'))} />
+          <Kpi icon={Activity} label="Movimentações" value={num(d?.kpis.movimentacoesHoje ?? 0)} tone="indigo" sub="no período" onClick={() => setDetalhe(abrir('movimentacoes'))} />
         </div>
       </Secao>
 
@@ -296,7 +437,7 @@ export default function DashboardPage() {
               <XAxis type="number" hide />
               <YAxis type="category" dataKey="label" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} width={72} />
               <Tooltip contentStyle={tipStyle} cursor={{ fill: 'rgba(255,255,255,0.03)' }} formatter={(v: any) => [v, 'pedidos']} />
-              <Bar dataKey="valor" radius={[0, 5, 5, 0]} cursor="pointer" onClick={(p: any) => navigate(STATUS_INFO[p.status]?.rota || '/logistica/pedidos')}>
+              <Bar dataKey="valor" radius={[0, 5, 5, 0]} cursor="pointer" onClick={(p: any) => setDetalhe(abrirStatus({ status: p.status, label: p.label, valor: p.valor }))}>
                 {statusData.map((s) => <Cell key={s.status} fill={s.cor} />)}
               </Bar>
             </BarChart>
@@ -311,7 +452,7 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-2.5">
             {(d?.topClientes || []).filter(c => c.valor > 0).slice(0, 6).map((c, i) => (
-              <button key={c.clienteId} onClick={() => navigate('/fiscal/gestao')} className="w-full text-left group">
+              <button key={c.clienteId} onClick={() => setDetalhe(abrirCliente(c))} className="w-full text-left group">
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="text-slate-300 truncate flex items-center gap-1.5">
                     <span className="text-[10px] font-bold text-slate-600 w-3">{i + 1}</span>{c.nome}
@@ -338,7 +479,7 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-1.5">
             {produtosOrdenados.slice(0, 6).map((p) => (
-              <button key={p.produtoId} onClick={() => navigate('/wms/posicao')} className="w-full flex items-center justify-between text-xs py-1 hover:bg-white/[0.03] rounded px-1.5 -mx-1.5">
+              <button key={p.produtoId} onClick={() => setDetalhe(abrirProduto(p))} className="w-full flex items-center justify-between text-xs py-1 hover:bg-white/[0.03] rounded px-1.5 -mx-1.5">
                 <span className="text-slate-300 truncate flex items-center gap-1.5">
                   <span className="text-[9px] font-mono text-slate-600">{p.codigo}</span>{p.descricao}
                 </span>
@@ -361,7 +502,7 @@ export default function DashboardPage() {
               { label: 'Entregas\nconcluídas', value: `${d?.fluxoDia.entregues ?? 0}`, cor: '#8b5cf6', rota: '/logistica/torre', step: 4 },
             ].map((item, i, arr) => (
               <div key={i} className="flex items-center">
-                <button onClick={() => navigate(item.rota)} className="flex flex-col items-center flex-1 group">
+                <button onClick={() => setDetalhe(abrirFluxo({ titulo: item.label.replace('\n', ' '), valor: item.value, rota: item.rota }))} className="flex flex-col items-center flex-1 group">
                   <div className="h-11 w-11 rounded-full flex items-center justify-center text-white text-sm font-bold ring-4 ring-white/[0.04] shadow-lg group-hover:scale-105 transition-transform" style={{ background: item.cor }}>{item.step}</div>
                   <p className="text-[11px] font-medium text-slate-400 mt-2 text-center whitespace-pre-line">{item.label}</p>
                   <p className="text-sm font-bold text-white mt-0.5">{item.value}</p>
@@ -372,6 +513,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </Secao>
+
+      <DetalheModal detalhe={detalhe} onClose={() => setDetalhe(null)} navigate={navigate} />
     </div>
   );
 }
