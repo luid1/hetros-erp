@@ -67,6 +67,34 @@ export class CreateOrdemCompraDto extends TenantAwareDto {
 
 export class UpdateOrdemCompraDto extends PartialType(CreateOrdemCompraDto) {}
 
+export class ItemRecebimentoDto {
+  @ApiProperty({ description: 'ID do ItemOrdemCompra sendo recebido.' })
+  @IsString() @IsNotEmpty({ message: 'itemId é obrigatório.' })
+  itemId: string;
+
+  @ApiProperty({ description: 'Quantidade recebida nesta remessa.' })
+  @IsNumber({ maxDecimalPlaces: 6 }, { message: 'quantidadeRecebida deve ser numérica.' })
+  @IsPositive({ message: 'quantidadeRecebida deve ser maior que zero.' })
+  quantidadeRecebida: number;
+
+  @ApiPropertyOptional({ nullable: true }) @optStr()
+  loteNumero?: string | null;
+
+  @ApiPropertyOptional({ nullable: true }) @optStr()
+  dataValidade?: string | null;
+}
+
+export class ReceberOrdemCompraDto extends TenantAwareDto {
+  @ApiPropertyOptional({
+    type: [ItemRecebimentoDto],
+    description: 'Itens e quantidades recebidas. Se omitido, recebe o saldo pendente de todos os itens.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true }) @Type(() => ItemRecebimentoDto)
+  itens?: ItemRecebimentoDto[];
+}
+
 export class MudarStatusOrdemCompraDto extends TenantAwareDto {
   @ApiProperty({ enum: ['PENDENTE', 'APROVADA', 'PARCIAL', 'ENTREGUE', 'CANCELADA'] })
   @IsString() @IsNotEmpty({ message: 'status é obrigatório.' })

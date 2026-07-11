@@ -175,48 +175,129 @@ export class ComprasService {
   }
 
   /**
-   * Recebe a OC: dá entrada no estoque de cada item com produto, gera o Contas a Pagar
-   * e marca a OC como ENTREGUE.
+   * Recebe a OC (total ou parcial): gera uma `EntradaMercadoria` com os itens da
+   * remessa, dá entrada no estoque de cada item com produto, gera o Contas a Pagar
+   * (vinculado à entrada) e ajusta o status para PARCIAL ou ENTREGUE.
+   *
+   * `dto.itens` opcional: quando informado, recebe só as quantidades declaradas
+   * (respeitando o saldo pendente de cada item); quando omitido, recebe todo o
+   * saldo pendente — mantendo o comportamento antigo de "recebimento total".
    */
-  async receber(tenantId: string, id: string, usuarioId: string) {
+  async receber(tenantId: string, id: string, usuarioId: string, dto?: { itens?: any[] }) {
     const oc = await this.prisma.ordemCompra.findFirst({ where: { id, tenantId }, include: { itens: true } });
     if (!oc) throw new NotFoundException('Ordem de compra não encontrada.');
-    if (oc.status === 'ENTREGUE') throw new BadRequestException('OC já foi entregue.');
+    if (oc.status === 'ENTREGUE') throw new BadRequestException('OC já foi entregue por completo.');
     if (oc.status === 'CANCELADA') throw new BadRequestException('OC cancelada não pode ser recebida.');
     if (!oc.filialId) throw new BadRequestException('Defina a filial de destino antes de receber.');
 
-    // 1. Entrada no estoque
+    // Quanto ainda falta receber de cada item (quantidade pedida − já recebida).
+    const pendentePorItem = new Map<string, number>();
     for (const item of oc.itens) {
-      if (!item.produtoId) continue;
-      await this.estoque.movimentar(tenantId, {
-        filialId: oc.filialId,
-        produtoId: item.produtoId,
-        tipo: TipoMovimentacao.ENTRADA_COMPRA,
-        quantidade: Number(item.quantidade),
-        custoUnitario: Number(item.precoUnitario),
-        usuarioId,
-        observacoes: `Recebimento OC #${oc.numero}`,
-      });
-      await this.prisma.itemOrdemCompra.update({ where: { id: item.id }, data: { quantidadeRecebida: item.quantidade } });
+      pendentePorItem.set(item.id, r2(Number(item.quantidade) - Number(item.quantidadeRecebida)));
     }
 
-    // 2 + 3. Contas a Pagar e status ENTREGUE numa única transação — não pode
-    // existir título sem a OC virar ENTREGUE (nem o contrário).
-    // OBS: a entrada no estoque (passo 1) usa a transação interna do `movimentar`;
-    // tornar o estoque atômico junto exige `movimentar` aceitar um `tx` externo
-    // (tracked como P1-1 — refatoração do núcleo WMS).
+    // Monta a remessa: do DTO (parcial) ou o saldo pendente inteiro (total).
+    const informado = Array.isArray(dto?.itens) && dto!.itens!.length > 0;
+    type Remessa = { item: typeof oc.itens[number]; qtd: number; loteNumero?: string | null; dataValidade?: string | null };
+    const remessa: Remessa[] = [];
+
+    if (informado) {
+      for (const linha of dto!.itens!) {
+        const item = oc.itens.find((i) => i.id === linha.itemId);
+        if (!item) throw new BadRequestException(`Item ${linha.itemId} não pertence a esta OC.`);
+        const qtd = Number(linha.quantidadeRecebida) || 0;
+        const pendente = pendentePorItem.get(item.id) ?? 0;
+        if (qtd <= 0) throw new BadRequestException('Quantidade recebida deve ser maior que zero.');
+        if (qtd > pendente + 1e-6) {
+          throw new BadRequestException(`Recebimento (${qtd}) excede o saldo pendente (${pendente}) do item.`);
+        }
+        remessa.push({ item, qtd, loteNumero: linha.loteNumero, dataValidade: linha.dataValidade });
+      }
+    } else {
+      for (const item of oc.itens) {
+        const pendente = pendentePorItem.get(item.id) ?? 0;
+        if (pendente > 0) remessa.push({ item, qtd: pendente });
+      }
+    }
+
+    if (remessa.length === 0) throw new BadRequestException('Nada a receber: todos os itens já foram recebidos.');
+
+    const valorRemessa = r2(remessa.reduce((s, l) => s + l.qtd * Number(l.item.precoUnitario), 0));
+
+    // 1. Entrada de mercadoria (cabeçalho + itens da remessa).
+    const entrada = await this.prisma.entradaMercadoria.create({
+      data: {
+        tenantId,
+        fornecedorId: oc.fornecedorId,
+        numeroNf: `OC-${oc.numero}`,
+        dataEntrada: new Date(),
+        valorTotal: valorRemessa,
+        status: 'CONFERIDA',
+        observacoes: `Recebimento da OC #${oc.numero}`,
+        itens: {
+          create: remessa.map((l) => ({
+            produtoId: l.item.produtoId,
+            descricao: l.item.descricao,
+            quantidade: l.qtd,
+            unidade: l.item.unidade,
+            valorUnitario: Number(l.item.precoUnitario),
+            valorTotal: r2(l.qtd * Number(l.item.precoUnitario)),
+            loteNumero: l.loteNumero || null,
+            dataValidade: l.dataValidade ? new Date(l.dataValidade) : null,
+          })),
+        },
+      },
+    });
+
+    // 2. Entrada no estoque + acumula quantidadeRecebida por item.
+    // OBS: a entrada no estoque usa a transação interna do `movimentar`; torná-la
+    // atômica com o resto exige `movimentar` aceitar um `tx` externo (P1-1 — WMS).
+    for (const l of remessa) {
+      if (l.item.produtoId) {
+        await this.estoque.movimentar(tenantId, {
+          filialId: oc.filialId,
+          produtoId: l.item.produtoId,
+          tipo: TipoMovimentacao.ENTRADA_COMPRA,
+          quantidade: l.qtd,
+          custoUnitario: Number(l.item.precoUnitario),
+          usuarioId,
+          entradaId: entrada.id,
+          observacoes: `Recebimento OC #${oc.numero}`,
+        });
+      }
+      await this.prisma.itemOrdemCompra.update({
+        where: { id: l.item.id },
+        data: { quantidadeRecebida: r2(Number(l.item.quantidadeRecebida) + l.qtd) },
+      });
+    }
+
+    // Novo status: ENTREGUE se todos os itens ficaram sem saldo pendente; senão PARCIAL.
+    const totalmente = oc.itens.every((item) => {
+      const recebidoAgora = remessa.filter((l) => l.item.id === item.id).reduce((s, l) => s + l.qtd, 0);
+      return Number(item.quantidadeRecebida) + recebidoAgora >= Number(item.quantidade) - 1e-6;
+    });
+    const novoStatus = totalmente ? StatusOrdemCompra.ENTREGUE : StatusOrdemCompra.PARCIAL;
+
+    // 3. Contas a Pagar (da remessa, vinculado à entrada) + status, numa transação:
+    // não pode existir título sem a OC mudar de status (nem o contrário).
     const [, atualizado] = await this.prisma.$transaction([
       this.prisma.contaPagar.create({
         data: {
           tenantId, filialId: oc.filialId, fornecedorId: oc.fornecedorId,
-          descricao: `Compra — OC #${oc.numero}`,
-          valorOriginal: oc.valorTotal,
+          entradaId: entrada.id,
+          descricao: `Compra — OC #${oc.numero}${totalmente ? '' : ' (parcial)'}`,
+          valorOriginal: valorRemessa,
           dataVencimento: this.vencimentoPorCondicao(oc.condicaoPagamento),
           status: 'ABERTO',
         },
       }),
       this.prisma.ordemCompra.update({
-        where: { id }, data: { status: StatusOrdemCompra.ENTREGUE, dataEntregaReal: new Date() },
+        where: { id },
+        data: {
+          status: novoStatus,
+          entradaId: entrada.id,
+          ...(totalmente ? { dataEntregaReal: new Date() } : {}),
+        },
       }),
     ]);
 

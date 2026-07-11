@@ -1,11 +1,13 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { TransportadorasService } from './transportadoras.service';
-import { CurrentTenant } from '../../common/decorators/context.decorator';
+import { CurrentTenant, Modulo, AuditEntidade } from '../../common/decorators/context.decorator';
 import { CreateTransportadoraDto, UpdateTransportadoraDto } from './dto/transportadora.dto';
 
 @ApiTags('Transportadoras')
 @ApiBearerAuth()
+@Modulo('CADASTROS')
+@AuditEntidade('Transportadora', 'transportadora')
 @Controller('transportadoras')
 export class TransportadorasController {
   constructor(private service: TransportadorasService) {}

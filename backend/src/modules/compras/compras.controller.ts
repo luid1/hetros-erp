@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ComprasService } from './compras.service';
 import { CurrentTenant, CurrentUser, Modulo } from '../../common/decorators/context.decorator';
 import { RequirePermissao } from '../../common/decorators/permissoes.decorator';
-import { CreateOrdemCompraDto, UpdateOrdemCompraDto, MudarStatusOrdemCompraDto } from './dto/compra.dto';
+import { CreateOrdemCompraDto, UpdateOrdemCompraDto, MudarStatusOrdemCompraDto, ReceberOrdemCompraDto } from './dto/compra.dto';
 
 @ApiTags('Compras')
 @ApiBearerAuth()
@@ -62,8 +62,8 @@ export class ComprasController {
 
   @Post(':id/receber')
   @RequirePermissao('ESTOQUE:UPDATE')
-  @ApiOperation({ summary: 'Recebe a OC: entrada no estoque + contas a pagar + marca ENTREGUE' })
-  receber(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string) {
-    return this.service.receber(tenantId, id, user.id);
+  @ApiOperation({ summary: 'Recebe a OC (total ou parcial): gera entrada de mercadoria + estoque + contas a pagar' })
+  receber(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string, @Body() dto: ReceberOrdemCompraDto) {
+    return this.service.receber(tenantId, id, user.id, dto);
   }
 }

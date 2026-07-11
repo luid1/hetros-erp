@@ -205,9 +205,13 @@ export class EstoqueService {
   /**
    * Baixa uma quantidade seguindo FEFO: consome dos lotes que vencem primeiro.
    * Se o físico não cobrir, a sobra sai do último lote (podendo ficar negativo).
+   *
+   * `loteId` (rastreabilidade): quando a separação já definiu o lote físico que
+   * saiu, ele é consumido PRIMEIRO (até o disponível), e só o excedente cai no
+   * FEFO. Assim o lote baixado bate com o que foi separado/impresso na NF-e.
    */
   async baixarFefo(tenantId: string, dto: {
-    filialId: string; produtoId: string; quantidade: number;
+    filialId: string; produtoId: string; quantidade: number; loteId?: string;
     tipo?: TipoMovimentacao; nfeId?: string; pedidoId?: string; usuarioId: string; observacoes?: string;
   }) {
     const tipo = dto.tipo || TipoMovimentacao.SAIDA_VENDA;
@@ -215,8 +219,16 @@ export class EstoqueService {
     let restante = Number(dto.quantidade);
     const alocacoes: { loteId: string | null; quantidade: number }[] = [];
 
+    // Rastreabilidade: prioriza o lote efetivamente separado, se houver saldo nele.
+    if (dto.loteId) {
+      const preferido = lotes.find((l) => l.loteId === dto.loteId);
+      const usar = Math.min(restante, Math.max(0, preferido?.disponivel ?? 0));
+      if (usar > 0) { alocacoes.push({ loteId: dto.loteId, quantidade: usar }); restante -= usar; }
+    }
+
     for (const lote of lotes) {
       if (restante <= 0) break;
+      if (dto.loteId && lote.loteId === dto.loteId) continue; // já consumido acima
       const usar = Math.min(restante, Math.max(0, lote.disponivel));
       if (usar > 0) { alocacoes.push({ loteId: lote.loteId, quantidade: usar }); restante -= usar; }
     }

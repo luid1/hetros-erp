@@ -1,11 +1,13 @@
 import { Controller, Get, Post, Put, Patch, Delete, Body, Param } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { UsuariosService } from './usuarios.service';
-import { CurrentTenant } from '../../common/decorators/context.decorator';
+import { CurrentTenant, Modulo, AuditEntidade } from '../../common/decorators/context.decorator';
 import { CreateUsuarioDto, UpdateUsuarioDto, ResetSenhaDto, CreateRoleDto, UpdateRoleDto } from './dto/usuario.dto';
 
 @ApiTags('Usuários & Acessos')
 @ApiBearerAuth()
+@Modulo('CADASTROS')
+@AuditEntidade('Usuario', 'usuario')
 @Controller('usuarios')
 export class UsuariosController {
   constructor(private service: UsuariosService) {}

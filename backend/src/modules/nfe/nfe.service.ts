@@ -232,6 +232,20 @@ export class NFeService {
     // (baixaPendente=true + motivo) para retry/alerta, em vez de só logar e esquecer.
     const falhas: string[] = [];
 
+    // Rastreabilidade (P2-6): o lote que a separadora efetivamente pegou está no
+    // ItemPedido; a NF-e só carrega produtoId. Montamos produtoId → loteId separado
+    // para baixar o MESMO lote (e não um FEFO qualquer que pode divergir do impresso).
+    const loteSeparadoPorProduto = new Map<string, string>();
+    if (payload.pedidoId) {
+      const itensPedido = await this.prisma.itemPedido.findMany({
+        where: { pedidoId: payload.pedidoId, loteId: { not: null } },
+        select: { produtoId: true, loteId: true },
+      });
+      for (const ip of itensPedido) {
+        if (ip.loteId) loteSeparadoPorProduto.set(ip.produtoId, ip.loteId);
+      }
+    }
+
     // 1. Baixa de estoque (SAIDA_VENDA, FEFO) — permite saldo negativo (venda "a comprar").
     //    Cada item é isolado: uma falha pontual vira pendência, não perde o restante.
     for (const item of payload.itens) {
@@ -242,9 +256,10 @@ export class NFeService {
           produtoId: item.produtoId,
           tipo: TipoMovimentacao.SAIDA_VENDA,
           quantidade: Number(item.quantidade),
+          loteId: loteSeparadoPorProduto.get(item.produtoId),
           nfeId: payload.nfeId,
           usuarioId: payload.usuarioId,
-          observacoes: `Baixa automática (FEFO) NF-e ${payload.nfeId.slice(0, 8)}`,
+          observacoes: `Baixa automática NF-e ${payload.nfeId.slice(0, 8)}`,
         });
       } catch (e: any) {
         falhas.push(`baixa de estoque do produto ${item.produtoId}: ${e.message}`);

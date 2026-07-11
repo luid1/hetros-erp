@@ -20,14 +20,42 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-11] — Sprint 3 (higiene sem decisão): P2-7, P2-5, P2-6, P1-6
+### O que mudou
+- **P2-7 · Auditoria com snapshot "antes" + entidade real:** novo decorator `@AuditEntidade('Model', 'prismaModel')`.
+  O `AuditInterceptor` agora, em UPDATE/DELETE de mestre, lê o registro **antes** da mutação (`dadosAntes`) e
+  grava o nome legível da entidade em vez da URL crua (deriva o 1º segmento da rota como fallback). Aplicado em
+  clientes, fornecedores, transportadoras, usuarios e veiculos.
+- **P2-5 · Recebimento parcial de OC + `EntradaMercadoria`:** `POST /compras/:id/receber` aceita `itens[]`
+  (`itemId`, `quantidadeRecebida`, `loteNumero?`, `dataValidade?`). Gera uma `EntradaMercadoria`+`ItemEntrada`
+  da remessa, dá entrada no estoque vinculando `entradaId`, acumula `quantidadeRecebida` por item, cria o
+  `ContaPagar` da remessa (com `entradaId`) e marca a OC como **PARCIAL** ou **ENTREGUE**. Sem `itens[]`, recebe
+  todo o saldo pendente (comportamento antigo preservado). Valida que a remessa não excede o pendente.
+- **P2-6 · Rastreabilidade de lote no FLV:** `estoque.baixarFefo` aceita `loteId` preferencial (consome o lote
+  separado primeiro, só o excedente cai no FEFO). No `nfe.emitida`, monta produtoId → lote separado a partir de
+  `ItemPedido.loteId` e passa à baixa — o lote que sai bate com o que foi separado.
+- **P1-6 · Primeiros testes automatizados:** runner **nativo do Node** (`npm test`, sem instalar jest) via
+  `node --require ts-node/register --test`. Máquina de estados do pedido extraída para `pedido-status.util.ts`
+  (puro, testável). Cobertura inicial: `money.util` e transições do pedido — **12 testes passando**.
+### Arquivos modificados
+- `backend/src/common/decorators/context.decorator.ts` (decorator `AuditEntidade`)
+- `backend/src/common/interceptors/audit.interceptor.ts` (snapshot antes + entidade real)
+- `backend/src/modules/{clientes,fornecedores,transportadoras,usuarios,veiculos}/*.controller.ts`
+- `backend/src/modules/compras/{compras.service.ts,compras.controller.ts,dto/compra.dto.ts}`
+- `backend/src/modules/estoque/estoque.service.ts` (`baixarFefo` com lote preferencial)
+- `backend/src/modules/nfe/nfe.service.ts` (lote separado na baixa)
+- `backend/src/modules/pedidos/{pedidos.service.ts,pedido-status.util.ts}`
+- `backend/test/{money.util,pedido-status.util}.spec.ts`, `backend/package.json` (script `test`)
+
+---
+
 ## 📍 PONTO DE PARADA (2026-07-11) — continuar de outro PC
 
 > Onde parei e o que vem a seguir estão detalhados no `MAPA-DE-CORRECOES.md`, seção **📍 PONTO DE PARADA**.
-> Último commit no GitHub (`luid1/hetros-erp` / `main`): `853dae4`.
 >
-> **Feito e testado:** P0-4, P0-5, P0-6, P1-3, P1-4, P1-5, P2-4, P2-8, P2-2 (stub `movimentacoes`) + fix do estorno no cancelamento de NF-e.
+> **Feito e testado:** P0-4/5/6, P1-3/4/5, P2-2 (stub), P2-4/8 + fix estorno NF-e · **Sprint 3:** P2-7, P2-5, P2-6, P1-6.
 > **Aguardando decisão:** `invoices` (dropar tabelas + NF-e×Invoice), DRE real, P2-1 (consolidar telas).
-> **Posso seguir sozinho:** P2-7 (auditoria), P2-5 (recebimento parcial de OC), P2-6 (rastreabilidade de lote), P1-6 (testes).
+> **Posso seguir sozinho:** expandir cobertura de testes (reserva de estoque, recebimento parcial).
 
 ---
 

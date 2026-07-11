@@ -4,6 +4,7 @@ import { EstoqueService } from '../estoque/estoque.service';
 import { TipoMovimentacao } from '@prisma/client';
 import { proximoNumero } from '../../common/utils/sequencia.util';
 import { money, sumMoney, subMoney, toCents, fromCents } from '../../common/utils/money.util';
+import { avaliarTransicaoPedido } from './pedido-status.util';
 
 interface ItemDto {
   produtoId: string;
@@ -307,31 +308,13 @@ export class PedidosService {
     return this.findOne(tenantId, pedidoId);
   }
 
-  // Máquina de estados do pedido: só transições legítimas são aceitas por esta rota
-  // genérica de logística. Confirmar/cancelar/faturar têm endpoints dedicados com sua
-  // própria lógica (reserva, NF-e), então não são disparados por aqui.
-  private static readonly TRANSICOES_PEDIDO: Record<string, string[]> = {
-    RASCUNHO: ['CONFIRMADO', 'CANCELADO'],
-    CONFIRMADO: ['EM_SEPARACAO', 'CANCELADO'],
-    EM_SEPARACAO: ['SEPARADO', 'CONFIRMADO', 'CANCELADO'],
-    SEPARADO: ['EM_SEPARACAO', 'FATURADO', 'CANCELADO'],
-    FATURADO: ['ENTREGUE', 'DEVOLVIDO'],
-    ENTREGUE: ['DEVOLVIDO'],
-    CANCELADO: [],
-    DEVOLVIDO: [],
-  };
-
   async updateStatus(tenantId: string, id: string, status: string) {
     const pedido = await this.findOne(tenantId, id);
     const atual = pedido.status as string;
 
-    if (atual === status) return pedido; // idempotente
-
-    const permitidas = PedidosService.TRANSICOES_PEDIDO[atual];
-    if (!permitidas) throw new BadRequestException(`Status atual inválido: ${atual}.`);
-    if (!permitidas.includes(status)) {
-      throw new BadRequestException(`Transição de ${atual} para ${status} não é permitida.`);
-    }
+    const avaliacao = avaliarTransicaoPedido(atual, status);
+    if (!avaliacao.ok) throw new BadRequestException((avaliacao as { motivo: string }).motivo);
+    if ((avaliacao as { idempotente?: boolean }).idempotente) return pedido;
 
     return this.prisma.pedido.update({
       where: { id },

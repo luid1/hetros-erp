@@ -2,13 +2,14 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } fro
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { FornecedoresService } from './fornecedores.service';
 import { CreateFornecedorDto, UpdateFornecedorDto } from './dto/fornecedor.dto';
-import { CurrentTenant, Modulo } from '../../common/decorators/context.decorator';
+import { CurrentTenant, Modulo, AuditEntidade } from '../../common/decorators/context.decorator';
 import { PermissoesGuard } from '../../common/guards/permissoes.guard';
 import { RequirePermissao } from '../../common/decorators/permissoes.decorator';
 
 @ApiTags('Fornecedores')
 @ApiBearerAuth()
 @Modulo('CADASTROS')
+@AuditEntidade('Fornecedor', 'fornecedor')
 @UseGuards(PermissoesGuard)
 @Controller('fornecedores')
 export class FornecedoresController {

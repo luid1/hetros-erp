@@ -31,9 +31,14 @@ O **esqueleto é bom** (schema maduro, arquitetura event-driven, módulo finance
 - **P2-2 · `dre`**: stub `return []`; o MAPA pede *implementar* DRE real (depende dos lançamentos financeiros), não remover.
 - **P2-1**: consolidar telas duplicadas (financeiro/fiscal/logística) — mudança de UX, alinhar quais telas manter.
 
+**✅ Feito (Sprint 3 — sem depender de decisão):**
+- **P2-7** auditoria: snapshot "antes" (via `@AuditEntidade('Model','prisma')` nos mestres) + nome real da entidade derivado da rota, não mais a URL crua.
+- **P2-5** recebimento parcial de OC: `POST /compras/:id/receber` aceita `itens[]` (qtd por item), gera `EntradaMercadoria`+`ItemEntrada`, vincula `ContaPagar.entradaId`, acumula `quantidadeRecebida` e marca **PARCIAL** ou **ENTREGUE**.
+- **P2-6** rastreabilidade de lote no FLV: `baixarFefo` aceita `loteId` preferencial; no `nfe.emitida` o lote separado (`ItemPedido.loteId`) é baixado primeiro, só o excedente cai no FEFO.
+- **P1-6** primeiros testes: runner nativo do Node (`npm test`, sem jest) — `money.util` e a máquina de estados do pedido (extraída p/ `pedido-status.util.ts`). 12 testes passando.
+
 **⏳ Próximos — dá para eu seguir sozinho (sem decisão):**
-- **P2-7** auditoria (snapshot "antes" + nome real da entidade) · **P2-5** recebimento parcial de OC + gerar `EntradaMercadoria` · **P2-6** rastreabilidade de lote no FLV.
-- **P1-6** primeiros testes automatizados (nenhum ainda).
+- Expandir cobertura de testes (reserva de estoque, recebimento parcial) — hoje só lógica pura.
 
 **Setup local para retomar:** Docker (`docker compose up -d` → Postgres 5433 + Redis 6380) · backend `cd backend && npm run start:dev` (3002) · frontend `cd frontend && npm run dev` (3000) · login `luid@hetros.com.br` / `admin123`.
 > Obs: em dev preenchi CNPJ/IE na filial 1001 (estavam vazios e travavam o faturamento) — isso é dado do banco local, **não** está no código/seed.
