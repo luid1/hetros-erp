@@ -10,7 +10,11 @@ export class DashboardController {
   constructor(private service: DashboardService) {}
 
   @Get()
-  findAll(@CurrentTenant() tenantId: string, @Query('filialId') filialId?: string) {
-    return this.service.findAll(tenantId, filialId);
+  findAll(
+    @CurrentTenant() tenantId: string,
+    @Query('filialId') filialId?: string,
+    @Query('periodo') periodo?: 'hoje' | 'semana' | 'mes',
+  ) {
+    return this.service.findAll(tenantId, filialId, periodo || 'hoje');
   }
 }

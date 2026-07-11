@@ -20,6 +20,28 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-11] — Dashboard completo (ex-"Painel Operacional") com dados reais
+### O que mudou
+- **Menu renomeado** "Painel Operacional" → **Dashboard**.
+- **Backend `/dashboard` reescrito** com seletor de período (`?periodo=hoje|semana|mes`) e todas as seções:
+  - **Financeiro**: faturamento + Δ% vs período anterior, ticket médio, margem bruta (do DRE), CMV,
+    resultado operacional; **aging** de contas a receber/pagar (vencido · 0-7 · 8-30 · +30), inadimplência %,
+    saldo projetado.
+  - **Estoque**: itens c/ saldo, valor do estoque (custo médio), validade por faixa (vencido/3d/7d),
+    perdas/quebras (R$ + kg), ruptura (produtos zerados).
+  - **Top clientes** (faturamento) e **Top produtos** (saída, por R$ ou kg).
+  - Série de faturamento (7/30 dias), pedidos por status, fluxo do dia.
+  - `DashboardModule` importa `DreModule` para reutilizar a margem.
+- **Frontend `DashboardPage` reconstruído** com **Recharts** (área com gradiente, barras), seletor de período,
+  ordenação (R$/kg), e **cards/gráficos clicáveis** com drill-down para as telas correspondentes
+  (faturamento→Gestão Fiscal, a receber/pagar→Contas, validade→Perecíveis, ruptura→Análise, etc.).
+- Verificado no runtime: período recalcula tudo, toggles e drill-downs funcionam, números batem com a API.
+### Arquivos modificados
+- `backend/src/modules/dashboard/{dashboard.service,dashboard.controller,dashboard.module}.ts`
+- `frontend/src/pages/DashboardPage.tsx`, `frontend/src/config/telas.ts`
+
+---
+
 ## [2026-07-11] — P2-1: consolidação de telas duplicadas (fiscal + logística)
 ### O que mudou
 - **Fiscal:** `Painel de Faturamento` (`/fiscal/painel`) sai do menu (vira `oculto`, rota preservada) — o

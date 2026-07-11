@@ -26,7 +26,7 @@ export interface TelaDef {
 
 export const TELAS: TelaDef[] = [
   // Visão geral
-  { key: '/dashboard', label: 'Painel Operacional', grupo: 'Visão Geral', icon: LayoutDashboard },
+  { key: '/dashboard', label: 'Dashboard', grupo: 'Visão Geral', icon: LayoutDashboard },
 
   // A · Cadastros
   { key: '/cadastros/clientes', label: 'Clientes', grupo: 'A · Cadastros', icon: Users },
