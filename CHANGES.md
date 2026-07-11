@@ -20,6 +20,92 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-10] — Correções do MAPA-DE-CORRECOES (P0/P1): integridade de dados, validação e concorrência
+
+### O que mudou
+
+**P0-4 · Faturamento transacional**
+- A emissão de NF-e a partir do pedido passou a rodar dentro de uma única transação: baixa de
+  estoque, geração do título e mudança de status do pedido acontecem juntas ou não acontecem —
+  acabou o risco de nota sem baixa (ou baixa sem nota). Pendência de atomicidade do WMS marcada no código.
+
+**P0-5 · DRE/Financeiro rotulado como demonstração**
+- `FinancialHub` (DRE, KPIs, rentabilidade e títulos) ganhou um banner âmbar avisando que os valores
+  são ilustrativos e **não** refletem o financeiro real. Evita decisão tomada em cima de dado fake
+  enquanto a integração com contas a pagar/receber reais está em desenvolvimento.
+
+**P0-6 · DTOs validados em 17 endpoints**
+- Endpoints que aceitavam `@Body() dto: any` agora usam DTOs `class-validator` com whitelist de campos.
+  Cobre: compras, entradas, inventário, fiscal (regra fiscal), filiais, transportadoras, veículos,
+  usuários (+ roles/reset de senha), carga (romaneio) e custos (cotação). Fecha a porta para payloads
+  malformados e para o `forbidNonWhitelisted` derrubar requisições legítimas.
+
+**P1-3 · Máquina de estados do pedido**
+- `updateStatus` agora valida a transição contra uma tabela de transições permitidas
+  (RASCUNHO→CONFIRMADO→EM_SEPARACAO→SEPARADO→FATURADO→ENTREGUE, com CANCELADO/DEVOLVIDO). Transição
+  inválida vira `400`; repetir o mesmo status é idempotente. Impede pular etapas ou reviver pedido cancelado.
+
+**P1-4 · Numeração sequencial sem corrida**
+- Nova tabela `sequencias` + helper `proximoNumero()` que incrementa de forma atômica via
+  `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` (um único comando SQL). Substituiu o padrão
+  `findFirst(orderBy desc) + 1` — que dava número duplicado sob emissão simultânea — em pedidos, OCs,
+  romaneios (dentro da própria transação) e NF-e (emissão e devolução). O `seed` alinha o contador ao
+  maior número legado na primeira vez.
+
+**P1-5 · Soft-delete em dados-mestre**
+- Novo helper `removerOuInativar()`: tenta o delete físico e, se o banco recusar por FK (registro com
+  histórico), cai para `ativo=false` preservando a rastreabilidade em vez de estourar erro de constraint.
+  Aplicado a clientes, fornecedores e transportadoras (usuários já inativava).
+
+**Extra · Cancelamento de NF-e não estornava (bug encontrado no teste do ciclo)**
+- O listener `handleNFeCancelada` gravava a movimentação de estorno com `usuarioId: 'sistema'` — id que
+  não existe na tabela de usuários — violando a FK `MovimentacaoEstoque_usuarioId_fkey`. O erro caía no
+  `catch` e a NF-e ficava CANCELADA **sem** devolver estoque, cancelar o título ou reverter o pedido.
+  Corrigido threading o usuário real do cancelamento (controller → service → evento → listener), igual ao
+  fluxo de emissão. Ciclo confirma→fatura→cancela validado ponta a ponta no localhost.
+
+**P2-4 · Dinheiro em float no pedido**
+- `montarItensETotais` e `descontoEmReais` (`pedidos.service.ts`) faziam multiplicação/soma JS crua, que
+  acumula drift de ponto flutuante (0.1+0.1+0.1 = 0.30000000000000004) e faz o total do pedido divergir
+  por centavos do total da NF-e/título. Passaram a usar `money.util` (opera em centavos inteiros):
+  `money()` por linha, `subMoney()` para o desconto e `sumMoney()` para o subtotal. Verificado no
+  localhost: pedido com 3×0,10 + frete 0,10 − desconto 0,05 → subtotal 0,30 e total 0,35 exatos.
+
+**P2-8 · Migration da tabela `sequencias` (corrige drift do P1-4)**
+- A tabela `sequencias` (numeração atômica) tinha sido criada por `prisma db push` e não constava no
+  histórico de migrations — um `prisma migrate deploy` num ambiente novo criaria tudo **menos** essa
+  tabela, quebrando `proximoNumero()` em runtime. Criada a migration `20260710120000_add_sequencias`
+  (marcada como aplicada em dev, onde a tabela já existia). `migrate status` limpo e `migrate diff`
+  banco×schema retorna vazio (sem drift).
+
+**P2-2 · Módulo backend morto: `movimentacoes` (removido)**
+- O módulo `movimentacoes` era um stub (`findAll` → `return []`) exposto em `/movimentacoes`; nenhuma tela
+  o chamava (o histórico de estoque usa `/estoque/:filialId/movimentacoes`, do `EstoqueModule`). Removido
+  o módulo e o wiring no `app.module.ts`. Verificado: `/movimentacoes` agora 404, `/estoque/:f/movimentacoes` segue 200.
+- **Pendências de decisão (não executadas):** `invoices` (módulo fiscal órfão, mas as tabelas
+  `invoices/invoice_taxes/invoice_audit_logs` têm dados de seed — dropar envolve a decisão P2-3 NFe×Invoice)
+  e `dre` (stub `return []`, mas o MAPA pede **implementar**, não remover). Ambos aguardam sua definição.
+
+### Arquivos modificados (Fase P2)
+- `backend/src/modules/pedidos/pedidos.service.ts` (money.util)
+- `backend/src/modules/nfe/{nfe.controller.ts,nfe.service.ts}` (estorno de cancelamento)
+- `backend/prisma/migrations/20260710120000_add_sequencias/migration.sql` (novo)
+- `backend/src/modules/movimentacoes/**` (removido) + `backend/src/app.module.ts`
+
+### Arquivos modificados
+- `backend/prisma/schema.prisma` (modelo `Sequencia`)
+- `backend/src/common/utils/sequencia.util.ts` (novo)
+- `backend/src/common/utils/soft-delete.util.ts` (novo)
+- `backend/src/modules/{compras,entradas,inventario,fiscal,filiais,transportadoras,veiculos,usuarios,carga,custos}/**` (DTOs + controllers)
+- `backend/src/modules/pedidos/pedidos.service.ts` (máquina de estados + numeração)
+- `backend/src/modules/nfe/nfe.service.ts` (faturamento transacional + numeração)
+- `backend/src/modules/carga/carga.service.ts` (numeração de romaneio na transação)
+- `backend/src/modules/compras/compras.service.ts` (numeração de OC + validação de preço)
+- `backend/src/modules/{clientes,fornecedores,transportadoras}/*.service.ts` (soft-delete)
+- `frontend/src/modules/financeiro/pages/FinancialHub.tsx` (banner de demonstração)
+
+---
+
 ## [2026-07-10] — Redesenho de telas densas, dropdowns escuros e camada global anti-claro
 
 ### O que mudou

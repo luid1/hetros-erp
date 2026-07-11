@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { TransportadorasService } from './transportadoras.service';
 import { CurrentTenant } from '../../common/decorators/context.decorator';
+import { CreateTransportadoraDto, UpdateTransportadoraDto } from './dto/transportadora.dto';
 
 @ApiTags('Transportadoras')
 @ApiBearerAuth()
@@ -10,7 +11,7 @@ export class TransportadorasController {
   constructor(private service: TransportadorasService) {}
 
   @Post()
-  create(@CurrentTenant() tenantId: string, @Body() dto: any) {
+  create(@CurrentTenant() tenantId: string, @Body() dto: CreateTransportadoraDto) {
     return this.service.create(tenantId, dto);
   }
 
@@ -25,7 +26,7 @@ export class TransportadorasController {
   }
 
   @Put(':id')
-  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: UpdateTransportadoraDto) {
     return this.service.update(tenantId, id, dto);
   }
 

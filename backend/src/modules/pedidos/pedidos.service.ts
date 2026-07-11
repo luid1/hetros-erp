@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, BadRequestException, Logger } from '@nes
 import { PrismaService } from '../../prisma/prisma.service';
 import { EstoqueService } from '../estoque/estoque.service';
 import { TipoMovimentacao } from '@prisma/client';
+import { proximoNumero } from '../../common/utils/sequencia.util';
+import { money, sumMoney, subMoney, toCents, fromCents } from '../../common/utils/money.util';
 
 interface ItemDto {
   produtoId: string;
@@ -43,11 +45,11 @@ export class PedidosService {
 
   // ── Resolve desconto do item em R$ ──
   private descontoEmReais(item: ItemDto): number {
-    const bruto = item.quantidade * item.precoUnitario;
+    const bruto = money(item.quantidade * item.precoUnitario);
     if (item.descontoTipo === 'PERCENT') {
-      return bruto * ((item.descontoPercent || 0) / 100);
+      return money(bruto * ((item.descontoPercent || 0) / 100));
     }
-    return item.desconto || 0;
+    return money(item.desconto || 0);
   }
 
   // ── Calcula linhas + totais do pedido ──
@@ -64,15 +66,13 @@ export class PedidosService {
     });
     const mapProd = new Map(produtos.map((p) => [p.id, p]));
 
-    let subtotal = 0;
     let pesoTotal = 0;
     const itensData = itensInput.map((item) => {
       const prod = mapProd.get(item.produtoId);
       if (!prod) throw new BadRequestException(`Produto ${item.produtoId} não encontrado.`);
-      const bruto = item.quantidade * item.precoUnitario;
+      const bruto = money(item.quantidade * item.precoUnitario);
       const descontoR$ = this.descontoEmReais(item);
-      const valorLinha = Math.max(0, bruto - descontoR$);
-      subtotal += valorLinha;
+      const valorLinha = Math.max(0, subMoney(bruto, descontoR$));
       pesoTotal += Number(prod.pesoBruto || 0) * item.quantidade;
       return {
         produtoId: item.produtoId,
@@ -88,9 +88,10 @@ export class PedidosService {
       };
     });
 
-    const descontoGeral = dto.descontoTotal || 0;
-    const frete = dto.valorFrete || 0;
-    const valorTotal = Math.max(0, subtotal - descontoGeral + frete);
+    const subtotal = sumMoney(itensData.map((i) => i.valorTotal));
+    const descontoGeral = money(dto.descontoTotal || 0);
+    const frete = money(dto.valorFrete || 0);
+    const valorTotal = Math.max(0, fromCents(toCents(subtotal) - toCents(descontoGeral) + toCents(frete)));
     return { itensData, subtotal, pesoTotal, valorTotal };
   }
 
@@ -128,7 +129,7 @@ export class PedidosService {
       orderBy: { numero: 'desc' },
       select: { numero: true },
     });
-    const numero = (ultimo?.numero || 0) + 1;
+    const numero = await proximoNumero(this.prisma, tenantId, `pedido:${dto.filialOrigemId}`, ultimo?.numero || 0);
 
     const { itensData, subtotal, pesoTotal, valorTotal } = await this.montarItensETotais(tenantId, dto);
     const credito = dto.clienteId
@@ -306,8 +307,32 @@ export class PedidosService {
     return this.findOne(tenantId, pedidoId);
   }
 
+  // Máquina de estados do pedido: só transições legítimas são aceitas por esta rota
+  // genérica de logística. Confirmar/cancelar/faturar têm endpoints dedicados com sua
+  // própria lógica (reserva, NF-e), então não são disparados por aqui.
+  private static readonly TRANSICOES_PEDIDO: Record<string, string[]> = {
+    RASCUNHO: ['CONFIRMADO', 'CANCELADO'],
+    CONFIRMADO: ['EM_SEPARACAO', 'CANCELADO'],
+    EM_SEPARACAO: ['SEPARADO', 'CONFIRMADO', 'CANCELADO'],
+    SEPARADO: ['EM_SEPARACAO', 'FATURADO', 'CANCELADO'],
+    FATURADO: ['ENTREGUE', 'DEVOLVIDO'],
+    ENTREGUE: ['DEVOLVIDO'],
+    CANCELADO: [],
+    DEVOLVIDO: [],
+  };
+
   async updateStatus(tenantId: string, id: string, status: string) {
-    await this.findOne(tenantId, id);
+    const pedido = await this.findOne(tenantId, id);
+    const atual = pedido.status as string;
+
+    if (atual === status) return pedido; // idempotente
+
+    const permitidas = PedidosService.TRANSICOES_PEDIDO[atual];
+    if (!permitidas) throw new BadRequestException(`Status atual inválido: ${atual}.`);
+    if (!permitidas.includes(status)) {
+      throw new BadRequestException(`Transição de ${atual} para ${status} não é permitida.`);
+    }
+
     return this.prisma.pedido.update({
       where: { id },
       data: { status: status as any },
@@ -336,7 +361,7 @@ export class PedidosService {
       orderBy: { numero: 'desc' },
       select: { numero: true },
     });
-    const numero = (ultimo?.numero || 0) + 1;
+    const numero = await proximoNumero(this.prisma, tenantId, `pedido:${origem.filialOrigemId}`, ultimo?.numero || 0);
 
     const itensData = dto.itens
       .filter((i) => i.produtoId && Number(i.quantidade) > 0)

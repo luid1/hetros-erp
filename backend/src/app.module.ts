@@ -13,7 +13,6 @@ import { VeiculosModule } from './modules/veiculos/veiculos.module';
 import { CustosModule } from './modules/custos/custos.module';
 import { ProdutosModule } from './modules/produtos/produtos.module';
 import { EstoqueModule } from './modules/estoque/estoque.module';
-import { MovimentacoesModule } from './modules/movimentacoes/movimentacoes.module';
 import { InventarioModule } from './modules/inventario/inventario.module';
 import { EntradasModule } from './modules/entradas/entradas.module';
 import { ComprasModule } from './modules/compras/compras.module';
@@ -58,7 +57,6 @@ import { HealthController } from './health.controller';
     CustosModule,
     ProdutosModule,
     EstoqueModule,
-    MovimentacoesModule,
     InventarioModule,
     EntradasModule,
     ComprasModule,

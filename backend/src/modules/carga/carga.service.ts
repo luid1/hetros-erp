@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { proximoNumero } from '../../common/utils/sequencia.util';
 
 @Injectable()
 export class CargaService {
@@ -153,8 +154,7 @@ export class CargaService {
       orderBy: { numero: 'desc' },
       select: { numero: true },
     });
-    const numero = (ultimo?.numero || 3500) + 1;
-    const autorizacao = `${new Date().getFullYear()}${String(numero).padStart(6, '0')}`;
+    const seedNumero = Math.max(ultimo?.numero || 0, 3500);
 
     const pesoTotal = await this.prisma.pedido.aggregate({
       where: { id: { in: dto.pedidoIds }, tenantId },
@@ -162,6 +162,8 @@ export class CargaService {
     });
 
     const romaneio = await this.prisma.$transaction(async (tx) => {
+      const numero = await proximoNumero(tx, tenantId, `romaneio:${dto.filialId}`, seedNumero);
+      const autorizacao = `${new Date().getFullYear()}${String(numero).padStart(6, '0')}`;
       const criado = await tx.romaneio.create({
         data: {
           tenantId,

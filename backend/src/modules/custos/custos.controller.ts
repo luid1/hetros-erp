@@ -2,6 +2,7 @@ import { Controller, Get, Post, Param, Query, Body } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CustosService } from './custos.service';
 import { CurrentTenant, CurrentUser, Modulo } from '../../common/decorators/context.decorator';
+import { SalvarCotacaoDto } from './dto/cotacao.dto';
 
 @ApiTags('Custos & Margem')
 @ApiBearerAuth()
@@ -48,9 +49,9 @@ export class CustosController {
     @CurrentTenant() tenantId: string,
     @CurrentUser() user: any,
     @Param('filialId') filialId: string,
-    @Body('itens') itens: any[],
+    @Body() dto: SalvarCotacaoDto,
   ) {
-    return this.service.salvarCotacao(tenantId, filialId, user.id, itens);
+    return this.service.salvarCotacao(tenantId, filialId, user.id, dto.itens);
   }
 
   @Get(':filialId/cotacoes')

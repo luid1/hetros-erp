@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EstoqueService } from '../estoque/estoque.service';
 import { FiscalService } from '../fiscal/fiscal.service';
 import { TipoMovimentacao, StatusDFe } from '@prisma/client';
+import { proximoNumero } from '../../common/utils/sequencia.util';
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 const addDias = (base: Date, dias: number) => new Date(base.getTime() + dias * 86400000);
@@ -58,7 +59,7 @@ export class NFeService {
       where: { tenantId, filialId, serie: '1', modelo: '55' },
       orderBy: { numero: 'desc' },
     });
-    const numero = (ultimo?.numero || 0) + 1;
+    const numero = await proximoNumero(this.prisma, tenantId, `nfe:${filialId}:55:1`, ultimo?.numero || 0);
 
     const valorNfe = r2(Number(pedido.valorTotal) + calc.totais.valorIcmsSt + calc.totais.valorIpi);
 
@@ -224,75 +225,105 @@ export class NFeService {
     itens: any[]; valorNfe: any; clienteId?: string; formaPagamento?: string; duplicatas: any[]; usuarioId: string;
   }) {
     this.logger.log(`📦 Processando nfe.emitida — NF-e ${payload.nfeId}`);
+
+    // A NF-e JÁ está autorizada no SEFAZ; não podemos "desfazê-la". O que fazemos
+    // aqui (baixa de estoque + financeiro) é a consequência interna. Se algo falhar,
+    // NÃO seguimos em silêncio: acumulamos os erros e marcamos a NF-e como pendente
+    // (baixaPendente=true + motivo) para retry/alerta, em vez de só logar e esquecer.
+    const falhas: string[] = [];
+
+    // 1. Baixa de estoque (SAIDA_VENDA, FEFO) — permite saldo negativo (venda "a comprar").
+    //    Cada item é isolado: uma falha pontual vira pendência, não perde o restante.
+    for (const item of payload.itens) {
+      if (!item.produtoId) continue;
+      try {
+        await this.estoque.baixarFefo(payload.tenantId, {
+          filialId: payload.filialId,
+          produtoId: item.produtoId,
+          tipo: TipoMovimentacao.SAIDA_VENDA,
+          quantidade: Number(item.quantidade),
+          nfeId: payload.nfeId,
+          usuarioId: payload.usuarioId,
+          observacoes: `Baixa automática (FEFO) NF-e ${payload.nfeId.slice(0, 8)}`,
+        });
+      } catch (e: any) {
+        falhas.push(`baixa de estoque do produto ${item.produtoId}: ${e.message}`);
+        this.logger.warn(`⚠️ Baixa de estoque falhou p/ produto ${item.produtoId}: ${e.message}`);
+      }
+    }
+
+    // 2. Financeiro (Contas a Receber) + liberação da reserva + status do pedido:
+    //    tudo em UMA transação. Ou gera todos os títulos e libera a reserva, ou nada
+    //    (antes: título parcial + pedido faturado sem cobrança = entrega e não cobra).
+    const dups = payload.duplicatas?.length
+      ? payload.duplicatas
+      : [{ numero: 'D001', dataVenc: addDias(new Date(), 30), valor: Number(payload.valorNfe) }];
+
     try {
-      // 1. Baixa de estoque (SAIDA_VENDA) — permite saldo negativo (venda "a comprar").
-      //    Cada item é blindado: uma falha pontual não impede o financeiro/status.
-      for (const item of payload.itens) {
-        if (!item.produtoId) continue;
-        try {
-          // FEFO: consome dos lotes que vencem primeiro
-          await this.estoque.baixarFefo(payload.tenantId, {
-            filialId: payload.filialId,
-            produtoId: item.produtoId,
-            tipo: TipoMovimentacao.SAIDA_VENDA,
-            quantidade: Number(item.quantidade),
-            nfeId: payload.nfeId,
-            usuarioId: payload.usuarioId,
-            observacoes: `Baixa automática (FEFO) NF-e ${payload.nfeId.slice(0, 8)}`,
+      await this.prisma.$transaction(async (tx) => {
+        for (const dup of dups) {
+          const forma = (payload.formaPagamento || '').toUpperCase();
+          const { linkBoleto, pixCopiaECola } = this.gerarCobranca(forma, dup);
+          await tx.contaReceber.create({
+            data: {
+              tenantId: payload.tenantId,
+              filialId: payload.filialId,
+              clienteId: payload.clienteId,
+              pedidoId: payload.pedidoId,
+              nfeId: payload.nfeId,
+              descricao: `Venda — NF-e ${payload.nfeId.slice(0, 8)} · parc. ${dup.numero}`,
+              numero: dup.numero,
+              valorOriginal: Number(dup.valor),
+              dataVencimento: new Date(dup.dataVenc),
+              status: 'ABERTO',
+              formaPagamento: payload.formaPagamento,
+              linkBoleto,
+              pixCopiaECola,
+            },
           });
-        } catch (e: any) {
-          this.logger.warn(`⚠️ Baixa de estoque falhou p/ produto ${item.produtoId}: ${e.message}`);
         }
-      }
 
-      // 2. Contas a Receber — uma por duplicata
-      const dups = payload.duplicatas?.length
-        ? payload.duplicatas
-        : [{ numero: 'D001', dataVenc: addDias(new Date(), 30), valor: Number(payload.valorNfe) }];
-
-      for (const dup of dups) {
-        const forma = (payload.formaPagamento || '').toUpperCase();
-        const { linkBoleto, pixCopiaECola } = this.gerarCobranca(forma, dup);
-        await this.prisma.contaReceber.create({
-          data: {
-            tenantId: payload.tenantId,
-            filialId: payload.filialId,
-            clienteId: payload.clienteId,
-            pedidoId: payload.pedidoId,
-            nfeId: payload.nfeId,
-            descricao: `Venda — NF-e ${payload.nfeId.slice(0, 8)} · parc. ${dup.numero}`,
-            numero: dup.numero,
-            valorOriginal: Number(dup.valor),
-            dataVencimento: new Date(dup.dataVenc),
-            status: 'ABERTO',
-            formaPagamento: payload.formaPagamento,
-            linkBoleto,
-            pixCopiaECola,
-          },
-        });
-      }
-
-      // 3. Libera a reserva do pedido (a mercadoria saiu de fato) + marca FATURADO.
-      if (payload.pedidoId) {
-        const ped = await this.prisma.pedido.findFirst({
-          where: { id: payload.pedidoId },
-          include: { itens: { select: { produtoId: true, quantidade: true } } },
-        });
-        if (ped) {
-          await this.estoque.liberarReserva(
-            payload.tenantId,
-            ped.filialOrigemId,
-            ped.itens
-              .filter((i) => !!i.produtoId)
-              .map((i) => ({ produtoId: i.produtoId as string, quantidade: Number(i.quantidade) })),
-          );
+        // Libera a reserva do pedido (a mercadoria saiu de fato) + marca FATURADO,
+        // dentro da mesma transação do financeiro.
+        if (payload.pedidoId) {
+          const ped = await tx.pedido.findFirst({
+            where: { id: payload.pedidoId },
+            include: { itens: { select: { produtoId: true, quantidade: true } } },
+          });
+          if (ped) {
+            await this.estoque.liberarReserva(
+              payload.tenantId,
+              ped.filialOrigemId,
+              ped.itens
+                .filter((i) => !!i.produtoId)
+                .map((i) => ({ produtoId: i.produtoId as string, quantidade: Number(i.quantidade) })),
+              tx,
+            );
+          }
+          await tx.pedido.update({ where: { id: payload.pedidoId }, data: { status: 'FATURADO' } });
         }
-        await this.prisma.pedido.update({ where: { id: payload.pedidoId }, data: { status: 'FATURADO' } });
-      }
+      });
+    } catch (e: any) {
+      falhas.push(`geração do financeiro/liberação de reserva: ${e.message}`);
+      this.logger.error(`❌ Financeiro da NF-e ${payload.nfeId} falhou: ${e.message}`, e.stack);
+    }
 
+    // 3. Fecha o processamento: se houve qualquer falha, a NF-e fica PENDENTE (visível
+    //    para o operador/retry) e emitimos um alerta. Sucesso limpa qualquer pendência.
+    if (falhas.length > 0) {
+      const motivo = falhas.join(' | ');
+      await this.prisma.nFe.update({
+        where: { id: payload.nfeId },
+        data: { baixaPendente: true, pendenciaMotivo: motivo.slice(0, 2000) },
+      });
+      this.events.emit('nfe.pendencia', { tenantId: payload.tenantId, nfeId: payload.nfeId, motivo });
+      this.logger.error(`🚨 NF-e ${payload.nfeId} EMITIDA com PENDÊNCIA: ${motivo}`);
+    } else {
+      await this.prisma.nFe.update({
+        where: { id: payload.nfeId },
+        data: { baixaPendente: false, pendenciaMotivo: null },
+      });
       this.logger.log(`✅ nfe.emitida ok — estoque baixado + ${dups.length} título(s) gerado(s)`);
-    } catch (err) {
-      this.logger.error(`❌ Erro ao processar nfe.emitida: ${err.message}`, err.stack);
     }
   }
 
@@ -312,7 +343,7 @@ export class NFeService {
   // ─────────────────────────────────────────
   // CANCELAMENTO — reverte financeiro e estoque
   // ─────────────────────────────────────────
-  async cancelar(tenantId: string, nfeId: string, motivo: string) {
+  async cancelar(tenantId: string, nfeId: string, motivo: string, usuarioId: string) {
     const nfe = await this.prisma.nFe.findFirst({ where: { id: nfeId, tenantId } });
     if (!nfe) throw new NotFoundException('NF-e não encontrada.');
     if (nfe.status !== StatusDFe.EMITIDO) throw new BadRequestException('Apenas NF-e emitidas podem ser canceladas.');
@@ -326,13 +357,13 @@ export class NFeService {
       data: { status: StatusDFe.CANCELADO, motivoCancelamento: motivo, xmlCancelamento: xml, dataCancelamento: new Date() },
     });
 
-    this.events.emit('nfe.cancelada', { tenantId, nfeId });
+    this.events.emit('nfe.cancelada', { tenantId, nfeId, usuarioId });
     return { status: 'CANCELADA' };
   }
 
   /** Listener: estorna estoque (volta a entrar) e cancela contas a receber em aberto. */
   @OnEvent('nfe.cancelada')
-  async handleNFeCancelada(payload: { tenantId: string; nfeId: string }) {
+  async handleNFeCancelada(payload: { tenantId: string; nfeId: string; usuarioId: string }) {
     try {
       const nfe = await this.prisma.nFe.findFirst({
         where: { id: payload.nfeId, tenantId: payload.tenantId },
@@ -349,7 +380,7 @@ export class NFeService {
           tipo: TipoMovimentacao.ENTRADA_DEVOLUCAO,
           quantidade: Number(item.quantidade),
           nfeId: nfe.id,
-          usuarioId: 'sistema',
+          usuarioId: payload.usuarioId,
           observacoes: `Estorno por cancelamento NF-e ${nfe.numero}`,
         });
       }
@@ -430,7 +461,7 @@ export class NFeService {
       where: { tenantId, filialId: origem.filialId, serie: '1', modelo: '55' },
       orderBy: { numero: 'desc' },
     });
-    const numero = (ultimo?.numero || 0) + 1;
+    const numero = await proximoNumero(this.prisma, tenantId, `nfe:${origem.filialId}:55:1`, ultimo?.numero || 0);
     const valorProdutos = r2(itensDev.reduce((s, d) => s + d.valorTotal, 0));
 
     const nfe = await this.prisma.nFe.create({

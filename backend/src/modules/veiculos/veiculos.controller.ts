@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Delete, Query, Param, Body } from '@nestjs/
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { VeiculosService } from './veiculos.service';
 import { CurrentTenant, Modulo } from '../../common/decorators/context.decorator';
+import { CreateVeiculoDto, UpdateVeiculoDto } from './dto/veiculo.dto';
 
 @ApiTags('Frotas & Veículos')
 @ApiBearerAuth()
@@ -18,13 +19,13 @@ export class VeiculosController {
 
   @Post()
   @ApiOperation({ summary: 'Cadastra um veículo' })
-  create(@CurrentTenant() tenantId: string, @Body() dto: any) {
+  create(@CurrentTenant() tenantId: string, @Body() dto: CreateVeiculoDto) {
     return this.service.create(tenantId, dto);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Edita um veículo' })
-  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: UpdateVeiculoDto) {
     return this.service.update(tenantId, id, dto);
   }
 

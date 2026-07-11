@@ -261,6 +261,15 @@ export default function FinancialHub() {
 
       <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-[1400px] mx-auto">
+      {/* Aviso: dados de demonstração (ainda não conectado ao financeiro real) */}
+      <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-800">
+        <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+        <div className="text-[13px] leading-snug">
+          <b>Dados de demonstração.</b> Os valores desta tela (DRE, KPIs, rentabilidade e títulos)
+          são ilustrativos e <b>não</b> refletem o financeiro real da operação. Não utilize para
+          tomada de decisão — a integração com os lançamentos reais (contas a pagar/receber) está em desenvolvimento.
+        </div>
+      </div>
       {/* Tabs */}
       <nav className="flex items-center gap-1 border-b border-neutral-200 mb-6 overflow-x-auto">
         <TabFin ativo={aba === 'dashboard'} icon={LayoutDashboard} label="Dashboard DRE & Caixa" onClick={() => setAba('dashboard')} />

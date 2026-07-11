@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { FiscalService } from './fiscal.service';
 import { CurrentTenant } from '../../common/decorators/context.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CreateRegraFiscalDto, UpdateRegraFiscalDto } from './dto/regra-fiscal.dto';
 
 @ApiTags('Fiscal')
 @ApiBearerAuth()
@@ -22,7 +23,7 @@ export class FiscalController {
 
   @Post('regras')
   @ApiOperation({ summary: 'Cria uma regra fiscal' })
-  criar(@CurrentTenant() tenantId: string, @Body() dto: any) {
+  criar(@CurrentTenant() tenantId: string, @Body() dto: CreateRegraFiscalDto) {
     return this.service.criarRegra(tenantId, dto);
   }
 
@@ -34,7 +35,7 @@ export class FiscalController {
 
   @Put('regras/:id')
   @ApiOperation({ summary: 'Atualiza uma regra fiscal' })
-  atualizar(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: any) {
+  atualizar(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: UpdateRegraFiscalDto) {
     return this.service.atualizarRegra(tenantId, id, dto);
   }
 

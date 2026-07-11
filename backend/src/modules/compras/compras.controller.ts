@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ComprasService } from './compras.service';
 import { CurrentTenant, CurrentUser, Modulo } from '../../common/decorators/context.decorator';
 import { RequirePermissao } from '../../common/decorators/permissoes.decorator';
+import { CreateOrdemCompraDto, UpdateOrdemCompraDto, MudarStatusOrdemCompraDto } from './dto/compra.dto';
 
 @ApiTags('Compras')
 @ApiBearerAuth()
@@ -35,14 +36,14 @@ export class ComprasController {
   @Post()
   @RequirePermissao('ESTOQUE:CREATE')
   @ApiOperation({ summary: 'Cria uma Ordem de Compra' })
-  create(@CurrentTenant() tenantId: string, @Body() dto: any) {
+  create(@CurrentTenant() tenantId: string, @Body() dto: CreateOrdemCompraDto) {
     return this.service.create(tenantId, dto);
   }
 
   @Put(':id')
   @RequirePermissao('ESTOQUE:UPDATE')
   @ApiOperation({ summary: 'Edita uma OC (recalcula totais)' })
-  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: UpdateOrdemCompraDto) {
     return this.service.update(tenantId, id, dto);
   }
 
@@ -55,8 +56,8 @@ export class ComprasController {
   @Patch(':id/status')
   @RequirePermissao('ESTOQUE:UPDATE')
   @ApiOperation({ summary: 'Muda o status da OC (ENTREGUE dá entrada no estoque + contas a pagar)' })
-  mudarStatus(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string, @Body('status') status: any) {
-    return this.service.mudarStatus(tenantId, id, status, user.id);
+  mudarStatus(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Param('id') id: string, @Body() dto: MudarStatusOrdemCompraDto) {
+    return this.service.mudarStatus(tenantId, id, dto.status as any, user.id);
   }
 
   @Post(':id/receber')

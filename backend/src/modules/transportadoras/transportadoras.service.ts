@@ -1,5 +1,6 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { removerOuInativar } from '../../common/utils/soft-delete.util';
 
 @Injectable()
 export class TransportadorasService {
@@ -42,7 +43,10 @@ export class TransportadorasService {
 
   async remove(tenantId: string, id: string) {
     await this.findOne(tenantId, id);
-    return this.prisma.transportadora.delete({ where: { id } });
+    return removerOuInativar(
+      () => this.prisma.transportadora.delete({ where: { id } }),
+      () => this.prisma.transportadora.update({ where: { id }, data: { ativo: false } }),
+    );
   }
 
   private sanitize(dto: any) {

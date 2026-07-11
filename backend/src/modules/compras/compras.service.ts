@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../prisma/prisma.service';
 import { EstoqueService } from '../estoque/estoque.service';
 import { StatusOrdemCompra, TipoMovimentacao } from '@prisma/client';
+import { proximoNumero } from '../../common/utils/sequencia.util';
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -22,6 +23,7 @@ export class ComprasService {
       const quantidade = Number(i.quantidade) || 0;
       const precoUnitario = Number(i.precoUnitario) || 0;
       if (quantidade <= 0) throw new BadRequestException('Quantidade deve ser maior que zero.');
+      if (precoUnitario < 0) throw new BadRequestException('Preço unitário não pode ser negativo.');
       return {
         produtoId: i.produtoId || null,
         descricao: (i.descricao || '').trim(),
@@ -109,7 +111,7 @@ export class ComprasService {
     const { preparados, valorTotal } = this.prepararItens(dto.itens);
 
     const ultimo = await this.prisma.ordemCompra.findFirst({ where: { tenantId }, orderBy: { numero: 'desc' } });
-    const numero = (ultimo?.numero || 0) + 1;
+    const numero = await proximoNumero(this.prisma, tenantId, 'oc', ultimo?.numero || 0);
 
     return this.prisma.ordemCompra.create({
       data: {

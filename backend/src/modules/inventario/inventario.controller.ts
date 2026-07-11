@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Body, Param } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { InventarioService } from './inventario.service';
 import { CurrentTenant, CurrentUser, Modulo } from '../../common/decorators/context.decorator';
+import { AbrirInventarioDto, ContarItemDto } from './dto/inventario.dto';
 
 @ApiTags('Inventario')
 @ApiBearerAuth()
@@ -22,14 +23,14 @@ export class InventarioController {
 
   @Post()
   @ApiOperation({ summary: 'Abre um inventário (congela o saldo do sistema)' })
-  abrir(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Body() dto: any) {
+  abrir(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Body() dto: AbrirInventarioDto) {
     return this.service.abrir(tenantId, user.id, dto);
   }
 
   @Patch('item/:itemId/contar')
   @ApiOperation({ summary: 'Grava a contagem física de um item' })
-  contar(@CurrentTenant() tenantId: string, @Param('itemId') itemId: string, @Body('quantidadeContada') qtd: number) {
-    return this.service.contar(tenantId, itemId, qtd);
+  contar(@CurrentTenant() tenantId: string, @Param('itemId') itemId: string, @Body() dto: ContarItemDto) {
+    return this.service.contar(tenantId, itemId, dto.quantidadeContada);
   }
 
   @Post(':id/fechar')

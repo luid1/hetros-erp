@@ -832,6 +832,11 @@ model NFe {
   motivoCancelamento String?
   dataEmissao     DateTime?
   dataCancelamento DateTime?
+  // Pendência pós-emissão: NF-e autorizada no SEFAZ mas a baixa de estoque e/ou a
+  // geração do financeiro falhou. Nunca seguimos em silêncio — sinalizamos aqui
+  // para fila de retry/alerta operacional.
+  baixaPendente   Boolean   @default(false)
+  pendenciaMotivo String?   @db.Text
   // Transporte
   tipoFrete       String?
   transportadoraId String?
@@ -1418,4 +1423,17 @@ model RouteStop {
   @@index([tenantId, pedidoId])
   @@index([routeId, ordem])
   @@map("route_stops")
+}
+
+// Contador sequencial atômico por tenant + escopo (ex: "pedido", "oc",
+// "romaneio:<filialId>", "nfe:<serie>"). O incremento é feito com um UPDATE
+// atômico (RETURNING) para evitar corrida entre duas emissões simultâneas —
+// nunca use findFirst(orderBy numero desc)+1, que gera número duplicado sob carga.
+model Sequencia {
+  tenantId String
+  escopo   String
+  valor    Int    @default(0)
+
+  @@id([tenantId, escopo])
+  @@map("sequencias")
 }

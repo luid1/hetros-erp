@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { CargaService } from './carga.service';
 import { CurrentTenant, Modulo } from '../../common/decorators/context.decorator';
 import { RequirePermissao } from '../../common/decorators/permissoes.decorator';
+import { CriarRomaneioDto } from './dto/romaneio.dto';
 
 @ApiTags('Controle de Carga')
 @ApiBearerAuth()
@@ -52,7 +53,7 @@ export class CargaController {
   @Post('romaneio')
   @RequirePermissao('PEDIDOS:CREATE')
   @ApiOperation({ summary: 'Cria uma rota (Romaneio) com motorista/veículo e os pedidos selecionados' })
-  criarRomaneio(@CurrentTenant() tenantId: string, @Body() body: any) {
+  criarRomaneio(@CurrentTenant() tenantId: string, @Body() body: CriarRomaneioDto) {
     return this.service.criarRomaneio(tenantId, body);
   }
 

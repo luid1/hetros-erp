@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { EntradasService } from './entradas.service';
 import { CurrentTenant, CurrentUser, Modulo } from '../../common/decorators/context.decorator';
 import { RequirePermissao } from '../../common/decorators/permissoes.decorator';
+import { CreateEntradaDto } from './dto/entrada.dto';
 
 @ApiTags('Entradas')
 @ApiBearerAuth()
@@ -24,7 +25,7 @@ export class EntradasController {
   @Post()
   @RequirePermissao('ESTOQUE:CREATE')
   @ApiOperation({ summary: 'Registra entrada de mercadoria (dá entrada no estoque + lote/validade)' })
-  create(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Body() dto: any) {
+  create(@CurrentTenant() tenantId: string, @CurrentUser() user: any, @Body() dto: CreateEntradaDto) {
     return this.service.create(tenantId, user.id, dto);
   }
 }

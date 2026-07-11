@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Patch, Delete, Body, Param } from '@nestjs/
 import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { UsuariosService } from './usuarios.service';
 import { CurrentTenant } from '../../common/decorators/context.decorator';
+import { CreateUsuarioDto, UpdateUsuarioDto, ResetSenhaDto, CreateRoleDto, UpdateRoleDto } from './dto/usuario.dto';
 
 @ApiTags('Usuários & Acessos')
 @ApiBearerAuth()
@@ -17,12 +18,12 @@ export class UsuariosController {
   }
 
   @Post('roles')
-  createRole(@CurrentTenant() tenantId: string, @Body() dto: any) {
+  createRole(@CurrentTenant() tenantId: string, @Body() dto: CreateRoleDto) {
     return this.service.createRole(tenantId, dto);
   }
 
   @Put('roles/:id')
-  updateRole(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: any) {
+  updateRole(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: UpdateRoleDto) {
     return this.service.updateRole(tenantId, id, dto);
   }
 
@@ -39,18 +40,18 @@ export class UsuariosController {
   }
 
   @Post()
-  create(@CurrentTenant() tenantId: string, @Body() dto: any) {
+  create(@CurrentTenant() tenantId: string, @Body() dto: CreateUsuarioDto) {
     return this.service.createUsuario(tenantId, dto);
   }
 
   @Put(':id')
-  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: any) {
+  update(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: UpdateUsuarioDto) {
     return this.service.updateUsuario(tenantId, id, dto);
   }
 
   @Patch(':id/senha')
-  resetSenha(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body('senha') senha: string) {
-    return this.service.resetSenha(tenantId, id, senha);
+  resetSenha(@CurrentTenant() tenantId: string, @Param('id') id: string, @Body() dto: ResetSenhaDto) {
+    return this.service.resetSenha(tenantId, id, dto.senha);
   }
 
   @Delete(':id')

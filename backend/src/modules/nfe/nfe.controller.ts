@@ -53,10 +53,11 @@ export class NFeController {
   @ApiOperation({ summary: 'Cancela NF-e no SEFAZ → estorna estoque + cancela títulos' })
   cancelar(
     @CurrentTenant() tenantId: string,
+    @CurrentUser() user: any,
     @Param('id') id: string,
     @Body('motivo') motivo: string,
   ) {
-    return this.service.cancelar(tenantId, id, motivo);
+    return this.service.cancelar(tenantId, id, motivo, user.id);
   }
 
   // ---- Carta de Correção Eletrônica (CC-e) ----
