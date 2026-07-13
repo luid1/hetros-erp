@@ -58,8 +58,12 @@ services:
       NFE_PROVIDER: mock
       # Semeia o banco na 1ª subida (idempotente). Deixe false após P2 (dados vêm da nuvem).
       SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
-      # Reservado p/ P2/P3: endereço da nuvem para sincronizar.
+      # P2 — sincronização com a nuvem (puxar cadastros). Vazio = CD autônomo (sem sync).
       UPSTREAM_URL: ${UPSTREAM_URL:-}
+      UPSTREAM_EMAIL: ${UPSTREAM_EMAIL:-}
+      UPSTREAM_PASSWORD: ${UPSTREAM_PASSWORD:-}
+      UPSTREAM_TOKEN: ${UPSTREAM_TOKEN:-}
+      SYNC_INTERVAL_MS: ${SYNC_INTERVAL_MS:-}
     # migrate deploy sempre; seed só se SEED_ON_BOOT=true; depois inicia a API.
     command: >
       sh -c "npx prisma migrate deploy &&

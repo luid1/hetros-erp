@@ -36,6 +36,7 @@ import { FolhaModule } from './modules/folha/folha.module';
 import { PagamentosMotoristaModule } from './modules/pagamentos-motorista/pagamentos-motorista.module';
 import { NotificacoesModule } from './modules/notificacoes/notificacoes.module';
 import { RelatoriosModule } from './modules/relatorios/relatorios.module';
+import { SyncModule } from './modules/sync/sync.module';
 import { PrecificacaoModule } from './modules/precificacao/precificacao.module';
 import { DevolucoesCompraModule } from './modules/devolucoes-compra/devolucoes-compra.module';
 import { AuditoriaModule } from './modules/auditoria/auditoria.module';
@@ -92,6 +93,7 @@ import { HealthController } from './health.controller';
     PagamentosMotoristaModule,
     NotificacoesModule,
     RelatoriosModule,
+    SyncModule,
     PrecificacaoModule,
     DevolucoesCompraModule,
     AuditoriaModule,
