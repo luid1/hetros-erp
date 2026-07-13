@@ -89,6 +89,30 @@ export const fornecedoresApi = {
   list: (params?: object) => api.get('/fornecedores', { params }),
 };
 
+// Entradas de mercadoria (recebimento)
+export const entradasApi = {
+  list: (params?: object) => api.get('/entradas', { params }),
+  get: (id: string) => api.get(`/entradas/${id}`),
+};
+
+// Documentos de transporte MDF-e / CT-e (Frente F.1 — persistidos, modo simulação)
+export const documentosTransporteApi = {
+  list: (params?: { filialId?: string; tipo?: 'MDFE' | 'CTE' }) =>
+    api.get('/documentos-transporte', { params }),
+  create: (dto: {
+    filialId: string;
+    tipo: 'MDFE' | 'CTE';
+    placa: string;
+    motorista?: string;
+    ufIni: string;
+    ufFim: string;
+    valor?: number;
+    nfes?: { numero: number; valor: number }[];
+  }) => api.post('/documentos-transporte', dto),
+  atualizarStatus: (id: string, status: 'ENCERRADO' | 'CANCELADO') =>
+    api.patch(`/documentos-transporte/${id}/status`, { status }),
+};
+
 // Financeiro
 export const financeiroApi = {
   // Contas a Receber
@@ -107,6 +131,16 @@ export const financeiroApi = {
   baixarPagar: (id: string, data: object) => api.patch(`/contas-pagar/${id}/baixar`, data),
   cancelarPagar: (id: string, motivo?: string) =>
     api.patch(`/contas-pagar/${id}/cancelar`, { motivo }),
+  // Plano de Contas
+  planoContas: {
+    list: (incluirInativas?: boolean) =>
+      api.get('/plano-contas', { params: incluirInativas ? { incluirInativas: 'true' } : {} }),
+    analiticas: () => api.get('/plano-contas/analiticas'),
+    criar: (data: object) => api.post('/plano-contas', data),
+    atualizar: (id: string, data: object) => api.patch(`/plano-contas/${id}`, data),
+    remover: (id: string) => api.delete(`/plano-contas/${id}`),
+    semear: () => api.post('/plano-contas/semear'),
+  },
   // Relatórios
   dre: (params?: object) => api.get('/dre', { params }),
   dreCompleto: (params?: object) => api.get('/dre/completo', { params }),
@@ -115,6 +149,91 @@ export const financeiroApi = {
 // Fluxo de Caixa (consolidado realizado)
 export const fluxoCaixaApi = {
   consolidado: (params?: object) => api.get('/fluxo-caixa', { params }),
+};
+
+// Vendedores (Frente B)
+export const vendedoresApi = {
+  list: (incluirInativos?: boolean) =>
+    api.get('/vendedores', { params: incluirInativos ? { incluirInativos: 'true' } : {} }),
+  get: (id: string) => api.get(`/vendedores/${id}`),
+  criar: (data: object) => api.post('/vendedores', data),
+  atualizar: (id: string, data: object) => api.patch(`/vendedores/${id}`, data),
+  remover: (id: string) => api.delete(`/vendedores/${id}`),
+};
+
+// Comissões (Frente B)
+export const comissoesApi = {
+  list: (params?: object) => api.get('/comissoes', { params }),
+  resumo: () => api.get('/comissoes/resumo'),
+  fechar: (data: object) => api.post('/comissoes/fechar', data),
+};
+
+// Tesouraria — contas financeiras, caixa e conciliação (Frente G)
+export const tesourariaApi = {
+  // Contas financeiras
+  contas: (incluirInativas?: boolean) =>
+    api.get('/tesouraria/contas', { params: incluirInativas ? { incluirInativas: 'true' } : {} }),
+  conta: (id: string) => api.get(`/tesouraria/contas/${id}`),
+  criarConta: (data: object) => api.post('/tesouraria/contas', data),
+  atualizarConta: (id: string, data: object) => api.patch(`/tesouraria/contas/${id}`, data),
+  removerConta: (id: string) => api.delete(`/tesouraria/contas/${id}`),
+  resumo: () => api.get('/tesouraria/resumo'),
+  // Movimentos
+  movimentos: (params?: object) => api.get('/tesouraria/movimentos', { params }),
+  movimentoAvulso: (data: object) => api.post('/tesouraria/movimentos', data),
+  transferir: (data: object) => api.post('/tesouraria/transferencias', data),
+  // Conciliação (OFX)
+  extratos: (contaId?: string) => api.get('/tesouraria/extratos', { params: contaId ? { contaId } : {} }),
+  itensExtrato: (extratoId: string) => api.get(`/tesouraria/extratos/${extratoId}/itens`),
+  importarExtrato: (data: object) => api.post('/tesouraria/extratos/importar', data),
+  conciliar: (data: object) => api.post('/tesouraria/conciliar', data),
+};
+
+// Despesas recorrentes (Frente I)
+export const recorrenciasApi = {
+  listar: (ativo?: boolean) =>
+    api.get('/recorrencias', { params: ativo === undefined ? {} : { ativo: String(ativo) } }),
+  get: (id: string) => api.get(`/recorrencias/${id}`),
+  preview: (id: string, quantidade = 6) =>
+    api.get(`/recorrencias/${id}/preview`, { params: { quantidade } }),
+  criar: (data: object) => api.post('/recorrencias', data),
+  atualizar: (id: string, data: object) => api.patch(`/recorrencias/${id}`, data),
+  remover: (id: string) => api.delete(`/recorrencias/${id}`),
+  gerar: () => api.post('/recorrencias/gerar', {}),
+};
+
+// Pessoas / Funcionários (Frente C)
+export const pessoasApi = {
+  list: (params?: object) => api.get('/funcionarios', { params }),
+  get: (id: string) => api.get(`/funcionarios/${id}`),
+  criar: (data: object) => api.post('/funcionarios', data),
+  atualizar: (id: string, data: object) => api.patch(`/funcionarios/${id}`, data),
+  remover: (id: string) => api.delete(`/funcionarios/${id}`),
+};
+
+// Folha de pagamento (Frente C)
+export const folhaApi = {
+  list: (params?: object) => api.get('/folha', { params }),
+  get: (id: string) => api.get(`/folha/${id}`),
+  criar: (data: object) => api.post('/folha', data),
+  atualizar: (id: string, data: object) => api.patch(`/folha/${id}`, data),
+  remover: (id: string) => api.delete(`/folha/${id}`),
+  gerarPadrao: (id: string) => api.post(`/folha/${id}/gerar-padrao`, {}),
+  adicionarItem: (id: string, data: object) => api.post(`/folha/${id}/itens`, data),
+  removerItem: (id: string, itemId: string) => api.delete(`/folha/${id}/itens/${itemId}`),
+  fechar: (id: string, data: object) => api.post(`/folha/${id}/fechar`, data),
+  reabrir: (id: string) => api.post(`/folha/${id}/reabrir`, {}),
+};
+
+// Pagamentos de motorista — diária/frete (Frente D)
+export const pagamentosMotoristaApi = {
+  list: (params?: object) => api.get('/pagamentos-motorista', { params }),
+  get: (id: string) => api.get(`/pagamentos-motorista/${id}`),
+  criar: (data: object) => api.post('/pagamentos-motorista', data),
+  atualizarValor: (id: string, valor: number) => api.patch(`/pagamentos-motorista/${id}/valor`, { valor }),
+  aprovar: (id: string, data: object) => api.post(`/pagamentos-motorista/${id}/aprovar`, data),
+  cancelar: (id: string, motivo?: string) => api.post(`/pagamentos-motorista/${id}/cancelar`, { motivo }),
+  sincronizar: () => api.post('/pagamentos-motorista/sincronizar', {}),
 };
 
 
@@ -142,4 +261,65 @@ export const rotasApi = {
 // Auditoria
 export const auditoriaApi = {
   logs: (params?: object) => api.get('/auditoria', { params }),
+};
+
+// Relatórios gerenciais (Frente L)
+export const relatoriosApi = {
+  curvaABC: (params: { tipo?: 'produto' | 'cliente'; de?: string; ate?: string; filialId?: string }) =>
+    api.get('/relatorios/curva-abc', { params }),
+  giroEstoque: (params: { de?: string; ate?: string; filialId?: string }) =>
+    api.get('/relatorios/giro-estoque', { params }),
+  ranking: (params: { tipo?: 'vendedor' | 'cliente' | 'produto'; de?: string; ate?: string; filialId?: string }) =>
+    api.get('/relatorios/ranking', { params }),
+  agingFinanceiro: (params?: { filialId?: string }) =>
+    api.get('/relatorios/aging-financeiro', { params }),
+};
+
+// Notificações (Frente K)
+export const notificacoesApi = {
+  list: (params?: { naoLidas?: boolean; limit?: number }) =>
+    api.get('/notificacoes', {
+      params: { naoLidas: params?.naoLidas ? 'true' : undefined, limit: params?.limit },
+    }),
+  naoLidas: () => api.get('/notificacoes/nao-lidas'),
+  marcarLida: (id: string) => api.post(`/notificacoes/${id}/lida`, {}),
+  marcarTodasLidas: () => api.post('/notificacoes/marcar-todas-lidas', {}),
+  remover: (id: string) => api.delete(`/notificacoes/${id}`),
+  gerar: () => api.post('/notificacoes/gerar', {}),
+};
+
+// Precificação por tabela (Frente M.2)
+export const precificacaoApi = {
+  listar: (params?: { produtoId?: string; tabela?: string; search?: string }) =>
+    api.get('/precificacao/tabelas', { params }),
+  resolver: (params: { produtoId: string; tabela?: string; clienteId?: string; data?: string }) =>
+    api.get('/precificacao/resolver', { params }),
+  resolverLote: (dto: { produtoIds: string[]; tabela?: string; clienteId?: string; data?: string }) =>
+    api.post('/precificacao/resolver-lote', dto),
+  upsert: (dto: {
+    produtoId: string;
+    tabela: string;
+    preco: number;
+    promoAtiva?: boolean;
+    promoPreco?: number | null;
+    promoInicio?: string | null;
+    promoFim?: string | null;
+    ativo?: boolean;
+  }) => api.post('/precificacao/tabelas', dto),
+  remover: (id: string) => api.delete(`/precificacao/tabelas/${id}`),
+};
+
+// Devoluções de compra ao fornecedor (Frente M.1)
+export const devolucoesCompraApi = {
+  list: (params?: { fornecedorId?: string; status?: string }) =>
+    api.get('/devolucoes-compra', { params }),
+  get: (id: string) => api.get(`/devolucoes-compra/${id}`),
+  create: (dto: {
+    filialId: string;
+    fornecedorId?: string;
+    entradaId?: string;
+    motivo?: string;
+    observacoes?: string;
+    itens: { produtoId: string; descricao?: string; quantidade: number; valorUnitario?: number; loteId?: string }[];
+  }) => api.post('/devolucoes-compra', dto),
 };

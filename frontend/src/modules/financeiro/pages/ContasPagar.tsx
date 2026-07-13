@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { toast, confirmDialog } from '../../../components/ui/feedback';
-import { financeiroApi } from '../../../services/api';
+import { financeiroApi, tesourariaApi } from '../../../services/api';
 
 const R$ = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const primeiroDiaMes = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; };
@@ -196,14 +196,25 @@ export default function ContasPagar() {
 function ModalBaixa({ conta, onClose, onDone }: { conta: Conta; onClose: () => void; onDone: () => void }) {
   const [valor, setValor] = useState(String(conta.valorAberto));
   const [forma, setForma] = useState('');
+  const [contaId, setContaId] = useState('');
+  const [contasFin, setContasFin] = useState<{ id: string; nome: string; padrao: boolean }[]>([]);
   const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    tesourariaApi.contas().then((r: any) => {
+      const lista = r.data || [];
+      setContasFin(lista);
+      const padrao = lista.find((c: any) => c.padrao);
+      if (padrao) setContaId(padrao.id);
+    }).catch(() => setContasFin([]));
+  }, []);
 
   const confirmar = async () => {
     const v = numBR(valor);
     if (v <= 0) { toast('Informe um valor positivo.', 'error'); return; }
     setSalvando(true);
     try {
-      await financeiroApi.baixarPagar(conta.id, { valor: v, formaPagamento: forma || undefined });
+      await financeiroApi.baixarPagar(conta.id, { valor: v, formaPagamento: forma || undefined, contaId: contaId || undefined });
       toast('Pagamento registrado.', 'success');
       onDone();
     } catch (e: any) {
@@ -228,9 +239,16 @@ function ModalBaixa({ conta, onClose, onDone }: { conta: Conta; onClose: () => v
             <input type="number" step="0.01" autoFocus value={valor} onChange={e => setValor(e.target.value)} className="flex-1 bg-transparent px-2 py-2.5 text-lg text-slate-100 text-right font-mono focus:outline-none" />
           </div>
         </label>
-        <label className="block mb-4">
+        <label className="block mb-3">
           <span className="text-xs text-slate-400">Forma de pagamento (opcional)</span>
           <input value={forma} onChange={e => setForma(e.target.value)} placeholder="PIX, Dinheiro, Boleto..." className="mt-1 w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-400" />
+        </label>
+        <label className="block mb-4">
+          <span className="text-xs text-slate-400">Conta de origem (tesouraria)</span>
+          <select value={contaId} onChange={e => setContaId(e.target.value)} className="mt-1 w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-emerald-400">
+            <option value="">Não movimentar caixa</option>
+            {contasFin.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </select>
         </label>
         <button onClick={confirmar} disabled={salvando} className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-900 font-bold py-2.5 rounded-lg">
           <CheckCircle2 className="h-4 w-4" /> Confirmar baixa
@@ -240,12 +258,22 @@ function ModalBaixa({ conta, onClose, onDone }: { conta: Conta; onClose: () => v
   ), document.body);
 }
 
+interface ContaAnalitica { id: string; codigo: string; descricao: string }
+
 function ModalNovo({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [descricao, setDescricao] = useState('');
   const [valor, setValor] = useState('');
   const [vencimento, setVencimento] = useState(hojeISO());
   const [parcelas, setParcelas] = useState('1');
+  const [categoria, setCategoria] = useState('');
+  const [contas, setContas] = useState<ContaAnalitica[]>([]);
   const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    financeiroApi.planoContas.analiticas()
+      .then((r) => setContas(r.data || []))
+      .catch(() => setContas([]));
+  }, []);
 
   const confirmar = async () => {
     const v = numBR(valor);
@@ -256,6 +284,7 @@ function ModalNovo({ onClose, onDone }: { onClose: () => void; onDone: () => voi
       await financeiroApi.criarPagar({
         descricao, valorTotal: v, dataVencimento: vencimento,
         parcelas: Math.max(1, parseInt(parcelas) || 1),
+        ...(categoria ? { planoContasCodigo: categoria } : {}),
       });
       toast('Título criado.', 'success');
       onDone();
@@ -289,6 +318,15 @@ function ModalNovo({ onClose, onDone }: { onClose: () => void; onDone: () => voi
           <label className="block">
             <span className="text-xs text-slate-400">1º vencimento</span>
             <input type="date" value={vencimento} onChange={e => setVencimento(e.target.value)} className="mt-1 w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-rose-400" />
+          </label>
+          <label className="block">
+            <span className="text-xs text-slate-400">Categoria (Plano de Contas)</span>
+            <select value={categoria} onChange={e => setCategoria(e.target.value)} className="mt-1 w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-rose-400">
+              <option value="">Sem categoria (não classificar no DRE)</option>
+              {contas.map((c) => (
+                <option key={c.id} value={c.codigo}>{c.codigo} · {c.descricao}</option>
+              ))}
+            </select>
           </label>
         </div>
         <button onClick={confirmar} disabled={salvando} className="mt-4 w-full flex items-center justify-center gap-2 bg-rose-500 hover:bg-rose-400 text-white font-bold py-2.5 rounded-lg disabled:opacity-40">

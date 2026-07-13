@@ -1,10 +1,11 @@
-import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger, Inject } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EstoqueService } from '../estoque/estoque.service';
 import { FiscalService } from '../fiscal/fiscal.service';
 import { TipoMovimentacao, StatusDFe } from '@prisma/client';
 import { proximoNumero } from '../../common/utils/sequencia.util';
+import { NFE_PROVIDER, NfeProvider } from './providers/nfe-provider.interface';
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 const addDias = (base: Date, dias: number) => new Date(base.getTime() + dias * 86400000);
@@ -18,6 +19,7 @@ export class NFeService {
     private estoque: EstoqueService,
     private fiscal: FiscalService,
     private events: EventEmitter2,
+    @Inject(NFE_PROVIDER) private nfeProvider: NfeProvider,
   ) {}
 
   // ─────────────────────────────────────────
@@ -88,6 +90,7 @@ export class NFeService {
         valorDesconto: pedido.descontoTotal,
         valorIcms: calc.totais.valorIcms,
         valorIcmsSt: calc.totais.valorIcmsSt,
+        valorFcp: calc.totais.valorFcp,
         valorIpi: calc.totais.valorIpi,
         valorPis: calc.totais.valorPis,
         valorCofins: calc.totais.valorCofins,
@@ -110,6 +113,10 @@ export class NFeService {
             baseCalcIcms: imposto.baseCalcIcms,
             aliquotaIcms: imposto.aliquotaIcms,
             valorIcms: imposto.valorIcms,
+            baseCalcFcp: imposto.baseCalcFcp,
+            aliquotaFcp: imposto.aliquotaFcp,
+            valorFcp: imposto.valorFcp,
+            valorFcpSt: imposto.valorFcpSt,
             cstPis: imposto.cstPis,
             baseCalcPis: imposto.baseCalcPis,
             aliquotaPis: imposto.aliquotaPis,
@@ -185,7 +192,7 @@ export class NFeService {
     await this.prisma.nFe.update({ where: { id: nfeId }, data: { status: StatusDFe.PENDENTE_EMISSAO } });
 
     try {
-      const resultado = await this.chamarApiSefaz(nfe);
+      const resultado = await this.nfeProvider.autorizar(nfe);
 
       await this.prisma.nFe.update({
         where: { id: nfeId },
@@ -365,11 +372,11 @@ export class NFeService {
     if (!nfe.chaveAcesso) throw new BadRequestException('NF-e sem chave de acesso.');
     if (!motivo || motivo.trim().length < 15) throw new BadRequestException('Motivo do cancelamento deve ter ao menos 15 caracteres.');
 
-    const xml = await this.cancelarSefaz(nfe.chaveAcesso, motivo);
+    const cancelamento = await this.nfeProvider.cancelar(nfe.chaveAcesso, motivo, nfe);
 
     await this.prisma.nFe.update({
       where: { id: nfeId },
-      data: { status: StatusDFe.CANCELADO, motivoCancelamento: motivo, xmlCancelamento: xml, dataCancelamento: new Date() },
+      data: { status: StatusDFe.CANCELADO, motivoCancelamento: motivo, xmlCancelamento: cancelamento.xml, dataCancelamento: new Date() },
     });
 
     this.events.emit('nfe.cancelada', { tenantId, nfeId, usuarioId });
@@ -431,11 +438,11 @@ export class NFeService {
     const sequencia = (ultima?.sequencia || 0) + 1;
     if (sequencia > 20) throw new BadRequestException('Limite de 20 cartas de correção por NF-e atingido.');
 
-    const xml = `<evento><infEvento><tpEvento>110110</tpEvento><nSeqEvento>${sequencia}</nSeqEvento><xCorrecao>${texto}</xCorrecao></infEvento></evento>`;
+    const cce = await this.nfeProvider.cartaCorrecao(nfe.chaveAcesso || '', sequencia, texto, nfe);
     return this.prisma.cartaCorrecao.create({
       data: {
         tenantId, nfeId, sequencia, correcao: texto,
-        protocolo: `110110${Date.now()}`, xml, status: 'REGISTRADO', usuarioId,
+        protocolo: cce.protocolo, xml: cce.xml, status: cce.status, usuarioId,
       },
     });
   }
@@ -515,7 +522,7 @@ export class NFeService {
     if (!nfe) throw new NotFoundException('NF-e de devolução não encontrada.');
     if (nfe.status !== StatusDFe.RASCUNHO) throw new BadRequestException('Devolução já emitida.');
 
-    const resultado = await this.chamarApiSefaz(nfe);
+    const resultado = await this.nfeProvider.autorizar(nfe);
     await this.prisma.nFe.update({
       where: { id: nfeId },
       data: { status: StatusDFe.EMITIDO, chaveAcesso: resultado.chaveAcesso, protocolo: resultado.protocolo,
@@ -584,42 +591,6 @@ export class NFeService {
     });
   }
 
-  // ─────────────────────────────────────────
-  // MOCKS SEFAZ (modo teste — sem transmissão real)
-  // ─────────────────────────────────────────
-  private async chamarApiSefaz(nfe: any): Promise<{ chaveAcesso: string; protocolo: string; xml: string; danfeUrl: string }> {
-    const fakeChave = `35${new Date().getFullYear()}${(nfe.emitenteCnpj || '').replace(/\D/g, '').padStart(14, '0')}55${String(nfe.serie).padStart(3, '0')}${String(nfe.numero).padStart(9, '0')}1${Date.now().toString().slice(-9)}`;
-    return {
-      chaveAcesso: fakeChave.slice(0, 44),
-      protocolo: `135${Date.now()}`,
-      xml: this.montarXml(nfe, fakeChave.slice(0, 44)),
-      danfeUrl: `https://sistema.exemplo.com/danfe/${nfe.id}.pdf`,
-    };
-  }
-
-  /** Monta um XML simplificado (visual/teste) com itens e impostos. */
-  private montarXml(nfe: any, chave: string): string {
-    const dets = (nfe.itens || []).map((it: any, i: number) => `
-    <det nItem="${i + 1}">
-      <prod><cProd>${it.codigo}</cProd><xProd>${it.descricao}</xProd><NCM>${it.ncm}</NCM><CFOP>${it.cfop}</CFOP>
-        <uCom>${it.unidade}</uCom><qCom>${it.quantidade}</qCom><vUnCom>${it.valorUnitario}</vUnCom><vProd>${it.valorTotal}</vProd></prod>
-      <imposto>
-        <ICMS><CSOSN>${it.cstCsosn}</CSOSN><vBC>${it.baseCalcIcms || 0}</vBC><pICMS>${it.aliquotaIcms || 0}</pICMS><vICMS>${it.valorIcms || 0}</vICMS></ICMS>
-        <PIS><CST>${it.cstPis}</CST><vPIS>${it.valorPis || 0}</vPIS></PIS>
-        <COFINS><CST>${it.cstCofins}</CST><vCOFINS>${it.valorCofins || 0}</vCOFINS></COFINS>
-      </imposto>
-    </det>`).join('');
-    return `<?xml version="1.0" encoding="UTF-8"?><nfeProc xmlns="http://www.portalfiscal.inf.br/nfe"><NFe><infNFe Id="NFe${chave}">
-  <ide><natOp>${nfe.naturezaOperacao}</natOp><serie>${nfe.serie}</serie><nNF>${nfe.numero}</nNF><finNFe>${nfe.finalidade || '1'}</finNFe></ide>
-  <emit><CNPJ>${(nfe.emitenteCnpj || '').replace(/\D/g, '')}</CNPJ></emit>
-  <dest><xNome>${nfe.destRazaoSocial || ''}</xNome></dest>${dets}
-  <total><ICMSTot><vProd>${nfe.valorProdutos}</vProd><vICMS>${nfe.valorIcms || 0}</vICMS><vNF>${nfe.valorNfe}</vNF></ICMSTot></total>
-</infNFe></NFe></nfeProc>`;
-  }
-
-  private async cancelarSefaz(chave: string, motivo: string): Promise<string> {
-    return `<retEvento><infEvento><cStat>135</cStat><xMotivo>${motivo}</xMotivo></infEvento></retEvento>`;
-  }
 }
 
 function rnd(n: number): string {

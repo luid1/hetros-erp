@@ -93,6 +93,10 @@ export class BaixarReceberDto extends TenantAwareDto {
   @ApiPropertyOptional()
   @IsOptional() @IsString()
   observacoes?: string;
+
+  @ApiPropertyOptional({ description: 'Conta financeira creditada (gera MovimentoCaixa de entrada).' })
+  @IsOptional() @IsString()
+  contaId?: string;
 }
 
 /** Cancelamento de um título em aberto. */

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import api from '../services/api';
-import DetalheModal, { DetalheCard } from '../components/dashboard/DetalheModal';
+import api, { nfeApi, financeiroApi, comprasApi, estoqueApi, pedidosApi } from '../services/api';
+import DetalheModal, { DetalheCard, DetalheRegistro } from '../components/dashboard/DetalheModal';
 import {
   Package, AlertTriangle, TrendingUp, TrendingDown, Receipt, Activity, RefreshCw,
   PackageCheck, Wallet, Scale, Users, Boxes, ArrowUpRight, ArrowDownRight, ChevronRight,
@@ -24,6 +24,7 @@ const R$c = (v: number) => {
 const pct = (v: number) => `${(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
 const num = (v: number) => (v || 0).toLocaleString('pt-BR');
 const kg = (v: number) => `${(v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg`;
+const dataBR = (v?: string | null) => (v ? new Date(v).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—');
 
 /* ─────────────── Tipos ─────────────── */
 interface Aging { vencido: number; ate7: number; ate30: number; mais30: number; total: number; qtd: number }
@@ -128,6 +129,7 @@ export default function DashboardPage() {
   const [dataInicio, setDataInicio] = useState(hojeISO);
   const [dataFim, setDataFim] = useState(hojeISO);
   const [detalhe, setDetalhe] = useState<DetalheCard | null>(null);
+  const fid = filialAtiva?.id;
 
   const carregar = useCallback(() => {
     setLoading(true);
@@ -176,6 +178,16 @@ export default function DashboardPage() {
         ],
         rota: '/fiscal/gestao', verMaisLabel: 'Ver gestão fiscal',
         atalhos: [{ label: 'Emitir NF-e', rota: '/fiscal/emitir' }, { label: 'Notas emitidas', rota: '/fiscal/nfe' }],
+        listaTitulo: 'Últimas NF-e emitidas', listaVazia: 'Nenhuma NF-e emitida no período.',
+        carregarLista: async (): Promise<DetalheRegistro[]> => {
+          if (!fid) return [];
+          const { data } = await nfeApi.list(fid, { status: 'EMITIDO' });
+          return (Array.isArray(data) ? data : []).slice(0, 20).map((n: any): DetalheRegistro => ({
+            titulo: `NF-e ${n.numero || '—'}${n.serie ? `/${n.serie}` : ''}`,
+            subtitulo: `${n.cliente?.razaoSocial || n.destRazaoSocial || 'Cliente'} · ${dataBR(n.dataEmissao)}`,
+            valor: R$c(Number(n.valorNfe) || 0),
+          }));
+        },
       };
       case 'ticket': return {
         icon: Receipt, tone: 'teal', titulo: 'Ticket Médio', valorPrincipal: R$c(f?.ticketMedio ?? 0), subtitulo: 'valor médio por nota',
@@ -199,12 +211,30 @@ export default function DashboardPage() {
         linhas: [...agingLinhas(f?.receber), { label: 'Inadimplência', valor: pct(f?.inadimplenciaPct ?? 0), cor: (f?.inadimplenciaPct ?? 0) > 0 ? 'text-rose-400' : 'text-emerald-400' }],
         rota: '/financeiro/receber', verMaisLabel: 'Ver contas a receber',
         atalhos: [{ label: 'Fluxo de caixa', rota: '/financeiro/fluxo-caixa' }],
+        listaTitulo: 'Títulos vencidos', listaVazia: 'Nenhum título vencido.',
+        carregarLista: async (): Promise<DetalheRegistro[]> => {
+          const { data } = await financeiroApi.receber({ status: 'VENCIDO' });
+          return (Array.isArray(data) ? data : []).slice(0, 20).map((t: any): DetalheRegistro => ({
+            titulo: t.cliente?.razaoSocial || t.cliente?.nomeFantasia || t.descricao || 'Título',
+            subtitulo: `${t.numero ? `#${t.numero} · ` : ''}venc. ${dataBR(t.dataVencimento)}`,
+            valor: R$c(Number(t.valorAberto) || 0), cor: 'text-rose-400',
+          }));
+        },
       };
       case 'pagar': return {
         icon: Landmark, tone: 'amber', titulo: 'A Pagar', valorPrincipal: R$c(f?.pagar.total ?? 0), subtitulo: `${num(f?.pagar.qtd ?? 0)} títulos`,
         linhas: agingLinhas(f?.pagar),
         rota: '/financeiro/pagar', verMaisLabel: 'Ver contas a pagar',
         atalhos: [{ label: 'Fluxo de caixa', rota: '/financeiro/fluxo-caixa' }],
+        listaTitulo: 'Títulos vencidos', listaVazia: 'Nenhum título vencido.',
+        carregarLista: async (): Promise<DetalheRegistro[]> => {
+          const { data } = await financeiroApi.pagar({ status: 'VENCIDO' });
+          return (Array.isArray(data) ? data : []).slice(0, 20).map((t: any): DetalheRegistro => ({
+            titulo: t.fornecedor?.razaoSocial || t.fornecedor?.nomeFantasia || t.descricao || 'Título',
+            subtitulo: `${t.numero ? `#${t.numero} · ` : ''}venc. ${dataBR(t.dataVencimento)}`,
+            valor: R$c(Number(t.valorAberto) || 0), cor: 'text-amber-400',
+          }));
+        },
       };
       case 'saldo': return {
         icon: Scale, tone: (f?.saldoProjetado ?? 0) >= 0 ? 'emerald' : 'rose', titulo: 'Saldo Projetado', valorPrincipal: R$c(f?.saldoProjetado ?? 0), subtitulo: 'receber − pagar',
@@ -238,6 +268,20 @@ export default function DashboardPage() {
           { label: 'Vencem em 7 dias', valor: num(e?.validade.ate7 ?? 0) },
         ],
         rota: '/wms/pereciveis', verMaisLabel: 'Ver perecíveis',
+        listaTitulo: 'Itens vencendo', listaVazia: 'Nenhum item em atenção.',
+        carregarLista: async (): Promise<DetalheRegistro[]> => {
+          if (!fid) return [];
+          const { data } = await estoqueApi.alertasValidade(fid);
+          return (Array.isArray(data) ? data : []).slice(0, 20).map((s: any): DetalheRegistro => {
+            const venc = s.lote?.dataValidade;
+            const vencido = venc ? new Date(venc) < new Date() : false;
+            return {
+              titulo: `${s.produto?.codigo ? `${s.produto.codigo} · ` : ''}${s.produto?.descricao || 'Produto'}`,
+              subtitulo: `${s.lote?.numero ? `Lote ${s.lote.numero} · ` : ''}val. ${dataBR(venc)}`,
+              valor: kg(Number(s.quantidadeDisponivel) || 0), cor: vencido ? 'text-rose-400' : 'text-amber-400',
+            };
+          });
+        },
       };
       case 'perdas': return {
         icon: TrendingDown, tone: (e?.perdaValor ?? 0) ? 'rose' : 'slate', titulo: 'Perdas/Quebras', valorPrincipal: R$c(e?.perdaValor ?? 0), subtitulo: 'no período',
@@ -251,6 +295,16 @@ export default function DashboardPage() {
           { label: 'Itens c/ saldo', valor: num(e?.itensComSaldo ?? 0) },
         ],
         rota: '/wms/analise-estoque', verMaisLabel: 'Ver análise de estoque',
+        listaTitulo: 'Produtos a comprar', listaVazia: 'Nenhum produto em ruptura.',
+        carregarLista: async (): Promise<DetalheRegistro[]> => {
+          if (!fid) return [];
+          const { data } = await comprasApi.aComprar(fid);
+          return (Array.isArray(data) ? data : []).slice(0, 20).map((p: any): DetalheRegistro => ({
+            titulo: `${p.codigo ? `${p.codigo} · ` : ''}${p.descricao || 'Produto'}`,
+            subtitulo: `disp. ${num(Number(p.disponivel) || 0)} · mín. ${num(Number(p.estoqueMinimo) || 0)}`,
+            valor: `+${num(Number(p.sugestaoCompra) || 0)}`, cor: p.negativo ? 'text-rose-400' : 'text-amber-400',
+          }));
+        },
       };
       case 'movimentacoes': return {
         icon: Activity, tone: 'indigo', titulo: 'Movimentações', valorPrincipal: num(d?.kpis.movimentacoesHoje ?? 0), subtitulo: 'no período',
@@ -279,6 +333,16 @@ export default function DashboardPage() {
     icon: PackageCheck, tone: 'sky', titulo: `Pedidos — ${s.label}`, valorPrincipal: num(s.valor), subtitulo: 'pedidos neste status',
     linhas: Object.entries(d?.pedidosPorStatus || {}).filter(([, v]) => v > 0).map(([k, v]) => ({ label: STATUS_INFO[k]?.label || k, valor: num(v), cor: k === s.status ? 'text-sky-300' : undefined })),
     rota: STATUS_INFO[s.status]?.rota || '/logistica/pedidos', verMaisLabel: 'Ver pedidos',
+    listaTitulo: `Pedidos — ${s.label}`, listaVazia: 'Nenhum pedido neste status.',
+    carregarLista: async (): Promise<DetalheRegistro[]> => {
+      if (!fid) return [];
+      const { data } = await pedidosApi.list(fid, { status: s.status });
+      return (Array.isArray(data) ? data : []).slice(0, 20).map((p: any): DetalheRegistro => ({
+        titulo: `#${p.numero || '—'} · ${p.cliente?.razaoSocial || p.cliente?.nomeFantasia || 'Cliente'}`,
+        subtitulo: dataBR(p.dataEmissao),
+        valor: R$c(Number(p.valorTotal) || 0),
+      }));
+    },
   });
 
   const abrirFluxo = (item: { titulo: string; valor: string; rota: string }): DetalheCard => ({

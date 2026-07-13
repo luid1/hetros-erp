@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowUpRight, ArrowDownRight, ChevronRight, ArrowRight, X } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -7,6 +7,13 @@ export interface DetalheLinha {
   label: string;
   valor: string;
   cor?: string; // classe tailwind opcional p/ o valor (ex: 'text-rose-400')
+}
+export interface DetalheRegistro {
+  titulo: string;
+  subtitulo?: string;
+  valor: string;
+  cor?: string; // classe tailwind opcional p/ o valor
+  rota?: string; // navega ao clicar na linha
 }
 export interface DetalheCard {
   icon: any; // lucide icon
@@ -20,6 +27,9 @@ export interface DetalheCard {
   rota?: string; // destino do "Ver mais"
   verMaisLabel?: string;
   atalhos?: { label: string; rota: string }[];
+  carregarLista?: () => Promise<DetalheRegistro[]>; // lista de registros reais (sob demanda)
+  listaTitulo?: string; // ex: 'Últimas NF-e'
+  listaVazia?: string; // ex: 'Nenhum título vencido'
 }
 
 /* Paleta reaproveitada do Kpi do DashboardPage */
@@ -59,6 +69,10 @@ export default function DetalheModal({
   onClose: () => void;
   navigate: (rota: string) => void;
 }) {
+  const [registros, setRegistros] = useState<DetalheRegistro[] | null>(null);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState(false);
+
   useEffect(() => {
     if (!detalhe) return;
     const onKey = (ev: KeyboardEvent) => {
@@ -68,8 +82,21 @@ export default function DetalheModal({
     return () => window.removeEventListener('keydown', onKey);
   }, [detalhe, onClose]);
 
+  useEffect(() => {
+    setRegistros(null);
+    setErro(false);
+    if (!detalhe?.carregarLista) { setCarregando(false); return; }
+    let ativo = true;
+    setCarregando(true);
+    detalhe.carregarLista()
+      .then((regs) => { if (ativo) setRegistros(regs); })
+      .catch(() => { if (ativo) setErro(true); })
+      .finally(() => { if (ativo) setCarregando(false); });
+    return () => { ativo = false; };
+  }, [detalhe]);
+
   if (!detalhe) return null;
-  const { icon: Icon, tone, titulo, valorPrincipal, subtitulo, delta, linhas, serie, rota, verMaisLabel, atalhos } = detalhe;
+  const { icon: Icon, tone, titulo, valorPrincipal, subtitulo, delta, linhas, serie, rota, verMaisLabel, atalhos, carregarLista, listaTitulo, listaVazia } = detalhe;
 
   const irPara = (r: string) => {
     onClose();
@@ -130,6 +157,51 @@ export default function DetalheModal({
                 <span className={`font-semibold tabular-nums ${l.cor || 'text-slate-100'}`}>{l.valor}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Lista de registros reais (sob demanda) */}
+        {carregarLista && (
+          <div className="px-5 pb-2">
+            {listaTitulo && (
+              <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-[0.1em] mb-1.5">{listaTitulo}</p>
+            )}
+            {carregando && (
+              <div className="space-y-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center justify-between rounded-lg bg-white/[0.03] border border-white/[0.06] px-3 py-2 animate-pulse">
+                    <div className="h-3 w-32 rounded bg-white/[0.08]" />
+                    <div className="h-3 w-16 rounded bg-white/[0.08]" />
+                  </div>
+                ))}
+              </div>
+            )}
+            {!carregando && erro && (
+              <p className="text-xs text-slate-500 py-3 text-center">Não foi possível carregar a lista.</p>
+            )}
+            {!carregando && !erro && registros && registros.length === 0 && (
+              <p className="text-xs text-slate-500 py-3 text-center">{listaVazia || 'Nenhum registro.'}</p>
+            )}
+            {!carregando && !erro && registros && registros.length > 0 && (
+              <div className="space-y-1.5 max-h-64 overflow-y-auto -mr-1 pr-1">
+                {registros.map((r, i) => {
+                  const clic = !!r.rota;
+                  return (
+                    <div
+                      key={i}
+                      onClick={clic ? () => irPara(r.rota!) : undefined}
+                      className={`flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] border border-white/[0.06] px-3 py-2 ${clic ? 'cursor-pointer hover:bg-white/[0.06] transition-colors' : ''}`}
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-200 truncate">{r.titulo}</p>
+                        {r.subtitulo && <p className="text-[10px] text-slate-500 truncate">{r.subtitulo}</p>}
+                      </div>
+                      <span className={`text-xs font-semibold tabular-nums shrink-0 ${r.cor || 'text-slate-100'}`}>{r.valor}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 

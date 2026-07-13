@@ -1,10 +1,11 @@
 import { toast } from '../../../components/ui/feedback';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Truck, Plus, X, FileText, CheckCircle2, Ban } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
-import api from '../../../services/api';
+import api, { documentosTransporteApi } from '../../../services/api';
 import { PageHeader, btnPrimary } from '../../cadastros/ui';
+import SeloSimulacao from '../../../components/ui/SeloSimulacao';
 
 const R$ = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
@@ -12,7 +13,7 @@ const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','P
 type Doc = {
   id: string; tipo: 'CTE' | 'MDFE'; numero: number; placa: string; motorista?: string;
   ufIni: string; ufFim: string; valor: number; nfes: { numero: number; valor: number }[];
-  status: 'ABERTO' | 'ENCERRADO' | 'CANCELADO'; criadoEm: string;
+  status: 'ABERTO' | 'ENCERRADO' | 'CANCELADO'; createdAt: string;
 };
 
 const STATUS_COR: Record<string, string> = {
@@ -27,7 +28,7 @@ export default function CteMdfe() {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [modal, setModal] = useState(false);
   const [notas, setNotas] = useState<any[]>([]);
-  const storeKey = `hetros_dfe_transporte_${filialAtiva?.id || 'x'}`;
+  const [salvando, setSalvando] = useState(false);
 
   // form
   const [placa, setPlaca] = useState('');
@@ -37,10 +38,13 @@ export default function CteMdfe() {
   const [valor, setValor] = useState('');
   const [selNfes, setSelNfes] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    try { setDocs(JSON.parse(localStorage.getItem(storeKey) || '[]')); } catch { setDocs([]); }
-  }, [storeKey]);
-  const persist = (lista: Doc[]) => { setDocs(lista); localStorage.setItem(storeKey, JSON.stringify(lista)); };
+  const carregar = useCallback(() => {
+    if (!filialAtiva) { setDocs([]); return; }
+    documentosTransporteApi.list({ filialId: filialAtiva.id })
+      .then(r => setDocs(r.data || []))
+      .catch(() => setDocs([]));
+  }, [filialAtiva]);
+  useEffect(() => { carregar(); }, [carregar]);
 
   const abrirModal = () => {
     setPlaca(''); setMotorista(''); setUfIni('SP'); setUfFim('SP'); setValor(''); setSelNfes(new Set());
@@ -48,21 +52,33 @@ export default function CteMdfe() {
     if (filialAtiva) api.get(`/nfe/${filialAtiva.id}`, { params: { status: 'EMITIDO' } }).then(r => setNotas(r.data)).catch(() => setNotas([]));
   };
 
-  const salvar = () => {
-    if (!placa.trim()) return toast('Informe a placa do veículo.');
+  const salvar = async () => {
+    if (!filialAtiva) return toast('Selecione uma filial.', 'error');
+    if (!placa.trim()) return toast('Informe a placa do veículo.', 'error');
     const nfesSel = notas.filter(n => selNfes.has(n.id)).map(n => ({ numero: n.numero, valor: Number(n.valorNfe || 0) }));
-    if (aba === 'MDFE' && nfesSel.length === 0) return toast('Vincule ao menos uma NF-e ao manifesto.');
-    const proxNum = Math.max(0, ...docs.filter(d => d.tipo === aba).map(d => d.numero)) + 1;
-    const novo: Doc = {
-      id: crypto.randomUUID(), tipo: aba, numero: proxNum, placa: placa.toUpperCase(), motorista,
-      ufIni, ufFim, valor: Number(valor) || nfesSel.reduce((s, n) => s + n.valor, 0),
-      nfes: nfesSel, status: 'ABERTO', criadoEm: new Date().toISOString(),
-    };
-    persist([novo, ...docs]);
-    setModal(false);
+    if (aba === 'MDFE' && nfesSel.length === 0) return toast('Vincule ao menos uma NF-e ao manifesto.', 'error');
+    setSalvando(true);
+    try {
+      await documentosTransporteApi.create({
+        filialId: filialAtiva.id, tipo: aba, placa: placa.toUpperCase(), motorista,
+        ufIni, ufFim, valor: Number(valor) || undefined, nfes: nfesSel,
+      });
+      toast(`${aba === 'MDFE' ? 'Manifesto' : 'CT-e'} registrado (simulação).`, 'success');
+      setModal(false);
+      carregar();
+    } catch (e: any) {
+      toast(e?.response?.data?.message || 'Falha ao registrar.', 'error');
+    } finally { setSalvando(false); }
   };
 
-  const mudarStatus = (id: string, status: Doc['status']) => persist(docs.map(d => d.id === id ? { ...d, status } : d));
+  const mudarStatus = async (id: string, status: 'ENCERRADO' | 'CANCELADO') => {
+    try {
+      await documentosTransporteApi.atualizarStatus(id, status);
+      carregar();
+    } catch (e: any) {
+      toast(e?.response?.data?.message || 'Falha ao atualizar status.', 'error');
+    }
+  };
 
   const lista = docs.filter(d => d.tipo === aba);
 
@@ -71,13 +87,15 @@ export default function CteMdfe() {
       <PageHeader
         icon={<Truck className="h-4 w-4" />}
         titulo="CT-e / MDF-e"
-        subtitulo="Documentos fiscais de transporte (modo teste — mock local)"
+        subtitulo="Documentos fiscais de transporte (simulação — persistidos no backend)"
         actions={
           <button onClick={abrirModal} className={btnPrimary + ' bg-indigo-500 hover:bg-indigo-400 shadow-indigo-500/20'}>
             <Plus className="h-3.5 w-3.5" /> {aba === 'MDFE' ? 'Simular Manifesto' : 'Novo CT-e'}
           </button>
         }
       />
+
+      <SeloSimulacao detalhe="MDF-e/CT-e são registrados no backend para histórico e auditoria, mas ainda não transmitidos à SEFAZ." />
 
       {/* Abas */}
       <div className="bg-white/[0.02] backdrop-blur-xl border-b border-white/[0.06] px-5 flex gap-1 shrink-0">
@@ -162,7 +180,7 @@ export default function CteMdfe() {
             </div>
             <div className="px-5 py-3 border-t border-white/10 flex justify-end gap-2 sticky bottom-0 bg-[#0E141F]/95 backdrop-blur-xl">
               <button onClick={() => setModal(false)} className="px-4 py-2 rounded-lg border border-white/10 text-slate-300 text-sm hover:bg-white/5">Cancelar</button>
-              <button onClick={salvar} className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm">Emitir (mock)</button>
+              <button onClick={salvar} disabled={salvando} className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm disabled:opacity-40">Emitir (simulação)</button>
             </div>
           </div>
         </div>

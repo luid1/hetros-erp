@@ -6,6 +6,9 @@ import {
 import { OnEvent } from '@nestjs/event-emitter';
 import { Prisma, StatusFinanceiro } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PlanoContasService } from '../plano-contas/plano-contas.service';
+import { TesourariaService } from '../tesouraria/tesouraria.service';
+import { TipoMovimento, OrigemMovimento } from '@prisma/client';
 import {
   money,
   subMoney,
@@ -38,6 +41,8 @@ export interface CriarPagarDto {
   intervaloDias?: number; // dias entre parcelas (default 30)
   formaPagamento?: string;
   observacoes?: string;
+  /** Código do plano de contas (categoria de despesa) → gera lançamento no DRE. */
+  planoContasCodigo?: string;
 }
 
 /** Baixa (pagamento) total ou parcial de um título. */
@@ -48,6 +53,7 @@ export interface BaixarPagarDto {
   valorJuros?: number;
   formaPagamento?: string;
   observacoes?: string;
+  contaId?: string; // conta financeira debitada (gera MovimentoCaixa)
 }
 
 /** Contexto do usuário autenticado (para a trilha de auditoria). */
@@ -58,7 +64,11 @@ export interface UsuarioCtx {
 
 @Injectable()
 export class ContasPagarService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private planoContas: PlanoContasService,
+    private tesouraria: TesourariaService,
+  ) {}
 
   // ───────────────────────── Leitura ─────────────────────────
 
@@ -188,6 +198,21 @@ export class ContasPagarService {
           },
         });
 
+        // Reconhecimento da despesa no DRE (regime de competência), se houver
+        // categoria (plano de contas). Idempotente pela origem CP:<id>.
+        if (dto.planoContasCodigo) {
+          await this.planoContas.lancar({
+            tenantId,
+            filialId: dto.filialId || null,
+            contaCodigo: dto.planoContasCodigo,
+            valor: valores[i],
+            dataCompetencia: competencia,
+            descricao: conta.descricao,
+            origem: `CP:${conta.id}`,
+            tx,
+          });
+        }
+
         out.push(conta);
       }
       return out;
@@ -264,6 +289,24 @@ export class ContasPagarService {
         },
       });
 
+      // Tesouraria: se a baixa indicou uma conta financeira, registra a saída de
+      // caixa correspondente (atualiza saldo + gera MovimentoCaixa conciliável).
+      if (dto.contaId) {
+        await this.tesouraria.registrarMovimentoTx(tx, {
+          tenantId,
+          contaId: dto.contaId,
+          filialId: conta.filialId,
+          tipo: TipoMovimento.SAIDA,
+          valor: valorPagoOp,
+          descricao: `Pagamento: ${conta.descricao}`,
+          origem: OrigemMovimento.BAIXA_PAGAR,
+          contaPagarId: conta.id,
+          data: dto.dataPagamento ? new Date(dto.dataPagamento) : new Date(),
+          usuario,
+          observacoes: dto.formaPagamento ? `Via ${dto.formaPagamento}` : null,
+        });
+      }
+
       return this.serializar(atualizada);
     });
   }
@@ -280,6 +323,9 @@ export class ContasPagarService {
         where: { id: conta.id },
         data: { status: StatusFinanceiro.CANCELADO },
       });
+
+      // Estorna o reconhecimento da despesa no DRE (se houver).
+      await this.planoContas.estornar(tenantId, `CP:${conta.id}`, tx);
 
       await tx.historicoFinanceiro.create({
         data: {

@@ -1,5 +1,20 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { validarCnpjCpf, validarIE, validarNcm, validarCfop, isCsosn, isCstIcms } from '../../common/utils/fiscal-validators.util';
+
+/** Regimes tributários suportados no cálculo. */
+export type RegimeTributario = 'SIMPLES_NACIONAL' | 'LUCRO_PRESUMIDO' | 'LUCRO_REAL';
+
+/**
+ * Alíquotas de PIS/COFINS por apuração.
+ *  - cumulativo (Lucro Presumido): 0,65% / 3,00%
+ *  - não-cumulativo (Lucro Real): 1,65% / 7,60%
+ *  - Simples Nacional: recolhido dentro do DAS → 0 destacado na nota.
+ */
+const PIS_COFINS = {
+  CUMULATIVO: { pis: 0.65, cofins: 3.0 },
+  NAO_CUMULATIVO: { pis: 1.65, cofins: 7.6 },
+} as const;
 
 /**
  * Motor de Regras Fiscais e Tributárias.
@@ -23,6 +38,11 @@ export interface ImpostoItem {
   // ICMS-ST
   baseCalcIcmsSt: number;
   valorIcmsSt: number;
+  // FCP (Fundo de Combate à Pobreza)
+  baseCalcFcp: number;
+  aliquotaFcp: number;
+  valorFcp: number;
+  valorFcpSt: number;
   // IPI
   cstIpi: string | null;
   aliquotaIpi: number;
@@ -42,6 +62,9 @@ export interface ImpostoItem {
   // Origem da regra (para auditoria/preview)
   regraId: string | null;
   regraDescricao: string;
+  // Contexto tributário aplicado (auditoria)
+  regime: RegimeTributario;
+  apuracaoPisCofins: 'CUMULATIVO' | 'NAO_CUMULATIVO' | 'SIMPLES';
 }
 
 const r2 = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
@@ -52,6 +75,14 @@ export class FiscalService {
   private readonly logger = new Logger(FiscalService.name);
 
   constructor(private prisma: PrismaService) {}
+
+  /** Normaliza o texto do regime da filial para o enum interno (tolera "SIMPLES"). */
+  private normalizarRegime(valor: unknown): RegimeTributario {
+    const v = String(valor ?? '').toUpperCase();
+    if (v.includes('REAL')) return 'LUCRO_REAL';
+    if (v.includes('PRESUMIDO')) return 'LUCRO_PRESUMIDO';
+    return 'SIMPLES_NACIONAL';
+  }
 
   // ─────────────────────────────────────────
   // 1. RESOLUÇÃO DA REGRA (matriz fiscal)
@@ -113,12 +144,14 @@ export class FiscalService {
     interestadual: boolean;
     consumidorFinal: boolean;
     tipoOperacao: string;        // VENDA, DEVOLUCAO...
+    regime: RegimeTributario;    // regime da filial emitente
     regra: any | null;
     produto: { ncm: string; cfop?: string | null; origem?: string; cstIcms?: string | null;
       aliquotaIcms?: any; aliquotaPis?: any; aliquotaCofins?: any; cstPis?: string | null; cstCofins?: string | null };
   }): ImpostoItem {
-    const { valorItem, interestadual, consumidorFinal, regra, produto, tipoOperacao } = params;
+    const { valorItem, interestadual, consumidorFinal, regra, produto, tipoOperacao, regime } = params;
     const dev = tipoOperacao === 'DEVOLUCAO';
+    const simples = regime === 'SIMPLES_NACIONAL';
 
     // ---- CFOP ----
     let cfop: string;
@@ -130,15 +163,25 @@ export class FiscalService {
       cfop = produto.cfop || (interestadual ? '6102' : '5102');
     }
 
-    // ---- ICMS ----
+    // ---- ICMS: CSOSN (Simples) × CST (Normal) ----
     // origem: 0=nacional ... 8=importado. Da regra, ou do produto (enum NACIONAL_0 → "0").
     const origemProd = String(regra?.origemProd ?? produto.origem ?? '0').replace(/\D/g, '').slice(-1) || '0';
-    const cstCsosn = regra?.cstIcms ?? produto.cstIcms ?? '102';
+    // Default coerente com o regime: Simples usa CSOSN 102 (sem crédito); Normal usa CST 00 (tributado).
+    const defaultCst = simples ? '102' : '00';
+    let cstCsosn = String(regra?.cstIcms ?? produto.cstIcms ?? defaultCst);
+    // Coerência regime × código: no Simples só CSOSN; no Normal só CST. Corrige mismatch óbvio.
+    if (simples && isCstIcms(cstCsosn) && !isCsosn(cstCsosn)) cstCsosn = '102';
+    if (!simples && isCsosn(cstCsosn)) cstCsosn = '00';
+
     const aliquotaIcms = Number(regra?.aliquotaIcms ?? produto.aliquotaIcms ?? 0);
     const reducao = Number(regra?.reducaoBaseIcms ?? 0);
-    const baseCalcIcms = r2(valorItem * (1 - reducao / 100));
-    // CSOSN do Simples sem crédito (102/103/300/400) → ICMS destacado 0
-    const icmsDestacado = ['00', '10', '20', '70', '90'].includes(cstCsosn);
+    const baseCalcIcmsBruta = r2(valorItem * (1 - reducao / 100));
+    // ICMS destacado: no Simples só CSOSN com crédito (101/201) destacam "por dentro";
+    // no Normal, CSTs tributados (00/10/20/70/90). Isento/ST-tributado anteriormente → 0.
+    const icmsDestacado = simples
+      ? ['101', '201'].includes(cstCsosn)
+      : ['00', '10', '20', '70', '90'].includes(cstCsosn.slice(-2));
+    const baseCalcIcms = icmsDestacado ? baseCalcIcmsBruta : 0;
     const valorIcms = icmsDestacado ? pct(baseCalcIcms, aliquotaIcms) : 0;
 
     // ---- ICMS-ST ----
@@ -151,19 +194,46 @@ export class FiscalService {
       valorIcmsSt = Math.max(0, r2(pct(baseCalcIcmsSt, aliqSt) - valorIcms));
     }
 
+    // ---- FCP (Fundo de Combate à Pobreza) ----
+    // Incide sobre a base do ICMS próprio (quando destacado) e/ou sobre a base da ST.
+    const aliquotaFcp = Number(regra?.aliquotaFcp ?? 0);
+    const aliquotaFcpSt = Number(regra?.aliquotaFcpSt ?? 0);
+    const baseCalcFcp = icmsDestacado ? baseCalcIcms : 0;
+    const valorFcp = aliquotaFcp > 0 && baseCalcFcp > 0 ? pct(baseCalcFcp, aliquotaFcp) : 0;
+    const valorFcpSt = aliquotaFcpSt > 0 && baseCalcIcmsSt > 0 ? pct(baseCalcIcmsSt, aliquotaFcpSt) : 0;
+
     // ---- IPI ----
     const cstIpi = regra?.cstIpi ?? null;
     const aliquotaIpi = Number(regra?.aliquotaIpi ?? 0);
     const valorIpi = pct(valorItem, aliquotaIpi);
 
-    // ---- PIS ----
-    const cstPis = regra?.cstPis ?? produto.cstPis ?? '07';
-    const aliquotaPis = Number(regra?.aliquotaPis ?? produto.aliquotaPis ?? 0);
+    // ---- PIS / COFINS: cumulativo × não-cumulativo por regime ----
+    let apuracaoPisCofins: 'CUMULATIVO' | 'NAO_CUMULATIVO' | 'SIMPLES';
+    let cstPis: string;
+    let cstCofins: string;
+    let aliquotaPis: number;
+    let aliquotaCofins: number;
+    if (simples) {
+      // Recolhido no DAS → não destaca na nota (CST 49 / alíquota 0).
+      apuracaoPisCofins = 'SIMPLES';
+      cstPis = regra?.cstPis ?? produto.cstPis ?? '49';
+      cstCofins = regra?.cstCofins ?? produto.cstCofins ?? '49';
+      aliquotaPis = 0;
+      aliquotaCofins = 0;
+    } else {
+      // Presumido = cumulativo; Real = não-cumulativo. Flag da regra pode forçar.
+      const cumulativo = regra?.pisCumulativo != null
+        ? !!regra.pisCumulativo
+        : regime === 'LUCRO_PRESUMIDO';
+      apuracaoPisCofins = cumulativo ? 'CUMULATIVO' : 'NAO_CUMULATIVO';
+      const tabela = cumulativo ? PIS_COFINS.CUMULATIVO : PIS_COFINS.NAO_CUMULATIVO;
+      cstPis = regra?.cstPis ?? produto.cstPis ?? '01';
+      cstCofins = regra?.cstCofins ?? produto.cstCofins ?? '01';
+      // Se a regra/produto trouxer alíquota explícita (>0), respeita; senão usa a do regime.
+      aliquotaPis = Number(regra?.aliquotaPis ?? produto.aliquotaPis ?? 0) || tabela.pis;
+      aliquotaCofins = Number(regra?.aliquotaCofins ?? produto.aliquotaCofins ?? 0) || tabela.cofins;
+    }
     const valorPis = pct(valorItem, aliquotaPis);
-
-    // ---- COFINS ----
-    const cstCofins = regra?.cstCofins ?? produto.cstCofins ?? '07';
-    const aliquotaCofins = Number(regra?.aliquotaCofins ?? produto.aliquotaCofins ?? 0);
     const valorCofins = pct(valorItem, aliquotaCofins);
 
     // ---- DIFAL (consumidor final, interestadual) ----
@@ -172,18 +242,22 @@ export class FiscalService {
       // diferença simplificada: (alíq interna destino − interestadual) sobre a base
       const aliqInterna = aliquotaIcms || 18;
       const aliqInter = 12;
-      valorDifal = Math.max(0, pct(baseCalcIcms, aliqInterna - aliqInter));
+      valorDifal = Math.max(0, pct(baseCalcIcmsBruta, aliqInterna - aliqInter));
     }
 
     return {
       cfop,
       cstCsosn,
       origemProd,
-      baseCalcIcms: icmsDestacado ? baseCalcIcms : 0,
+      baseCalcIcms,
       aliquotaIcms,
       valorIcms,
       baseCalcIcmsSt,
       valorIcmsSt,
+      baseCalcFcp,
+      aliquotaFcp,
+      valorFcp,
+      valorFcpSt,
       cstIpi,
       aliquotaIpi,
       valorIpi,
@@ -198,6 +272,8 @@ export class FiscalService {
       valorDifal,
       regraId: regra?.id || null,
       regraDescricao: regra?.descricao || 'Padrão (produto)',
+      regime,
+      apuracaoPisCofins,
     };
   }
 
@@ -216,6 +292,8 @@ export class FiscalService {
     const interestadual = ufOrigem !== ufDestino;
     // Consumidor final = cliente sem IE (não contribuinte)
     const consumidorFinal = !pedido.cliente?.ie || pedido.cliente?.ie?.toUpperCase() === 'ISENTO';
+    // Regime da filial emitente (define CST×CSOSN e apuração de PIS/COFINS)
+    const regime = this.normalizarRegime(pedido.filialOrigem?.regimeTributario);
 
     const itens = [] as any[];
     for (const item of pedido.itens) {
@@ -231,6 +309,7 @@ export class FiscalService {
         interestadual,
         consumidorFinal,
         tipoOperacao,
+        regime,
         regra,
         produto: item.produto,
       });
@@ -242,15 +321,16 @@ export class FiscalService {
         baseIcms: r2(acc.baseIcms + imposto.baseCalcIcms),
         valorIcms: r2(acc.valorIcms + imposto.valorIcms),
         valorIcmsSt: r2(acc.valorIcmsSt + imposto.valorIcmsSt),
+        valorFcp: r2(acc.valorFcp + imposto.valorFcp + imposto.valorFcpSt),
         valorIpi: r2(acc.valorIpi + imposto.valorIpi),
         valorPis: r2(acc.valorPis + imposto.valorPis),
         valorCofins: r2(acc.valorCofins + imposto.valorCofins),
         valorDifal: r2(acc.valorDifal + imposto.valorDifal),
       }),
-      { baseIcms: 0, valorIcms: 0, valorIcmsSt: 0, valorIpi: 0, valorPis: 0, valorCofins: 0, valorDifal: 0 },
+      { baseIcms: 0, valorIcms: 0, valorIcmsSt: 0, valorFcp: 0, valorIpi: 0, valorPis: 0, valorCofins: 0, valorDifal: 0 },
     );
 
-    return { itens, totais, contexto: { ufOrigem, ufDestino, interestadual, consumidorFinal } };
+    return { itens, totais, contexto: { ufOrigem, ufDestino, interestadual, consumidorFinal, regime } };
   }
 
   // ─────────────────────────────────────────
@@ -284,13 +364,22 @@ export class FiscalService {
     const cli = pedido.cliente;
     add('cliente', 'Cliente vinculado ao pedido', !!cli, 'BLOQUEIO');
     add('cliente-ativo', 'Cliente ativo', !!cli?.ativo, 'BLOQUEIO');
-    add('cnpj', 'CNPJ/CPF do cliente preenchido', !!cli?.cnpjCpf && cli.cnpjCpf.replace(/\D/g, '').length >= 11, 'BLOQUEIO',
-      cli?.cnpjCpf || 'não informado');
-    const endOk = !!(cli?.enderecoJson as any)?.uf && !!(cli?.enderecoJson as any)?.cidade;
+    // CNPJ/CPF com dígito verificador (evita rejeição SEFAZ por documento inválido).
+    const docOk = validarCnpjCpf(cli?.cnpjCpf);
+    add('cnpj', 'CNPJ/CPF do cliente válido (dígito verificador)', docOk, 'BLOQUEIO',
+      cli?.cnpjCpf ? (docOk ? undefined : 'dígito verificador inválido') : 'não informado');
+    const ufCli = (cli?.enderecoJson as any)?.uf;
+    const endOk = !!ufCli && !!(cli?.enderecoJson as any)?.cidade;
     add('endereco', 'Endereço do cliente completo (cidade/UF)', endOk, 'BLOQUEIO');
     const pj = cli?.tipo === 'PJ';
     add('ie', 'Inscrição Estadual informada (ou ISENTO)', !pj || !!cli?.ie, 'AVISO',
       cli?.ie || 'sem IE — será tratado como consumidor final');
+    // Validação de IE por UF (só quando informada e não isenta) — barata, evita rejeição.
+    if (cli?.ie && cli.ie.toUpperCase() !== 'ISENTO') {
+      const ieOk = validarIE(cli.ie, ufCli);
+      add('ie-valida', 'Inscrição Estadual válida para a UF', ieOk, 'AVISO',
+        ieOk ? undefined : `IE ${cli.ie} não confere com a UF ${ufCli || '?'}`);
+    }
     add('sintegra', 'Cadastro validado no Sintegra/CCC', !!cli?.sintegraOk, 'AVISO',
       cli?.sintegraOk ? 'validado' : 'não validado (modo teste)');
 
@@ -312,13 +401,26 @@ export class FiscalService {
         `físico ${fisico} · necessário ${item.quantidade}` + (disponivel < 0 ? ' (disponível negativo — a comprar)' : ''));
     }
 
-    // e) NCM dos produtos
-    const semNcm = pedido.itens.filter((i) => !i.produto?.ncm || i.produto.ncm.replace(/\D/g, '').length < 8);
+    // e) NCM dos produtos (formato de 8 dígitos)
+    const semNcm = pedido.itens.filter((i) => !validarNcm(i.produto?.ncm));
     add('ncm', 'Todos os produtos com NCM válido (8 dígitos)', semNcm.length === 0, 'BLOQUEIO',
-      semNcm.length ? `${semNcm.length} produto(s) sem NCM` : undefined);
+      semNcm.length ? `${semNcm.length} produto(s) com NCM ausente/inválido` : undefined);
 
-    // f) Emitente (filial)
-    add('emitente', 'Filial emitente com CNPJ', !!pedido.filialOrigem?.cnpj, 'BLOQUEIO');
+    // e.2) CFOP dos produtos (quando cadastrado no produto) — formato 4 dígitos.
+    const cfopInvalidos = pedido.itens.filter((i) => i.produto?.cfop && !validarCfop(i.produto.cfop));
+    if (cfopInvalidos.length) {
+      add('cfop', 'CFOP dos produtos em formato válido', false, 'AVISO',
+        `${cfopInvalidos.length} produto(s) com CFOP fora do padrão (4 dígitos)`);
+    }
+
+    // f) Emitente (filial): CNPJ presente E com dígito verificador válido.
+    const emitCnpj = pedido.filialOrigem?.cnpj;
+    add('emitente', 'Filial emitente com CNPJ válido', validarCnpjCpf(emitCnpj), 'BLOQUEIO',
+      emitCnpj ? (validarCnpjCpf(emitCnpj) ? undefined : 'CNPJ da filial com dígito inválido') : 'filial sem CNPJ');
+    // f.2) Regime tributário da filial (define o cálculo de imposto).
+    const regimeFilial = this.normalizarRegime(pedido.filialOrigem?.regimeTributario);
+    add('regime', 'Regime tributário da filial definido', !!pedido.filialOrigem?.regimeTributario, 'AVISO',
+      `apurando como ${regimeFilial.replace('_', ' ')}`);
 
     const bloqueios = checks.filter((c) => !c.ok && c.severidade === 'BLOQUEIO');
     const avisos = checks.filter((c) => !c.ok && c.severidade === 'AVISO');
@@ -360,7 +462,7 @@ export class FiscalService {
   }
 
   private sanitize(dto: any) {
-    const decimais = ['aliquotaIcms', 'reducaoBaseIcms', 'mvaSt', 'aliquotaIcmsSt', 'aliquotaIpi', 'aliquotaPis', 'aliquotaCofins'];
+    const decimais = ['aliquotaIcms', 'reducaoBaseIcms', 'mvaSt', 'aliquotaIcmsSt', 'aliquotaFcp', 'aliquotaFcpSt', 'aliquotaIpi', 'aliquotaPis', 'aliquotaCofins'];
     const out: any = { ...dto };
     delete out.id; delete out.tenantId; delete out.createdAt; delete out.updatedAt;
     for (const k of decimais) if (out[k] !== undefined) out[k] = Number(out[k]) || 0;

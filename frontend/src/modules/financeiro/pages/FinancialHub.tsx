@@ -22,6 +22,7 @@ import {
   Scale,
   Percent,
   DollarSign,
+  ChevronRight,
 } from 'lucide-react';
 import { PageHeader, btnGlass, btnPrimary } from '../../cadastros/ui';
 
@@ -63,13 +64,16 @@ interface DreLinha {
   chave: string;
   label: string;
   valor: number;
-  tipo: 'receita' | 'deducao' | 'resultado' | 'custo';
+  tipo: 'receita' | 'deducao' | 'resultado' | 'custo' | 'despesa';
   destaque?: boolean;
+  detalhe?: { codigo: string; descricao: string; valor: number }[];
 }
 
 interface DreKpis {
   receitaBruta: number; deducoes: number; receitaLiquida: number;
   cmv: number; lucroBruto: number; perdas: number; resultado: number; margemBruta: number;
+  despesasOperacionais: number; despesasFinanceiras: number; outrasReceitas: number;
+  resultadoLiquido: number; margemLiquida: number;
 }
 interface DreCompleto {
   periodo: { inicio: string; fim: string; label: string };
@@ -355,6 +359,20 @@ function DashboardDRE() {
           icon={TrendingUp}
           tom="lucro"
         />
+        <KpiGigante
+          label="(–) Despesas Operac. + Financ."
+          valor={-(k.despesasOperacionais + k.despesasFinanceiras)}
+          hint="Classificadas no Plano de Contas"
+          icon={ArrowDownRight}
+          tom="deducao"
+        />
+        <KpiGigante
+          label="(=) Resultado Líquido"
+          valor={k.resultadoLiquido}
+          hint={`Margem líquida ${pct(k.margemLiquida)} · após despesas e outras receitas`}
+          icon={TrendingUp}
+          tom={k.resultadoLiquido >= 0 ? 'lucro' : 'deducao'}
+        />
       </div>
 
       {/* Cascata DRE + painéis de caixa */}
@@ -366,33 +384,7 @@ function DashboardDRE() {
           </h2>
           <div>
             {linhas.map((l, i) => (
-              <div
-                key={l.chave}
-                className={`flex items-center justify-between gap-4 py-4 ${
-                  i < linhas.length - 1 ? 'border-b border-neutral-100' : ''
-                }`}
-              >
-                <span
-                  className={`text-[13.5px] leading-snug ${
-                    l.tipo === 'resultado' ? 'font-semibold text-slate-900' : 'font-normal text-slate-600'
-                  }`}
-                >
-                  {l.label}
-                </span>
-                <span
-                  className={`text-[15px] tabular-nums shrink-0 ${
-                    l.tipo === 'resultado'
-                      ? l.valor < 0
-                        ? 'font-semibold text-rose-500'
-                        : 'font-semibold text-emerald-600'
-                      : l.valor < 0
-                        ? 'font-medium text-rose-500'
-                        : 'font-medium text-slate-800'
-                  }`}
-                >
-                  {brl(l.valor)}
-                </span>
-              </div>
+              <LinhaDre key={l.chave} l={l} ultima={i === linhas.length - 1} />
             ))}
           </div>
         </section>
@@ -483,6 +475,54 @@ function DashboardDRE() {
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+/* Linha do DRE com drill-down opcional (detalhe por conta analítica) */
+function LinhaDre({ l, ultima }: { l: DreLinha; ultima: boolean }) {
+  const [aberto, setAberto] = useState(false);
+  const temDetalhe = !!(l.detalhe && l.detalhe.length > 0);
+  return (
+    <div className={ultima ? '' : 'border-b border-neutral-100'}>
+      <div
+        className={`flex items-center justify-between gap-4 py-4 ${temDetalhe ? 'cursor-pointer select-none' : ''}`}
+        onClick={temDetalhe ? () => setAberto((v) => !v) : undefined}
+      >
+        <span
+          className={`text-[13.5px] leading-snug flex items-center gap-1.5 ${
+            l.tipo === 'resultado' ? 'font-semibold text-slate-900' : 'font-normal text-slate-600'
+          }`}
+        >
+          {temDetalhe && (
+            <ChevronRight className={`h-3.5 w-3.5 text-neutral-400 transition-transform ${aberto ? 'rotate-90' : ''}`} />
+          )}
+          {l.label}
+        </span>
+        <span
+          className={`text-[15px] tabular-nums shrink-0 ${
+            l.tipo === 'resultado'
+              ? l.valor < 0
+                ? 'font-semibold text-rose-500'
+                : 'font-semibold text-emerald-600'
+              : l.valor < 0
+                ? 'font-medium text-rose-500'
+                : 'font-medium text-slate-800'
+          }`}
+        >
+          {brl(l.valor)}
+        </span>
+      </div>
+      {temDetalhe && aberto && (
+        <div className="pb-3 pl-5 space-y-1.5">
+          {l.detalhe!.map((d) => (
+            <div key={d.codigo} className="flex items-center justify-between gap-4 text-[12px]">
+              <span className="text-neutral-500">{d.codigo} · {d.descricao}</span>
+              <span className="tabular-nums text-slate-600">{brl(d.valor)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -6,7 +6,7 @@ import {
   Package, Truck, FileText, ShoppingCart, AlertTriangle, Save, CreditCard, MapPin, Lock, Unlock, Repeat, Loader2, User,
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
-import api from '../../../services/api';
+import api, { vendedoresApi } from '../../../services/api';
 import { imprimirComprovanteReposicao } from '../impressos';
 import { SteppedForm, Step, PageHeader, btnPrimary } from '../../cadastros/ui';
 
@@ -517,6 +517,9 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
   // C. Pagamento / entrega
   const [formaPagamento, setFormaPag] = useState('BOLETO');
   const [numeroParcelas, setParcelas] = useState('1');
+  const [vendedores, setVendedores] = useState<any[]>([]);
+  const [vendedorId, setVendedorId] = useState('');
+  const [percentualComissao, setPercentualComissao] = useState('');
   const [tipoFrete, setTipoFrete] = useState('CIF');
   const [valorFrete, setValorFrete] = useState('0');
   const [endEntrega, setEndEntrega] = useState({ rua: '', numero: '', bairro: '', cidade: '', uf: 'SP', cep: '' });
@@ -541,6 +544,11 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
 
   const formaSel = FORMAS_PAG.find(f => f.v === formaPagamento);
 
+  // Carrega vendedores (para o seletor de comissão)
+  useEffect(() => {
+    vendedoresApi.list().then(r => setVendedores(r.data || [])).catch(() => setVendedores([]));
+  }, []);
+
   // ── Carrega pedido para edição ──
   useEffect(() => {
     if (!pedidoId) return;
@@ -556,6 +564,8 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
       setClienteSel(p.cliente || null);
       setFormaPag(p.formaPagamento || 'BOLETO');
       setParcelas(String(p.numeroParcelas ?? 1));
+      setVendedorId(p.vendedorId || '');
+      setPercentualComissao(p.percentualComissao != null ? String(p.percentualComissao) : '');
       setTipoFrete(p.tipoFrete || 'CIF');
       setValorFrete(String(p.valorFrete ?? 0));
       setDescontoGeral(String(p.descontoTotal ?? 0));
@@ -636,6 +646,8 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
       formaPagamento,
       condicaoPagamento: (parseInt(numeroParcelas) || 1) > 1 ? `${numeroParcelas}X` : 'A_VISTA',
       numeroParcelas: parseInt(numeroParcelas) || 1,
+      vendedorId: vendedorId || undefined,
+      percentualComissao: percentualComissao !== '' ? (parseFloat(String(percentualComissao).replace(',', '.')) || 0) : undefined,
       tipoFrete,
       valorFrete: parseFloat(valorFrete) || 0,
       descontoTotal: parseFloat(descontoGeral) || 0,
@@ -835,6 +847,28 @@ function ModalPedido({ pedidoId, onClose, onSalvo }: { pedidoId: string | null; 
                 <select value={numeroParcelas} onChange={e => setParcelas(e.target.value)} disabled={!formaSel?.parcelavel} className={`${inp} disabled:bg-gray-100 disabled:text-gray-400`}>
                   {Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n === 1 ? 'À vista' : `${n}x`}</option>)}
                 </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div>
+                <label className={lbl}>Vendedor (comissão)</label>
+                <select value={vendedorId} onChange={e => {
+                  const id = e.target.value;
+                  setVendedorId(id);
+                  const v = vendedores.find(x => x.id === id);
+                  if (v && percentualComissao === '') setPercentualComissao(String(v.percentualPadrao ?? ''));
+                  if (!id) setPercentualComissao('');
+                }} className={inp}>
+                  <option value="">Sem vendedor</option>
+                  {vendedores.map(v => <option key={v.id} value={v.id}>{v.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>% Comissão</label>
+                <input type="number" step="0.01" min="0" max="100" value={percentualComissao} disabled={!vendedorId}
+                  onChange={e => setPercentualComissao(e.target.value)}
+                  placeholder="% do vendedor"
+                  className={`${inp} disabled:bg-gray-100 disabled:text-gray-400`} />
               </div>
             </div>
             <p className="text-[10px] text-gray-400 mt-1.5 flex items-center gap-1">

@@ -2,13 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StatusDFe, TipoMovimentacao } from '@prisma/client';
 import { money, sumMoney } from '../../common/utils/money.util';
+import { PlanoContasService } from '../plano-contas/plano-contas.service';
 
 export interface DreLinha {
   chave: string;
   label: string;
   valor: number;                 // negativo em deduções/custos/despesas
-  tipo: 'receita' | 'deducao' | 'resultado' | 'custo';
+  tipo: 'receita' | 'deducao' | 'resultado' | 'custo' | 'despesa';
   destaque?: boolean;
+  /** Detalhamento por conta analítica (drill-down), quando aplicável. */
+  detalhe?: { codigo: string; descricao: string; valor: number }[];
 }
 
 /**
@@ -29,7 +32,10 @@ export interface DreLinha {
  */
 @Injectable()
 export class DreService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private planoContas: PlanoContasService,
+  ) {}
 
   /** Compat: a rota antiga `GET /dre` retorna só as linhas. */
   async findAll(tenantId: string, filtros?: { filialId?: string; dataInicio?: string; dataFim?: string }) {
@@ -85,9 +91,23 @@ export class DreService {
       select: { quantidade: true, custoUnitario: true },
     });
     const perdas = sumMoney(perdasMov.map((m) => Number(m.quantidade) * Number(m.custoUnitario)));
-    const resultado = money(lucroBruto - perdas);
+    const resultadoOperacionalBruto = money(lucroBruto - perdas);
+
+    // 4. Despesas operacionais/financeiras + outras receitas — vêm do razão
+    //    gerencial (LancamentoFinanceiro classificado no Plano de Contas).
+    const { despesasOperacionais, despesasFinanceiras, outrasReceitas } =
+      await this.planoContas.despesasPorConta(tenantId, inicio, fim, filialId);
+
+    const resultadoLiquido = money(
+      resultadoOperacionalBruto -
+        despesasOperacionais.total -
+        despesasFinanceiras.total +
+        outrasReceitas.total,
+    );
 
     const margemBruta = receitaLiquida > 0 ? Math.round((lucroBruto / receitaLiquida) * 1000) / 10 : 0;
+    const margemLiquida =
+      receitaLiquida > 0 ? Math.round((resultadoLiquido / receitaLiquida) * 1000) / 10 : 0;
 
     const linhas: DreLinha[] = [
       { chave: 'receita_bruta', label: 'Receita Bruta de Vendas', valor: receitaBruta, tipo: 'receita', destaque: true },
@@ -96,19 +116,55 @@ export class DreService {
       { chave: 'cmv', label: '(-) CMV — Custo da Mercadoria Vendida', valor: -cmv, tipo: 'custo' },
       { chave: 'lucro_bruto', label: '(=) Lucro Bruto', valor: lucroBruto, tipo: 'resultado', destaque: true },
       { chave: 'perdas', label: '(-) Perdas e Quebras', valor: -perdas, tipo: 'custo' },
-      { chave: 'resultado_operacional', label: '(=) Resultado Operacional', valor: resultado, tipo: 'resultado', destaque: true },
+      { chave: 'resultado_operacional', label: '(=) Resultado Operacional Bruto', valor: resultadoOperacionalBruto, tipo: 'resultado', destaque: true },
+      {
+        chave: 'despesas_operacionais',
+        label: '(-) Despesas Operacionais',
+        valor: -despesasOperacionais.total,
+        tipo: 'despesa',
+        detalhe: despesasOperacionais.contas,
+      },
+      {
+        chave: 'despesas_financeiras',
+        label: '(-) Despesas Financeiras',
+        valor: -despesasFinanceiras.total,
+        tipo: 'despesa',
+        detalhe: despesasFinanceiras.contas,
+      },
+      {
+        chave: 'outras_receitas',
+        label: '(+) Outras Receitas',
+        valor: outrasReceitas.total,
+        tipo: 'receita',
+        detalhe: outrasReceitas.contas,
+      },
+      { chave: 'resultado_liquido', label: '(=) Resultado Líquido', valor: resultadoLiquido, tipo: 'resultado', destaque: true },
     ];
 
     return {
       periodo: { inicio, fim, label },
       linhas,
-      kpis: { receitaBruta, deducoes, receitaLiquida, cmv, lucroBruto, perdas, resultado, margemBruta },
+      kpis: {
+        receitaBruta,
+        deducoes,
+        receitaLiquida,
+        cmv,
+        lucroBruto,
+        perdas,
+        resultado: resultadoOperacionalBruto,
+        despesasOperacionais: despesasOperacionais.total,
+        despesasFinanceiras: despesasFinanceiras.total,
+        outrasReceitas: outrasReceitas.total,
+        resultadoLiquido,
+        margemBruta,
+        margemLiquida,
+      },
       cobertura: {
         nfesEmitidas: nfes.length,
         movimentacoesVenda: saidas.length,
         observacao:
-          'DRE realizada a partir de NF-e emitidas e movimentações de estoque. Despesas ' +
-          'administrativas/operacionais fora do CMV dependem do Plano de Contas (ainda não alimentado).',
+          'DRE realizada: receita/impostos das NF-e, CMV/perdas das movimentações e ' +
+          'despesas operacionais/financeiras do Plano de Contas (lançamentos a partir das contas a pagar categorizadas).',
       },
     };
   }

@@ -6,6 +6,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { imprimirDanfe } from '../danfe';
 import { PageHeader, btnGlass } from '../../cadastros/ui';
+import SeloSimulacao from '../../../components/ui/SeloSimulacao';
 
 const R$ = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -102,10 +103,8 @@ export default function Faturamento() {
         }
       />
 
-      <div className="bg-amber-50 border-b border-amber-200 px-5 py-2 text-xs text-amber-800 flex items-center gap-2 shrink-0">
-        <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-        Modo de teste: gera a NF-e e baixa estoque + conta a receber, mas <b>não transmite para a SEFAZ</b> (sem validade fiscal).
-      </div>
+      <SeloSimulacao detalhe="gera a NF-e e baixa estoque + conta a receber, mas não transmite para a SEFAZ." />
+
 
       {/* Barra de ação em lote */}
       <div className="bg-white border-b border-gray-200 px-5 py-2 flex items-center justify-between shrink-0">

@@ -26,6 +26,18 @@ import { ContasReceberModule } from './modules/contas-receber/contas-receber.mod
 import { ContasPagarModule } from './modules/contas-pagar/contas-pagar.module';
 import { FluxoCaixaModule } from './modules/fluxo-caixa/fluxo-caixa.module';
 import { DreModule } from './modules/dre/dre.module';
+import { PlanoContasModule } from './modules/plano-contas/plano-contas.module';
+import { VendedoresModule } from './modules/vendedores/vendedores.module';
+import { ComissoesModule } from './modules/comissoes/comissoes.module';
+import { TesourariaModule } from './modules/tesouraria/tesouraria.module';
+import { RecorrenciasModule } from './modules/recorrencias/recorrencias.module';
+import { PessoasModule } from './modules/pessoas/pessoas.module';
+import { FolhaModule } from './modules/folha/folha.module';
+import { PagamentosMotoristaModule } from './modules/pagamentos-motorista/pagamentos-motorista.module';
+import { NotificacoesModule } from './modules/notificacoes/notificacoes.module';
+import { RelatoriosModule } from './modules/relatorios/relatorios.module';
+import { PrecificacaoModule } from './modules/precificacao/precificacao.module';
+import { DevolucoesCompraModule } from './modules/devolucoes-compra/devolucoes-compra.module';
 import { AuditoriaModule } from './modules/auditoria/auditoria.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { CargaModule } from './modules/carga/carga.module';
@@ -70,6 +82,18 @@ import { HealthController } from './health.controller';
     FluxoCaixaModule,
     RotasModule,
     DreModule,
+    PlanoContasModule,
+    VendedoresModule,
+    ComissoesModule,
+    TesourariaModule,
+    RecorrenciasModule,
+    PessoasModule,
+    FolhaModule,
+    PagamentosMotoristaModule,
+    NotificacoesModule,
+    RelatoriosModule,
+    PrecificacaoModule,
+    DevolucoesCompraModule,
     AuditoriaModule,
     DashboardModule,
     CargaModule,

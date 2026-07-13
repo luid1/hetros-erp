@@ -1,9 +1,10 @@
 import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect } from 'react';
-import { Apple, Pencil, Trash2, Package, Box, Tag } from 'lucide-react';
+import { Apple, Pencil, Trash2, Package, Box, Tag, Copy, Barcode } from 'lucide-react';
 import api from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { CadastroShell, TopBar, FilterBar, Chips, TableCard, Th, StatusBadge, Modal, SteppedForm, Step, Campo, Loader, Vazio, inp, R$ } from '../ui';
+import Menu from '../../../components/ui/Menu';
 
 const CATEGORIAS = ['FRUTA', 'LEGUME', 'VERDURA'];
 const CLASSIFICACOES = ['Extra', 'Tipo 1', 'Tipo 2', 'Graúdo', 'Médio', 'Miúdo'];
@@ -38,6 +39,10 @@ export default function Produtos() {
   useEffect(() => { const t = setTimeout(carregar, 250); return () => clearTimeout(t); }, [search]);
 
   const filtrados = cat ? lista.filter(p => p.categoria === cat) : lista;
+
+  const copiar = (texto: string, msg: string) => {
+    navigator.clipboard?.writeText(String(texto ?? '')).then(() => toast(msg)).catch(() => toast('Não foi possível copiar.'));
+  };
 
   const excluir = async (p: any) => {
     if (!await confirmDialog(`Inativar o produto "${p.descricao}"?`)) return;
@@ -76,9 +81,17 @@ export default function Produtos() {
                   </td>
                   <td className="px-3 py-1.5 text-right font-mono text-slate-300">{R$(p.precoVenda)}</td>
                   <td className="px-3 py-1.5"><StatusBadge ativo={p.ativo} /></td>
-                  <td className="px-3 py-1.5"><div className="flex gap-1.5">
-                    {pode('/cadastros/produtos', 'EDITAR') && <button onClick={() => setEditando(p)} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Pencil className="h-3 w-3" /> Editar</button>}
-                    {pode('/cadastros/produtos', 'EXCLUIR') && <button onClick={() => excluir(p)} className="text-slate-500 hover:text-rose-400 px-1"><Trash2 className="h-3.5 w-3.5" /></button>}
+                  <td className="px-3 py-1.5 text-right"><div className="flex justify-end">
+                    <Menu items={[
+                      { titulo: true, label: p.descricao },
+                      ...(pode('/cadastros/produtos', 'EDITAR') ? [{ label: 'Editar', icon: <Pencil />, onClick: () => setEditando(p) }] : []),
+                      { label: 'Copiar', icon: <Copy />, submenu: [
+                        { label: 'Código', icon: <Tag />, atalho: p.codigo, onClick: () => copiar(p.codigo, 'Código copiado') },
+                        { label: 'NCM', atalho: p.ncm, onClick: () => copiar(p.ncm, 'NCM copiado') },
+                        ...(p.codigoBarras ? [{ label: 'Cód. de barras', icon: <Barcode />, onClick: () => copiar(p.codigoBarras, 'Código de barras copiado') }] : []),
+                      ] },
+                      ...(pode('/cadastros/produtos', 'EXCLUIR') ? [{ separador: true }, { label: 'Inativar', icon: <Trash2 />, perigo: true, onClick: () => excluir(p) }] : []),
+                    ]} />
                   </div></td>
                 </tr>
               ))}

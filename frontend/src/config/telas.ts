@@ -6,9 +6,18 @@ import {
   LayoutDashboard, Users, Package, Warehouse, FileText,
   DollarSign, Truck, ClipboardList, BarChart3, Settings,
   Building2, AlertTriangle, Receipt, ShieldCheck, MapPin,
-  PackageCheck, ShoppingCart, Coins, Landmark,
+  PackageCheck, ShoppingCart, Coins, Landmark, Percent, Repeat, Wallet,
+  Tags, Undo2,
 } from 'lucide-react';
 import type { ElementType } from 'react';
+
+/** Sub-item exibido no flyout (menu que abre ao passar o mouse no item pai). */
+export interface SubTela {
+  key: string;      // rota (deve existir como TelaDef p/ herdar permissão)
+  label: string;
+  icon?: ElementType;
+  hint?: string;    // descrição curta opcional exibida abaixo do rótulo
+}
 
 export interface TelaDef {
   key: string;
@@ -22,6 +31,8 @@ export interface TelaDef {
   badgeColor?: string;
   /** Fora do menu lateral, mas ainda acessível por rota/permissão. */
   oculto?: boolean;
+  /** Sub-páginas exibidas num flyout ao passar o mouse (hover) sobre este item. */
+  submenu?: SubTela[];
 }
 
 export const TELAS: TelaDef[] = [
@@ -34,13 +45,19 @@ export const TELAS: TelaDef[] = [
   { key: '/cadastros/transportadoras', label: 'Transportadoras', grupo: 'A · Cadastros', icon: Truck },
   { key: '/cadastros/produtos', label: 'Produtos & NCM', grupo: 'A · Cadastros', icon: Package },
   { key: '/cadastros/filiais', label: 'Filiais / Boxes', grupo: 'A · Cadastros', icon: Warehouse },
+  { key: '/cadastros/tabelas-preco', label: 'Tabelas de Preço', grupo: 'A · Cadastros', icon: Tags },
 
   // B · Estoque / WMS
-  { key: '/wms/posicao', label: 'Posição de Estoque', grupo: 'B · Estoque / WMS', icon: Warehouse },
+  { key: '/wms/posicao', label: 'Posição de Estoque', grupo: 'B · Estoque / WMS', icon: Warehouse, submenu: [
+    { key: '/wms/movimentacoes', label: 'Movimentações', icon: BarChart3, hint: 'Entradas e saídas' },
+    { key: '/wms/inventario', label: 'Inventário', icon: ClipboardList, hint: 'Contagem e ajustes' },
+    { key: '/wms/analise-estoque', label: 'Análise Estoque Físico', icon: BarChart3, hint: 'Físico vs. sistema' },
+  ] },
   { key: '/wms/pereciveis', label: 'Perecíveis / FLV', grupo: 'B · Estoque / WMS', icon: AlertTriangle, badge: '!', badgeColor: 'bg-red-500' },
   { key: '/wms/compras', label: 'Ordens de Compra', grupo: 'B · Estoque / WMS', icon: ShoppingCart },
   { key: '/compras/app', label: 'App de Compras', grupo: 'B · Estoque / WMS', icon: ShoppingCart, highlight: true },
   { key: '/wms/entradas', label: 'Entradas (XML NF-e)', grupo: 'B · Estoque / WMS', icon: ClipboardList },
+  { key: '/wms/devolucoes-compra', label: 'Devoluções ao Fornecedor', grupo: 'B · Estoque / WMS', icon: Undo2 },
   { key: '/wms/movimentacoes', label: 'Movimentações', grupo: 'B · Estoque / WMS', icon: BarChart3 },
   { key: '/wms/inventario', label: 'Inventário', grupo: 'B · Estoque / WMS', icon: ClipboardList },
   { key: '/wms/analise-estoque', label: 'Análise Estoque Físico', grupo: 'B · Estoque / WMS', icon: BarChart3, highlight: true },
@@ -58,8 +75,14 @@ export const TELAS: TelaDef[] = [
   { key: '/logistica/frotas', label: 'Frotas & Veículos', grupo: 'C · Logística', icon: Truck },
 
   // D · Fiscal / DFe
-  { key: '/fiscal/emitir', label: 'Faturamento', grupo: 'D · Fiscal / DFe', icon: Receipt, highlight: true },
-  { key: '/fiscal/gestao', label: 'Gestão Fiscal', grupo: 'D · Fiscal / DFe', icon: Receipt },
+  { key: '/fiscal/emitir', label: 'Faturamento', grupo: 'D · Fiscal / DFe', icon: Receipt, highlight: true, submenu: [
+    { key: '/fiscal/matriz', label: 'Matriz Fiscal', icon: FileText, hint: 'Regras de tributação' },
+    { key: '/fiscal/cte', label: 'CT-e / MDF-e', icon: FileText, hint: 'Transporte e manifesto' },
+  ] },
+  { key: '/fiscal/gestao', label: 'Gestão Fiscal', grupo: 'D · Fiscal / DFe', icon: Receipt, submenu: [
+    { key: '/fiscal/nfe', label: 'NF-e Emitidas', icon: Receipt, hint: 'Documentos autorizados' },
+    { key: '/fiscal/painel', label: 'Painel de Faturamento', icon: BarChart3, hint: 'Gráficos e indicadores' },
+  ] },
   { key: '/fiscal/matriz', label: 'Matriz Fiscal', grupo: 'D · Fiscal / DFe', icon: FileText },
   { key: '/fiscal/cte', label: 'CT-e / MDF-e', grupo: 'D · Fiscal / DFe', icon: FileText },
   // Painel de Faturamento (dashboard de gráficos) fundido na Gestão Fiscal — fora do menu, acessível por rota.
@@ -68,17 +91,42 @@ export const TELAS: TelaDef[] = [
   { key: '/fiscal/nfe', label: 'NF-e Emitidas', grupo: 'D · Fiscal / DFe', icon: Receipt, oculto: true },
 
   // E · Financeiro
-  { key: '/financeiro/dre', label: 'DRE & Relatórios', grupo: 'E · Financeiro', icon: BarChart3, highlight: true },
+  { key: '/financeiro/dre', label: 'DRE & Relatórios', grupo: 'E · Financeiro', icon: BarChart3, highlight: true, submenu: [
+    { key: '/financeiro/controladoria', label: 'Controladoria', icon: Landmark, hint: 'Visão consolidada' },
+    { key: '/financeiro/fluxo-caixa', label: 'Fluxo de Caixa', icon: Landmark, hint: 'Entradas e saídas' },
+    { key: '/financeiro/tesouraria', label: 'Tesouraria', icon: Landmark, hint: 'Contas, caixa e conciliação' },
+    { key: '/financeiro/receber', label: 'Contas a Receber', icon: DollarSign, hint: 'Títulos de clientes' },
+    { key: '/financeiro/pagar', label: 'Contas a Pagar', icon: DollarSign, hint: 'Títulos a fornecedores' },
+    { key: '/financeiro/recorrencias', label: 'Despesas Recorrentes', icon: Repeat, hint: 'Aluguéis e assinaturas automáticas' },
+    { key: '/financeiro/plano-contas', label: 'Plano de Contas', icon: Landmark, hint: 'Categorias do DRE' },
+    { key: '/financeiro/vendedores', label: 'Vendedores', icon: Users, hint: 'Representantes e % de comissão' },
+    { key: '/financeiro/comissoes', label: 'Comissões', icon: Percent, hint: 'Comissões a fechar' },
+    { key: '/financeiro/funcionarios', label: 'Funcionários', icon: Users, hint: 'Cadastro de colaboradores' },
+    { key: '/financeiro/folha', label: 'Folha de Pagamento', icon: Wallet, hint: 'Salários → contas a pagar' },
+    { key: '/financeiro/pagamentos-motorista', label: 'Diárias de Motorista', icon: Truck, hint: 'Frete/diária por rota' },
+  ] },
   { key: '/financeiro/custos', label: 'Custos & Margem', grupo: 'E · Financeiro', icon: Coins },
+  { key: '/financeiro/plano-contas', label: 'Plano de Contas', grupo: 'E · Financeiro', icon: Landmark, oculto: true },
+  { key: '/financeiro/vendedores', label: 'Vendedores', grupo: 'E · Financeiro', icon: Users, oculto: true },
+  { key: '/financeiro/comissoes', label: 'Comissões', grupo: 'E · Financeiro', icon: Percent, oculto: true },
   // Unificados dentro do hub DRE — fora do menu, mas acessíveis por rota.
   { key: '/financeiro/controladoria', label: 'Controladoria (Financeiro)', grupo: 'E · Financeiro', icon: Landmark, oculto: true },
   { key: '/financeiro/fluxo-caixa', label: 'Fluxo de Caixa', grupo: 'E · Financeiro', icon: Landmark, oculto: true },
+  { key: '/financeiro/tesouraria', label: 'Tesouraria', grupo: 'E · Financeiro', icon: Landmark, oculto: true },
+  { key: '/financeiro/recorrencias', label: 'Despesas Recorrentes', grupo: 'E · Financeiro', icon: Repeat, oculto: true },
+  { key: '/financeiro/funcionarios', label: 'Funcionários', grupo: 'E · Financeiro', icon: Users, oculto: true },
+  { key: '/financeiro/folha', label: 'Folha de Pagamento', grupo: 'E · Financeiro', icon: Wallet, oculto: true },
+  { key: '/financeiro/pagamentos-motorista', label: 'Diárias de Motorista', grupo: 'E · Financeiro', icon: Truck, oculto: true },
   { key: '/financeiro/receber', label: 'Contas a Receber', grupo: 'E · Financeiro', icon: DollarSign, oculto: true },
   { key: '/financeiro/pagar', label: 'Contas a Pagar', grupo: 'E · Financeiro', icon: DollarSign, oculto: true },
 
   // F · Gerencial
+  { key: '/gerencial/relatorios', label: 'Relatórios Gerenciais', grupo: 'F · Gerencial', icon: BarChart3 },
   { key: '/gerencial/auditoria', label: 'Logs de Auditoria', grupo: 'F · Gerencial', icon: ShieldCheck },
-  { key: '/gerencial/usuarios', label: 'Usuários & Acessos', grupo: 'F · Gerencial', icon: Users },
+  { key: '/gerencial/usuarios', label: 'Usuários & Acessos', grupo: 'F · Gerencial', icon: Users, submenu: [
+    { key: '/gerencial/configuracoes', label: 'Configurações', icon: Settings, hint: 'Parâmetros do sistema' },
+    { key: '/gerencial/auditoria', label: 'Logs de Auditoria', icon: ShieldCheck, hint: 'Trilha de eventos' },
+  ] },
   { key: '/gerencial/configuracoes', label: 'Configurações', grupo: 'F · Gerencial', icon: Settings },
 ];
 

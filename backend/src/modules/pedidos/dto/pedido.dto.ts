@@ -92,6 +92,12 @@ export class CreatePedidoDto extends TenantAwareDto {
   @ApiPropertyOptional() @optNum()
   numeroParcelas?: number;
 
+  @ApiPropertyOptional({ nullable: true, description: 'Vendedor responsável (comissão).' }) @optStr()
+  vendedorId?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, description: '% de comissão (sobrepõe o padrão do vendedor).' }) @optNum()
+  percentualComissao?: number;
+
   @ApiPropertyOptional({ nullable: true }) @optStr()
   tipoFrete?: string | null;
 

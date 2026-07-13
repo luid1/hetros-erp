@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../prisma/prisma.service';
 
 /**
@@ -48,7 +49,10 @@ export class DeliveryConfirmationService {
     process.env.FOCUS_NFE_URL || 'https://homologacao.focusnfe.com.br';
   private readonly focusToken = process.env.FOCUS_NFE_TOKEN || '';
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async confirmar(
     tenantId: string,
@@ -109,14 +113,36 @@ export class DeliveryConfirmationService {
       const pendentes = await tx.routeStop.count({
         where: { routeId: s.routeId, status: { in: ['PENDING', 'IN_TRANSIT'] } },
       });
+      let rotaConcluida = false;
       if (pendentes === 0) {
         await tx.route.update({
           where: { id: s.routeId },
           data: { status: 'COMPLETED' },
         });
+        rotaConcluida = true;
       }
-      return s;
+      return { ...s, rotaConcluida };
     });
+
+    // Se a rota foi concluída nesta entrega, dispara o evento para gerar o
+    // pagamento (diária/frete) do motorista. Idempotente no listener (por routeId).
+    if ((atualizado as any).rotaConcluida) {
+      try {
+        const route = await this.prisma.route.findFirst({ where: { id: atualizado.routeId } });
+        if (route) {
+          this.eventEmitter.emit('rota.concluida', {
+            tenantId,
+            routeId: route.id,
+            filialId: route.filialId,
+            motoristaId: route.motoristaId,
+            motoristaNome: route.motoristaNome,
+            dataRota: route.dataRota,
+          });
+        }
+      } catch (e) {
+        this.logger.error('Falha ao emitir rota.concluida', e as Error);
+      }
+    }
 
     // 2) Ponte fiscal SEFAZ (fora da transação de banco; falha não reverte entrega)
     const fiscal = await this.enviarEvento110130(atualizado.pedidoId, {

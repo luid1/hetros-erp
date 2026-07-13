@@ -20,6 +20,45 @@ Adicione uma entrada no topo a cada alteração, seguindo o formato:
 
 ---
 
+## [2026-07-13] — Frentes financeiras + fiscais A→D, K, M, F.1, F.1b, F.2 (SEFAZ atrás de flag)
+### O que mudou
+- **Frente A — Plano de Contas + DRE real:** módulo `plano-contas` (CRUD + seed idempotente do plano
+  padrão grupo 3.x + `lancar()/estornar()` idempotentes por origem + `despesasPorConta()`). `contas-pagar`
+  aceita `planoContasCodigo` e lança/estorna a despesa no razão por competência. DRE ganha blocos
+  **Despesas Operacionais/Financeiras** (drill-down) + **Resultado Líquido** e margem líquida.
+- **Frente B — Vendedor + comissão:** models `Vendedor`/`Comissao` + `vendedorId`/`percentualComissao`
+  no Pedido; módulos `vendedores`/`comissoes`; `nfe.emitida` gera comissão (idempotente), cancelamento
+  estorna; `POST /comissoes/fechar` → Conta a Pagar (CONTA.COMISSOES).
+- **Frente G — Tesouraria:** contas financeiras + movimento de caixa + conciliação; baixa de título
+  passa por conta. **Frente I — Despesas recorrentes:** `DespesaRecorrente` + `@Cron` gera Conta a Pagar
+  idempotente por período com categoria do plano.
+- **Frente C — Pessoas + folha:** `Funcionario`/`Folha`/`ItemFolha`; folha fechada → contas a pagar
+  (CONTA.SALARIOS), estorno ao reabrir. **Frente D — Diária motorista:** `PagamentoMotorista`, rota
+  concluída → Conta a Pagar (CONTA.FRETE_MOTORISTA), estorno ao cancelar.
+- **Frente K — Notificações:** sino de notificações (`NotificacoesSino`) + módulo backend.
+- **Frente M — Devolução de compra + precificação:** `devolucoes-compra`, `precificacao`/tabelas de preço.
+- **Frente F.1 — Selo simulação + MDF-e/CT-e persistidos:** `DocumentoTransporte` (numeração atômica),
+  `CteMdfe` migrado de localStorage → backend, `SeloSimulacao` aplicado nas telas fiscais.
+- **Frente F.1b — Motor fiscal por regime tributário:** `fiscal-validators.util.ts` (CNPJ/CPF/IE/NCM/CFOP/EAN
+  com dígito verificador); `calcularItem` aplica CST×CSOSN por regime, **FCP** próprio + FCP-ST e
+  **PIS/COFINS** cumulativo (Presumido) × não-cumulativo (Real) × Simples; `validarFaturamento` mais rígido.
+- **Frente F.2 — Integração SEFAZ real atrás de feature flag (scaffold):** abstração `NfeProvider`
+  (`autorizar`/`cancelar`/`cartaCorrecao`) com **MockNfeProvider** (default, simulação — comportamento
+  idêntico ao anterior) e **RealNfeProvider** stub que **falha claro** se `NFE_PROVIDER=focus|sefaz` sem
+  certificado/token (zero risco de transmissão acidental); seleção por `process.env.NFE_PROVIDER` (default
+  `mock`). Model `CertificadoDigital` (senha **cifrada AES-256-GCM**, nunca em claro) + CRUD `/certificados`.
+### Arquivos modificados / novos
+- backend: `modules/{plano-contas,vendedores,comissoes,tesouraria,recorrencias,pessoas,folha,pagamentos-motorista,notificacoes,devolucoes-compra,precificacao,relatorios}/`,
+  `modules/nfe/{providers/,certificado.service.ts,certificado.controller.ts,nfe.service.ts,nfe.module.ts}`,
+  `modules/fiscal/{fiscal.service.ts,documentos-transporte.*}`, `common/utils/fiscal-validators.util.ts`,
+  `modules/{contas-pagar,contas-receber,dre,pedidos}/*`, `prisma/schema.prisma` + migrations
+  `20260712*` (frentes B/G/I/C/D/K/M, F.1, F.1b, F.2 `f2_certificado_digital`).
+- frontend: `modules/financeiro/pages/{PlanoContas,Vendedores,Comissoes,Tesouraria,Recorrencias,Funcionarios,Folha,PagamentosMotorista}.tsx`,
+  `modules/{cadastros/pages/TabelasPreco,estoque/pages/DevolucoesCompra,gerencial/pages/Relatorios,fiscal/pages/CteMdfe}.tsx`,
+  `components/{layout/NotificacoesSino,ui/SeloSimulacao,ui/Menu}.tsx`, `services/api.ts`.
+
+---
+
 ## [2026-07-11] — Dashboard: filtros de data (dia/mês/ano/personalizado) · remove Invoice · renomeia filial
 ### O que mudou
 - **Dashboard — períodos e intervalo personalizado:** presets **Ano** e **Personalizado** (De/Até) além de

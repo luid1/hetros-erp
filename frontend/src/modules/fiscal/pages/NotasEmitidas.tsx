@@ -6,6 +6,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { imprimirDanfe } from '../danfe';
 import { PageHeader, btnGlass } from '../../cadastros/ui';
+import SeloSimulacao from '../../../components/ui/SeloSimulacao';
 
 const R$ = (v: any) => (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dt = (v: any) => v ? new Date(v).toLocaleDateString('pt-BR') : '—';
@@ -101,6 +102,8 @@ export default function NotasEmitidas() {
           </button>
         }
       />
+
+      <SeloSimulacao detalhe="notas geradas em simulação — sem transmissão à SEFAZ. CC-e e devolução também são simuladas." />
 
       {/* Barra de filtros */}
       <div className="bg-white/[0.02] backdrop-blur-xl border-b border-white/[0.06] px-5 py-2.5 flex flex-wrap items-center gap-3 shrink-0">

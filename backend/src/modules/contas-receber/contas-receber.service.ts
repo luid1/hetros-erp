@@ -6,6 +6,8 @@ import {
 import { OnEvent } from '@nestjs/event-emitter';
 import { Prisma, StatusFinanceiro } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TesourariaService } from '../tesouraria/tesouraria.service';
+import { TipoMovimento, OrigemMovimento } from '@prisma/client';
 import {
   money,
   subMoney,
@@ -49,6 +51,7 @@ export interface BaixarReceberDto {
   valorJuros?: number;
   formaPagamento?: string;
   observacoes?: string;
+  contaId?: string; // conta financeira creditada (gera MovimentoCaixa)
 }
 
 /** Contexto do usuário autenticado (para a trilha de auditoria). */
@@ -59,7 +62,10 @@ export interface UsuarioCtx {
 
 @Injectable()
 export class ContasReceberService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private tesouraria: TesourariaService,
+  ) {}
 
   // ───────────────────────── Leitura ─────────────────────────
 
@@ -269,6 +275,24 @@ export class ContasReceberService {
             `Recebimento ${quitado ? 'total' : 'parcial'}${dto.formaPagamento ? ` via ${dto.formaPagamento}` : ''}.`,
         },
       });
+
+      // Tesouraria: se a baixa indicou uma conta financeira, registra a entrada
+      // de caixa correspondente (atualiza saldo + gera MovimentoCaixa conciliável).
+      if (dto.contaId) {
+        await this.tesouraria.registrarMovimentoTx(tx, {
+          tenantId,
+          contaId: dto.contaId,
+          filialId: conta.filialId,
+          tipo: TipoMovimento.ENTRADA,
+          valor: valorRecebido,
+          descricao: `Recebimento: ${conta.descricao}`,
+          origem: OrigemMovimento.BAIXA_RECEBER,
+          contaReceberId: conta.id,
+          data: dto.dataPagamento ? new Date(dto.dataPagamento) : new Date(),
+          usuario,
+          observacoes: dto.formaPagamento ? `Via ${dto.formaPagamento}` : null,
+        });
+      }
 
       return this.serializar(atualizada);
     });

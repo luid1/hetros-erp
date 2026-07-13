@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EstoqueService } from '../estoque/estoque.service';
+import { PrecificacaoService } from '../precificacao/precificacao.service';
 import { TipoMovimentacao } from '@prisma/client';
 import { proximoNumero } from '../../common/utils/sequencia.util';
 import { money, sumMoney, subMoney, toCents, fromCents } from '../../common/utils/money.util';
@@ -11,7 +12,7 @@ interface ItemDto {
   descricao?: string;
   quantidade: number;
   unidade?: string;
-  precoUnitario: number;
+  precoUnitario?: number; // se ausente/0, resolvido pelo motor de precificação (tabela do cliente)
   descontoTipo?: 'VALOR' | 'PERCENT';
   descontoPercent?: number;
   desconto?: number; // R$
@@ -30,6 +31,8 @@ interface PedidoDto {
   formaPagamento?: string;
   condicaoPagamento?: string;
   numeroParcelas?: number;
+  vendedorId?: string;
+  percentualComissao?: number;
   tipoFrete?: string;
   valorFrete?: number;
   descontoTotal?: number;
@@ -42,11 +45,15 @@ interface PedidoDto {
 @Injectable()
 export class PedidosService {
   private readonly logger = new Logger(PedidosService.name);
-  constructor(private prisma: PrismaService, private estoque: EstoqueService) {}
+  constructor(
+    private prisma: PrismaService,
+    private estoque: EstoqueService,
+    private precificacao: PrecificacaoService,
+  ) {}
 
-  // ── Resolve desconto do item em R$ ──
-  private descontoEmReais(item: ItemDto): number {
-    const bruto = money(item.quantidade * item.precoUnitario);
+  // ── Resolve desconto do item em R$ (dado o preço unitário já resolvido) ──
+  private descontoEmReais(item: ItemDto, precoUnitario: number): number {
+    const bruto = money(item.quantidade * precoUnitario);
     if (item.descontoTipo === 'PERCENT') {
       return money(bruto * ((item.descontoPercent || 0) / 100));
     }
@@ -67,12 +74,27 @@ export class PedidosService {
     });
     const mapProd = new Map(produtos.map((p) => [p.id, p]));
 
+    // Motor de precificação (Frente M.2): resolve o preço da tabela do cliente para
+    // itens sem preço informado (precoUnitario ausente ou 0).
+    let precosResolvidos: Record<string, any> = {};
+    const precisamPreco = itensInput.filter((i) => !i.precoUnitario || Number(i.precoUnitario) <= 0).map((i) => i.produtoId);
+    if (precisamPreco.length > 0) {
+      precosResolvidos = await this.precificacao.resolverLote(tenantId, precisamPreco, {
+        clienteId: dto.clienteId,
+        data: dto.dataEmissao,
+      });
+    }
+
     let pesoTotal = 0;
     const itensData = itensInput.map((item) => {
       const prod = mapProd.get(item.produtoId);
       if (!prod) throw new BadRequestException(`Produto ${item.produtoId} não encontrado.`);
-      const bruto = money(item.quantidade * item.precoUnitario);
-      const descontoR$ = this.descontoEmReais(item);
+      const precoUnitario =
+        item.precoUnitario && Number(item.precoUnitario) > 0
+          ? money(item.precoUnitario)
+          : money(precosResolvidos[item.produtoId]?.preco ?? prod.precoVenda ?? 0);
+      const bruto = money(item.quantidade * precoUnitario);
+      const descontoR$ = this.descontoEmReais(item, precoUnitario);
       const valorLinha = Math.max(0, subMoney(bruto, descontoR$));
       pesoTotal += Number(prod.pesoBruto || 0) * item.quantidade;
       return {
@@ -80,7 +102,7 @@ export class PedidosService {
         descricao: item.descricao || prod.descricao,
         quantidade: item.quantidade,
         unidade: item.unidade || prod.unidadeMedida?.sigla || 'UN',
-        precoUnitario: item.precoUnitario,
+        precoUnitario,
         desconto: descontoR$,
         descontoTipo: item.descontoTipo || 'VALOR',
         descontoPercent: item.descontoPercent || 0,
@@ -152,6 +174,8 @@ export class PedidosService {
         formaPagamento: dto.formaPagamento,
         condicaoPagamento: dto.condicaoPagamento,
         numeroParcelas: dto.numeroParcelas || 1,
+        vendedorId: dto.vendedorId || null,
+        percentualComissao: dto.percentualComissao ?? null,
         periodo: dto.periodo,
         regiao: dto.regiao,
         volumes: dto.volumes || 0,
@@ -199,6 +223,8 @@ export class PedidosService {
         formaPagamento: dto.formaPagamento,
         condicaoPagamento: dto.condicaoPagamento,
         numeroParcelas: dto.numeroParcelas || 1,
+        vendedorId: dto.vendedorId || null,
+        percentualComissao: dto.percentualComissao ?? null,
         periodo: dto.periodo,
         regiao: dto.regiao,
         volumes: dto.volumes || 0,

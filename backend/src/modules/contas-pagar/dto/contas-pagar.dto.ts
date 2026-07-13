@@ -61,6 +61,10 @@ export class CriarPagarDto extends TenantAwareDto {
   @ApiPropertyOptional()
   @IsOptional() @IsString()
   observacoes?: string;
+
+  @ApiPropertyOptional({ description: 'Código do plano de contas (categoria da despesa).' })
+  @IsOptional() @IsString()
+  planoContasCodigo?: string;
 }
 
 /** Baixa (pagamento) total ou parcial de um título. */
@@ -89,6 +93,10 @@ export class BaixarPagarDto extends TenantAwareDto {
   @ApiPropertyOptional()
   @IsOptional() @IsString()
   observacoes?: string;
+
+  @ApiPropertyOptional({ description: 'Conta financeira debitada (gera MovimentoCaixa de saída).' })
+  @IsOptional() @IsString()
+  contaId?: string;
 }
 
 /** Cancelamento de um título em aberto. */

@@ -1,13 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Outlet, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { podeVerTela, rotaInicial, TELAS_MENU_POR_GRUPO } from '../../config/telas';
+import { podeVerTela, rotaInicial, TELAS_MENU_POR_GRUPO, type SubTela } from '../../config/telas';
 import { FeedbackHost } from '../ui/feedback';
+import NotificacoesSino from './NotificacoesSino';
 import {
   ChevronLeft, ChevronRight, LogOut, Building2, Menu, X, Circle,
 } from 'lucide-react';
 
-interface NavItem { to: string; icon: React.ElementType; label: string; badge?: string; badgeColor?: string; highlight?: boolean }
+interface NavItem { to: string; icon: React.ElementType; label: string; badge?: string; badgeColor?: string; highlight?: boolean; submenu?: SubTela[] }
 interface NavGroup { group: string; items: NavItem[] }
 
 // Menu derivado da FONTE ÚNICA (config/telas.ts) — sem lista paralela.
@@ -20,8 +22,11 @@ const navigation: NavGroup[] = Object.entries(TELAS_MENU_POR_GRUPO).map(([group,
     badge: t.badge,
     badgeColor: t.badgeColor,
     highlight: t.highlight,
+    submenu: t.submenu,
   })),
 }));
+
+interface FlyoutState { label: string; items: SubTela[]; top: number; left: number }
 
 export default function AppShell() {
   const [collapsed,   setCollapsed]   = useState(false);
@@ -30,10 +35,39 @@ export default function AppShell() {
   const navigate = useNavigate();
   const sw = collapsed ? 'w-14' : 'w-56';
 
-  // Filtra o menu pelas telas que o perfil do usuário pode ver
+  // Filtra o menu pelas telas que o perfil do usuário pode ver.
+  // Também filtra os subitens do flyout pela permissão (herdam a permissão da própria rota).
   const navVisivel = useMemo(() => navigation
-    .map((g) => ({ ...g, items: g.items.filter((i) => podeVerTela(user?.telas, user?.role, i.to)) }))
+    .map((g) => ({
+      ...g,
+      items: g.items
+        .filter((i) => podeVerTela(user?.telas, user?.role, i.to))
+        .map((i) => ({
+          ...i,
+          submenu: i.submenu?.filter((s) => podeVerTela(user?.telas, user?.role, s.key)),
+        })),
+    }))
     .filter((g) => g.items.length > 0), [user?.telas, user?.role]);
+
+  // Flyout (submenu que abre ao passar o mouse sobre o item pai)
+  const [flyout, setFlyout] = useState<FlyoutState | null>(null);
+  const fechaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const abrirFlyout = useCallback((e: React.MouseEvent<HTMLElement>, item: NavItem) => {
+    if (!item.submenu?.length) { setFlyout(null); return; }
+    if (fechaTimer.current) clearTimeout(fechaTimer.current);
+    const r = e.currentTarget.getBoundingClientRect();
+    setFlyout({ label: item.label, items: item.submenu, top: r.top, left: r.right + 8 });
+  }, []);
+
+  const agendarFecho = useCallback(() => {
+    if (fechaTimer.current) clearTimeout(fechaTimer.current);
+    fechaTimer.current = setTimeout(() => setFlyout(null), 140);
+  }, []);
+
+  const cancelarFecho = useCallback(() => {
+    if (fechaTimer.current) clearTimeout(fechaTimer.current);
+  }, []);
 
   return (
     <div className="relative flex h-screen overflow-hidden" style={{ backgroundColor: '#0B0F17' }}>
@@ -76,9 +110,12 @@ export default function AppShell() {
                 <p className="text-[9px] font-semibold text-slate-600 uppercase tracking-[0.14em] px-2 mb-1">{group.group}</p>
               )}
               <div className="space-y-0.5">
-                {group.items.map(({ to, icon: Icon, label, badge, badgeColor, highlight }) => (
+                {group.items.map((item) => {
+                  const { to, icon: Icon, label, badge, badgeColor, highlight, submenu } = item;
+                  const temSub = !!submenu?.length;
+                  return (
+                  <div key={to} onMouseEnter={(e) => abrirFlyout(e, item)} onMouseLeave={agendarFecho}>
                   <NavLink
-                    key={to}
                     to={to}
                     title={collapsed ? label : undefined}
                     className={({ isActive }) => `
@@ -104,6 +141,13 @@ export default function AppShell() {
                             {badge}
                           </span>
                         )}
+                        {/* Indicador de submenu (aparece à direita quando há sub-páginas) */}
+                        {temSub && !collapsed && (
+                          <ChevronRight className={`h-3 w-3 shrink-0 text-slate-600 group-hover:text-slate-300 transition-colors duration-200 ${badge ? '' : 'ml-auto'}`} />
+                        )}
+                        {temSub && collapsed && (
+                          <span className="absolute right-0.5 top-1 h-1 w-1 rounded-full bg-sky-400/70" />
+                        )}
                         {collapsed && (
                           <span className="absolute left-full ml-2 px-2.5 py-1.5 bg-[#0E141F]/90 backdrop-blur-xl border border-white/[0.08] text-slate-200 text-xs rounded-lg shadow-2xl whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50 transition-opacity duration-200">
                             {label}
@@ -112,7 +156,9 @@ export default function AppShell() {
                       </>
                     )}
                   </NavLink>
-                ))}
+                  </div>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -153,6 +199,7 @@ export default function AppShell() {
             <FilialSelector />
           </div>
           <div className="flex items-center gap-3">
+            <NotificacoesSino />
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse" title="Online" />
             <span className="text-xs text-slate-500 hidden sm:block">
               {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
@@ -166,6 +213,39 @@ export default function AppShell() {
           <TelaGuard><Outlet /></TelaGuard>
         </main>
       </div>
+      {/* Flyout de submenu — abre ao passar o mouse sobre um item com sub-páginas */}
+      {flyout && createPortal(
+        <div
+          className="fixed z-[60] w-60 rounded-xl border border-white/[0.09] bg-[#0E141F]/95 backdrop-blur-2xl shadow-[0_16px_48px_0_rgba(0,0,0,0.55)] py-1.5 animate-fade-in"
+          style={{ top: Math.min(flyout.top, window.innerHeight - (flyout.items.length * 46 + 56)), left: flyout.left }}
+          onMouseEnter={cancelarFecho}
+          onMouseLeave={agendarFecho}
+        >
+          <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold text-slate-600 uppercase tracking-[0.12em] border-b border-white/[0.06] mb-1">{flyout.label}</p>
+          {flyout.items.map((s) => {
+            const SubIcon = s.icon || Circle;
+            return (
+              <NavLink
+                key={s.key}
+                to={s.key}
+                onClick={() => setFlyout(null)}
+                className={({ isActive }) => `flex items-start gap-2.5 px-3 py-2 text-[12px] transition-colors duration-150 ${isActive ? 'bg-sky-400/[0.12] text-sky-200' : 'text-slate-300 hover:bg-white/[0.06] hover:text-slate-100'}`}
+              >
+                {({ isActive }) => (
+                  <>
+                    <SubIcon className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${isActive ? 'text-sky-300' : 'text-slate-500'}`} />
+                    <span className="min-w-0">
+                      <span className="block font-medium truncate">{s.label}</span>
+                      {s.hint && <span className="block text-[10px] text-slate-500 truncate">{s.hint}</span>}
+                    </span>
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </div>,
+        document.body
+      )}
       <FeedbackHost />
     </div>
   );
