@@ -82,6 +82,7 @@ export const comprasApi = {
   update: (id: string, data: object) => api.put(`/compras/${id}`, data),
   updateStatus: (id: string, status: string) => api.patch(`/compras/${id}/status`, { status }),
   aComprar: (filialId: string) => api.get(`/estoque/${filialId}/a-comprar`),
+  produtosStatus: (filialId: string) => api.get(`/estoque/${filialId}/produtos-status`),
   historicoProduto: (produtoId: string) => api.get(`/compras/produto/${produtoId}/historico`),
 };
 

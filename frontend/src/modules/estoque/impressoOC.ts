@@ -51,8 +51,7 @@ export function htmlPedidoCompra(oc: any): string {
   body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #111; margin: 0; padding: 24px; }
   .doc { max-width: 780px; margin: 0 auto; }
   .cab { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0B0F17; padding-bottom: 12px; }
-  .marca { font-size: 26px; font-weight: 900; letter-spacing: 1px; color: #0B0F17; }
-  .marca small { display: block; font-size: 11px; font-weight: 600; color: #666; letter-spacing: 2px; }
+  .marca img { height: 56px; width: auto; object-fit: contain; }
   .titdoc { text-align: right; }
   .titdoc h1 { margin: 0; font-size: 18px; color: #0B0F17; }
   .titdoc .num { font-size: 22px; font-weight: 900; }
@@ -74,9 +73,7 @@ export function htmlPedidoCompra(oc: any): string {
   .tot .total { border-top: 2px solid #0B0F17; margin-top: 4px; padding-top: 8px; font-size: 18px; font-weight: 900; }
   .obs { margin-top: 18px; font-size: 12px; }
   .obs h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #888; margin: 0 0 4px; }
-  .assin { display: flex; gap: 40px; margin-top: 48px; }
-  .assin div { flex: 1; border-top: 1px solid #999; padding-top: 6px; text-align: center; font-size: 11px; color: #666; }
-  .rod { margin-top: 24px; font-size: 10px; color: #999; text-align: center; }
+  .rod { margin-top: 40px; font-size: 10px; color: #999; text-align: center; }
   @media print { body { padding: 0; } .noprint { display: none; } }
   .barra { text-align: center; margin-bottom: 16px; }
   .barra button { font: inherit; font-weight: 700; padding: 10px 22px; border: 0; border-radius: 8px; background: #0B0F17; color: #fff; cursor: pointer; }
@@ -85,7 +82,7 @@ export function htmlPedidoCompra(oc: any): string {
   <div class="barra noprint"><button onclick="window.print()">🖨️ Imprimir / Salvar PDF</button></div>
   <div class="doc">
     <div class="cab">
-      <div class="marca">HETROS<small>IMPORTAÇÃO E EXPORTAÇÃO</small></div>
+      <div class="marca"><img src="${location.origin}/logo-hetros.png" alt="Hetros" /></div>
       <div class="titdoc">
         <h1>PEDIDO DE COMPRA</h1>
         <div class="num">Nº ${esc(oc.numero)}</div>
@@ -113,10 +110,6 @@ export function htmlPedidoCompra(oc: any): string {
       <div class="row total"><span>TOTAL</span><span>${R$(total)}</span></div>
     </div></div>
     ${oc.observacoes ? `<div class="obs"><h2>Observações</h2><p>${esc(oc.observacoes)}</p></div>` : ''}
-    <div class="assin">
-      <div>Comprador — Hetros</div>
-      <div>Fornecedor — ciência</div>
-    </div>
     <div class="rod">Documento gerado pelo Hetros ERP em ${new Date().toLocaleString('pt-BR')} — não é documento fiscal.</div>
   </div>
 </body></html>`;

@@ -107,6 +107,17 @@ async function main() {
         .filter((p) => ['NFE', 'PEDIDOS'].includes(p.modulo))
         .map((p) => p.id),
     },
+    {
+      nome:      'COMPRADOR',
+      descricao: 'Comprador — cria/acompanha CI/OC e vê produtos e estoque',
+      // Precisa criar OC (ESTOQUE:CREATE) e ler produtos/fornecedores (CADASTROS:READ).
+      perms:     todasPermissoes
+        .filter((p) => (p.modulo === 'ESTOQUE' && p.acao !== 'DELETE') || (p.modulo === 'CADASTROS' && p.acao === 'READ'))
+        .map((p) => p.id),
+      // Só as telas de compras — App de Compras é a tela inicial.
+      telas:       ['/compras/app', '/wms/compras'],
+      telaInicial: '/compras/app',
+    },
   ];
 
   const rolesMap: Record<string, string> = {};
@@ -120,6 +131,8 @@ async function main() {
           tenantId:  tenant.id,
           nome:      rd.nome,
           descricao: rd.descricao,
+          ...(('telas' in rd && rd.telas) ? { telas: rd.telas } : {}),
+          ...(('telaInicial' in rd && rd.telaInicial) ? { telaInicial: rd.telaInicial } : {}),
           permissoes: { create: rd.perms.map((id) => ({ permissaoId: id })) },
         },
       });
@@ -161,6 +174,18 @@ async function main() {
       email:    'fiscal@hetros.com.br',
       password: 'fiscal123',
       role:     'FISCAL',
+    },
+    {
+      nome:     'Leide',
+      email:    'leide@hetros.com.br',
+      password: '123456',
+      role:     'COMPRADOR',
+    },
+    {
+      nome:     'Guilherme',
+      email:    'guilherme@hetros.com.br',
+      password: '123456',
+      role:     'COMPRADOR',
     },
   ];
 

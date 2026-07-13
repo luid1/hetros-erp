@@ -384,6 +384,59 @@ export class EstoqueService {
       .sort((a, b) => a.disponivel - b.disponivel);
   }
 
+  /**
+   * TODOS os produtos ativos cruzados com o saldo da filial — inclui os que não têm
+   * saldo (disponível 0). Para o App de Compras: o comprador vê tudo e quais estão
+   * positivos (verde) e quais estão zerados/negativos (vermelho). Ordena os
+   * negativos/zerados primeiro.
+   */
+  async getProdutosComStatus(tenantId: string, filialId: string) {
+    const [produtos, saldos] = await Promise.all([
+      this.prisma.produto.findMany({
+        where: { tenantId, ativo: true },
+        select: {
+          id: true, codigo: true, descricao: true, categoria: true, estoqueMinimo: true,
+          precoCompra: true, unidadeMedida: { select: { sigla: true } },
+        },
+      }),
+      this.prisma.estoqueSaldo.findMany({
+        where: { tenantId, filialId },
+        select: { produtoId: true, quantidade: true, quantidadeReservada: true },
+      }),
+    ]);
+
+    // Agrega saldo por produto (soma lotes/localizações).
+    const saldoPorProduto = new Map<string, { qtd: number; reservada: number }>();
+    for (const s of saldos) {
+      const cur = saldoPorProduto.get(s.produtoId) || { qtd: 0, reservada: 0 };
+      cur.qtd += Number(s.quantidade);
+      cur.reservada += Number(s.quantidadeReservada);
+      saldoPorProduto.set(s.produtoId, cur);
+    }
+
+    return produtos
+      .map((p) => {
+        const sld = saldoPorProduto.get(p.id) || { qtd: 0, reservada: 0 };
+        const disponivel = sld.qtd - sld.reservada;
+        const estoqueMinimo = Number(p.estoqueMinimo || 0);
+        return {
+          produtoId: p.id,
+          codigo: p.codigo,
+          descricao: p.descricao,
+          categoria: p.categoria,
+          unidade: p.unidadeMedida?.sigla || 'UN',
+          precoCompra: p.precoCompra != null ? Number(p.precoCompra) : null,
+          disponivel,
+          estoqueMinimo,
+          positivo: disponivel > 0,
+          negativo: disponivel < 0,
+          abaixoMinimo: disponivel <= estoqueMinimo,
+        };
+      })
+      // Zerados/negativos primeiro; depois por menor disponível; empate por nome.
+      .sort((a, b) => a.disponivel - b.disponivel || a.descricao.localeCompare(b.descricao));
+  }
+
   async getMovimentacoes(tenantId: string, filialId: string, filters: { produtoId?: string; tipo?: TipoMovimentacao; dataInicio?: Date; dataFim?: Date }) {
     return this.prisma.movimentacaoEstoque.findMany({
       where: {

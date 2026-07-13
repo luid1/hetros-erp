@@ -71,6 +71,12 @@ export class EstoqueController {
     return this.service.getAComprar(tenantId, filialId);
   }
 
+  @Get(':filialId/produtos-status')
+  @ApiOperation({ summary: 'TODOS os produtos ativos com saldo e status (positivo/negativo) — App de Compras' })
+  produtosStatus(@CurrentTenant() tenantId: string, @Param('filialId') filialId: string) {
+    return this.service.getProdutosComStatus(tenantId, filialId);
+  }
+
   @Get(':filialId/perdas')
   @ApiOperation({ summary: 'Resumo de perdas e quebras (avarias) do período — qtd e valor R$' })
   resumoPerdas(

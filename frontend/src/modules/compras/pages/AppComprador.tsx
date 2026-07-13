@@ -84,6 +84,20 @@ interface ItemAComprar {
   estoqueMinimo: number;
 }
 
+interface ProdutoStatus {
+  produtoId: string;
+  codigo?: string | null;
+  descricao: string;
+  categoria?: string | null;
+  unidade?: string | null;
+  precoCompra?: number | null;
+  disponivel: number;
+  estoqueMinimo: number;
+  positivo: boolean;
+  negativo: boolean;
+  abaixoMinimo: boolean;
+}
+
 interface HistoricoCompra {
   ordemId: string;
   numero: number;
@@ -157,6 +171,7 @@ export default function AppComprador() {
   const [erroOcs, setErroOcs] = useState('');
 
   const [aComprar, setAComprar] = useState<ItemAComprar[]>([]);
+  const [todosProdutos, setTodosProdutos] = useState<ProdutoStatus[]>([]);
   const [carregandoRep, setCarregandoRep] = useState(true);
 
   const [modalNovaOC, setModalNovaOC] = useState(false);
@@ -195,14 +210,16 @@ export default function AppComprador() {
   const carregarReposicao = useCallback(() => {
     if (!filialAtiva?.id) {
       setAComprar([]);
+      setTodosProdutos([]);
       setCarregandoRep(false);
       return;
     }
     setCarregandoRep(true);
-    comprasApi
-      .aComprar(filialAtiva.id)
-      .then((r) => setAComprar(Array.isArray(r.data) ? r.data : []))
-      .catch(() => setAComprar([]))
+    Promise.all([
+      comprasApi.aComprar(filialAtiva.id).then((r) => (Array.isArray(r.data) ? r.data : [])).catch(() => []),
+      comprasApi.produtosStatus(filialAtiva.id).then((r) => (Array.isArray(r.data) ? r.data : [])).catch(() => []),
+    ])
+      .then(([rep, todos]) => { setAComprar(rep); setTodosProdutos(todos); })
       .finally(() => setCarregandoRep(false));
   }, [filialAtiva?.id]);
 
@@ -312,6 +329,11 @@ export default function AppComprador() {
         .hetros-comprador textarea { background-color: #ffffff !important; color: #262626 !important; }
         .hetros-comprador input::placeholder,
         .hetros-comprador textarea::placeholder { color: #9ca3af !important; }
+        /* Popup nativo do select claro (sobrepõe o tema dark global) */
+        .hetros-comprador input, .hetros-comprador select, .hetros-comprador textarea { color-scheme: light !important; }
+        .hetros-comprador option, .hetros-comprador optgroup {
+          background-color: #ffffff !important; color: #262626 !important;
+        }
       `}</style>
       <div className="relative w-full max-w-[400px] h-[820px] bg-[#FAFAFA] rounded-[2.75rem] shadow-2xl ring-1 ring-black/10 overflow-hidden flex flex-col">
         {/* Notch */}
@@ -348,6 +370,7 @@ export default function AppComprador() {
           {aba === 'reposicao' && (
             <ReposicaoTab
               itens={aComprar}
+              todos={todosProdutos}
               cis={ocs}
               carregando={carregandoRep}
               temFilial={!!filialAtiva?.id}
@@ -718,6 +741,7 @@ function OCCard({ oc, onAprovar, onReprovar, onEditar }: { oc: OrdemCompra; onAp
    ════════════════════════════════════════════════════════════════════════════ */
 function ReposicaoTab({
   itens,
+  todos,
   cis,
   carregando,
   temFilial,
@@ -726,6 +750,7 @@ function ReposicaoTab({
   onAtualizar,
 }: {
   itens: ItemAComprar[];
+  todos: ProdutoStatus[];
   cis: OrdemCompra[];
   carregando: boolean;
   temFilial: boolean;
@@ -733,9 +758,18 @@ function ReposicaoTab({
   onAbrirProduto: (item: ItemAComprar) => void;
   onAtualizar: () => void;
 }) {
-  const [sub, setSub] = useState<'repor' | 'cis'>('repor');
+  const [sub, setSub] = useState<'repor' | 'todos' | 'cis'>('repor');
   const [busca, setBusca] = useState('');
+  const [buscaTodos, setBuscaTodos] = useState('');
   const [buscaCI, setBuscaCI] = useState('');
+
+  const todosFiltrados = useMemo(() => {
+    const q = buscaTodos.trim().toLowerCase();
+    return q
+      ? todos.filter((p) => p.descricao.toLowerCase().includes(q) || (p.codigo ?? '').toLowerCase().includes(q))
+      : todos;
+  }, [buscaTodos, todos]);
+  const positivos = todos.filter((p) => p.positivo).length;
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -770,41 +804,52 @@ function ReposicaoTab({
           {zerados > 0 && <> · <span className="text-rose-600 font-medium">{zerados} sem estoque</span></>}
         </p>
 
-        {/* Segmento: A repor · Últimas CIs */}
-        <div className="mt-4 grid grid-cols-2 gap-1 bg-neutral-200/70 rounded-2xl p-1">
+        {/* Segmento: A repor · Todos · Últimas CIs */}
+        <div className="mt-4 grid grid-cols-3 gap-1 bg-neutral-200/70 rounded-2xl p-1">
           <button
             onClick={() => setSub('repor')}
-            className={`py-2 rounded-xl text-[13px] font-semibold transition ${sub === 'repor' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500'}`}
+            className={`py-2 rounded-xl text-[12px] font-semibold transition ${sub === 'repor' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500'}`}
           >
             A repor · {itens.length}
           </button>
           <button
-            onClick={() => setSub('cis')}
-            className={`py-2 rounded-xl text-[13px] font-semibold transition ${sub === 'cis' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500'}`}
+            onClick={() => setSub('todos')}
+            className={`py-2 rounded-xl text-[12px] font-semibold transition ${sub === 'todos' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500'}`}
           >
-            Últimas CIs · {cis.length}
+            Todos · {todos.length}
+          </button>
+          <button
+            onClick={() => setSub('cis')}
+            className={`py-2 rounded-xl text-[12px] font-semibold transition ${sub === 'cis' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500'}`}
+          >
+            CIs · {cis.length}
           </button>
         </div>
 
         {/* Busca (muda conforme o segmento) */}
         <div className="mt-3 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
-          {sub === 'repor' ? (
-            <input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar produto ou código…"
-              className="w-full rounded-2xl border border-neutral-200 bg-white pl-11 pr-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-400"
-            />
-          ) : (
+          {sub === 'cis' ? (
             <input
               value={buscaCI}
               onChange={(e) => setBuscaCI(e.target.value)}
               placeholder="Buscar por nº da CI ou fornecedor…"
               className="w-full rounded-2xl border border-neutral-200 bg-white pl-11 pr-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-400"
             />
+          ) : (
+            <input
+              value={sub === 'repor' ? busca : buscaTodos}
+              onChange={(e) => (sub === 'repor' ? setBusca(e.target.value) : setBuscaTodos(e.target.value))}
+              placeholder="Buscar produto ou código…"
+              className="w-full rounded-2xl border border-neutral-200 bg-white pl-11 pr-4 py-3 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-400"
+            />
           )}
         </div>
+        {sub === 'todos' && (
+          <p className="text-[12px] text-neutral-500 mt-2">
+            <span className="text-emerald-600 font-medium">{positivos} com estoque</span> · <span className="text-rose-600 font-medium">{todos.length - positivos} zerado/negativo</span>
+          </p>
+        )}
       </header>
 
       {sub === 'repor' ? (
@@ -853,6 +898,44 @@ function ReposicaoTab({
                 </button>
               );
             })
+          )}
+        </section>
+      ) : sub === 'todos' ? (
+        /* TODOS os produtos com status (verde = positivo, vermelho = zerado/negativo) */
+        <section className="px-4 mt-2 space-y-1.5">
+          {carregando ? (
+            <div className="py-14 text-center text-neutral-400">
+              <Loader2 className="h-7 w-7 mx-auto animate-spin mb-2" />
+              <p className="text-sm">Consultando o estoque…</p>
+            </div>
+          ) : !temFilial ? (
+            <div className="rounded-3xl border border-dashed border-neutral-300 py-12 text-center text-neutral-400 text-sm px-6">
+              Selecione uma filial ativa para ver os produtos.
+            </div>
+          ) : todosFiltrados.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-neutral-300 py-12 text-center">
+              <Package className="h-9 w-9 mx-auto text-neutral-300 mb-2" />
+              <p className="text-neutral-500 text-sm font-medium">{buscaTodos ? 'Nenhum produto encontrado.' : 'Nenhum produto cadastrado.'}</p>
+            </div>
+          ) : (
+            todosFiltrados.map((p) => (
+              <button
+                key={p.produtoId}
+                onClick={() => onAbrirProduto({ produtoId: p.produtoId, codigo: p.codigo, descricao: p.descricao, unidade: p.unidade, quantidade: p.disponivel, disponivel: p.disponivel, estoqueMinimo: p.estoqueMinimo })}
+                className="w-full text-left rounded-xl bg-white border border-neutral-200 pl-3 pr-2 py-2 flex items-center gap-2.5 active:scale-[0.99] hover:border-neutral-300 transition"
+              >
+                <span className={`h-2 w-2 rounded-full shrink-0 ${p.positivo ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-medium text-neutral-800 truncate leading-tight">{p.descricao}</p>
+                  <p className="text-[10px] text-neutral-400 mt-0.5">{p.codigo || '—'}{p.estoqueMinimo > 0 ? ` · mín. ${num(p.estoqueMinimo)}` : ''}</p>
+                </div>
+                <div className="text-right shrink-0 leading-none">
+                  <p className={`text-[15px] font-semibold tabular-nums ${p.positivo ? 'text-emerald-600' : 'text-rose-600'}`}>{num(p.disponivel)}</p>
+                  <p className="text-[9px] text-neutral-400 uppercase tracking-wide">{p.unidade || 'un'}</p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-neutral-300 shrink-0" />
+              </button>
+            ))
           )}
         </section>
       ) : (
@@ -1182,9 +1265,11 @@ function NovaOCModal({
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [carregando, setCarregando] = useState(true);
 
+  // Data de hoje (local, YYYY-MM-DD) — entrega já vem setada no dia em que a CI é aberta.
+  const hojeISO = new Date().toLocaleDateString('en-CA');
   const [fornecedorId, setFornecedorId] = useState('');
   const [condicao, setCondicao] = useState('30_DIAS');
-  const [entrega, setEntrega] = useState('');
+  const [entrega, setEntrega] = useState(hojeISO);
   const [obs, setObs] = useState('');
   const [itens, setItens] = useState<ItemForm[]>([
     prefill
@@ -1320,26 +1405,33 @@ function NovaOCModal({
           </div>
         ) : (
           <div className="px-6 pb-8 space-y-4">
+            {/* Passo 1 — Fornecedor (sempre visível) */}
+            <Campo label="Fornecedor *">
+              <select value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)} className="campo campo-select">
+                <option value="">Escolha o fornecedor…</option>
+                {fornecedores.map((f) => (
+                  <option key={f.id} value={f.id}>{nomeForn(f)}</option>
+                ))}
+              </select>
+            </Campo>
+
+            {/* Passo 2+ — só aparece depois de escolher o fornecedor */}
+            {!fornecedorId ? (
+              <p className="text-center text-[12px] text-neutral-400 py-4">Escolha o fornecedor para continuar.</p>
+            ) : (
+            <div className="space-y-4 animate-[fadeIn_.25s_ease-out]">
             <div className="grid grid-cols-2 gap-3">
-              <Campo label="Fornecedor *">
-                <select value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)} className="campo">
-                  <option value="">— selecione —</option>
-                  {fornecedores.map((f) => (
-                    <option key={f.id} value={f.id}>{nomeForn(f)}</option>
-                  ))}
-                </select>
-              </Campo>
               <Campo label="Pagamento">
-                <select value={condicao} onChange={(e) => setCondicao(e.target.value)} className="campo">
+                <select value={condicao} onChange={(e) => setCondicao(e.target.value)} className="campo campo-select">
                   {CONDICOES.map((c) => (
                     <option key={c} value={c}>{COND_LABEL[c]}</option>
                   ))}
                 </select>
               </Campo>
+              <Campo label="Entrega prevista">
+                <input type="date" value={entrega} onChange={(e) => setEntrega(e.target.value)} className="campo" />
+              </Campo>
             </div>
-            <Campo label="Entrega prevista">
-              <input type="date" value={entrega} onChange={(e) => setEntrega(e.target.value)} className="campo" />
-            </Campo>
 
             {/* Itens */}
             <div>
@@ -1353,8 +1445,8 @@ function NovaOCModal({
                 {itens.map((it, i) => (
                   <div key={i} className="rounded-2xl border border-neutral-200 bg-white p-3">
                     <div className="flex items-center gap-2">
-                      <select value={it.produtoId} onChange={(e) => escolherProduto(i, e.target.value)} className="campo flex-1">
-                        <option value="">— produto —</option>
+                      <select value={it.produtoId} onChange={(e) => escolherProduto(i, e.target.value)} className="campo campo-select flex-1">
+                        <option value="">Escolha o produto…</option>
                         {produtos.map((p) => (
                           <option key={p.id} value={p.id}>{p.descricao}</option>
                         ))}
@@ -1369,11 +1461,13 @@ function NovaOCModal({
                       <input
                         value={it.descricao}
                         onChange={(e) => setItem(i, 'descricao', e.target.value)}
-                        placeholder="Descrição do item"
+                        placeholder="…ou digite a descrição do item"
                         className="campo mt-2"
                       />
                     )}
-                    <div className="grid grid-cols-3 gap-2 mt-2">
+                    {/* Qtd/Un/Preço aparecem depois de escolher o produto ou descrever o item */}
+                    {(it.produtoId || it.descricao.trim()) && (<>
+                    <div className="grid grid-cols-3 gap-2 mt-2 animate-[fadeIn_.2s_ease-out]">
                       <div>
                         <span className="text-[10px] text-neutral-400 ml-1">Qtd</span>
                         <input
@@ -1406,6 +1500,7 @@ function NovaOCModal({
                     <p className="text-right text-[11px] text-neutral-400 mt-1.5">
                       Subtotal <b className="text-neutral-600">{brl((Number(it.quantidade) || 0) * (Number(it.precoUnitario) || 0))}</b>
                     </p>
+                    </>)}
                   </div>
                 ))}
               </div>
@@ -1431,6 +1526,8 @@ function NovaOCModal({
               {salvando ? <Loader2 className="h-5 w-5 animate-spin" /> : editando ? <Check className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
               {salvando ? 'Salvando…' : editando ? 'Salvar alterações' : 'Criar OC no sistema'}
             </button>
+            </div>
+            )}
           </div>
         )}
       </div>
@@ -1447,7 +1544,17 @@ function NovaOCModal({
           outline: none;
         }
         .campo:focus { border-color: #a3a3a3; box-shadow: 0 0 0 3px rgba(0,0,0,0.05); }
+        /* Selects: some a seta nativa feia e usa um chevron discreto + espaço à direita */
+        .campo-select {
+          appearance: none; -webkit-appearance: none; -moz-appearance: none;
+          padding-right: 2.2rem;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23737373' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 0.85rem center;
+          cursor: pointer;
+        }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   );
