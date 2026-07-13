@@ -8,8 +8,8 @@ export const getToken = () => token;
 
 export const api = axios.create({
   baseURL: API_URL,
-  timeout: 15000,
-  // Evita a tela intersticial do localtunnel (loca.lt) em túnel de teste
+  // 60s: o tier grátis do Render "dorme" e a 1ª requisição pode levar ~50s (cold start).
+  timeout: 60000,
   headers: { 'Bypass-Tunnel-Reminder': 'true', 'User-Agent': 'HetrosCompradores' },
 });
 

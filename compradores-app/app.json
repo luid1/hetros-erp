@@ -25,7 +25,7 @@
     },
     "extra": {
       "eas": { "projectId": "9612b101-a053-4fe6-b542-a41bd998b177" },
-      "apiUrl": "https://wicked-months-tickle.loca.lt/api/v1"
+      "apiUrl": "https://hetros-backend.onrender.com/api/v1"
     },
     "owner": "luixik"
   }
