@@ -28,6 +28,12 @@ import {
 import { rotasApi, nfeApi } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { toast } from '../../../components/ui/feedback';
+import { registrarSender, enfileirar, ehErroDeRede, flush, contar, assinar } from '../../../services/offlineOutbox';
+
+// Como reenviar uma confirmação de entrega guardada offline (registrado uma vez).
+registrarSender('entrega', ({ stopId, corpo }: { stopId: string; corpo: any }) =>
+  rotasApi.confirmarEntrega(stopId, corpo),
+);
 
 /**
  * App do Motorista — simulação fiel de app de entregas nativo (pronto p/ Capacitor).
@@ -213,6 +219,15 @@ export default function AppMotorista() {
   const [gpsEstado, setGpsEstado] = useState<GpsEstado>('aguardando');
   const [pos, setPos] = useState<{ lat: number; lng: number; acc: number } | null>(null);
   const watchId = useRef<number | null>(null);
+  const [pendentesEnvio, setPendentesEnvio] = useState(0);
+
+  // Fila offline: acompanha pendências e reenvia ao montar/reconectar.
+  useEffect(() => {
+    setPendentesEnvio(contar('entrega'));
+    const off = assinar(() => setPendentesEnvio(contar('entrega')));
+    flush().then((r) => { if (r.enviados > 0) toast(`${r.enviados} entrega(s) offline enviada(s).`, 'success'); });
+    return off;
+  }, []);
 
   const paradaAtiva =
     paradas[ativaIdx] || paradas.find((p) => p.status !== 'DELIVERED') || paradas[0];
@@ -370,8 +385,21 @@ export default function AppMotorista() {
       recebedorDoc: payload.recebedorDoc,
       nfeId: payload.nfeId,
     };
+    let offline = false;
     if (!stopId.startsWith('mock') && !stopId.startsWith('s')) {
-      await rotasApi.confirmarEntrega(stopId, corpo);
+      try {
+        await rotasApi.confirmarEntrega(stopId, corpo);
+      } catch (e) {
+        if (ehErroDeRede(e)) {
+          // Sem internet na rua: guarda a entrega (assinatura/foto/GPS) e reenvia sozinha depois.
+          enfileirar('entrega', { stopId, corpo });
+          setPendentesEnvio(contar('entrega'));
+          offline = true;
+        } else {
+          toast((e as any)?.response?.data?.message || 'Não consegui confirmar a entrega.', 'error');
+          return;
+        }
+      }
     }
 
     // Remove só a NF-e finalizada; a parada só é concluída quando não sobra NF-e.
@@ -385,7 +413,7 @@ export default function AppMotorista() {
 
     const paradaConcluida = !payload.nfeId || paradaAtiva.nfes.filter((n) => n.id !== payload.nfeId).length === 0;
     if (paradaConcluida) {
-      toast('✅ Entrega confirmada! Comprovante registrado.', 'success');
+      toast(offline ? '📥 Sem internet — entrega salva, será enviada ao reconectar.' : '✅ Entrega confirmada! Comprovante registrado.', offline ? 'info' : 'success');
       const prox = paradas.findIndex((p, i) => i !== ativaIdx && p.status !== 'DELIVERED');
       setAtivaIdx(prox >= 0 ? prox : ativaIdx);
       setAba('rota');
@@ -415,6 +443,17 @@ export default function AppMotorista() {
             Hetros Driver
           </span>
         </div>
+
+        {/* Aviso de entregas guardadas offline (toque p/ tentar enviar) */}
+        {pendentesEnvio > 0 && (
+          <button
+            onClick={() => flush().then((r) => { if (r.enviados > 0) toast(`${r.enviados} entrega(s) enviada(s).`, 'success'); })}
+            className="mx-4 mb-1 z-10 rounded-xl bg-amber-500/15 border border-amber-500/40 px-3 py-2 flex items-center justify-between active:scale-[0.99] transition"
+          >
+            <span className="text-[12px] font-semibold text-amber-300">📥 {pendentesEnvio} entrega(s) aguardando envio</span>
+            <span className="text-[11px] font-bold text-amber-400">tentar enviar ›</span>
+          </button>
+        )}
 
         {/* Header */}
         <header className="px-5 pt-2 pb-4 bg-gradient-to-b from-slate-800/80 to-transparent">

@@ -24,7 +24,9 @@ import {
   Store,
   Pencil,
   FileText,
+  LogOut,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { comprasApi, produtosApi, fornecedoresApi } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { imprimirPedidoCompra } from '../../estoque/impressoOC';
@@ -163,7 +165,8 @@ const nivelEstoque = (atual: number, minimo: number) =>
    COMPONENTE RAIZ
    ════════════════════════════════════════════════════════════════════════════ */
 export default function AppComprador() {
-  const { filialAtiva } = useAuth();
+  const { user, filialAtiva, logout } = useAuth();
+  const navigate = useNavigate();
   const [aba, setAba] = useState<Aba>('aprovacoes');
 
   const [ocs, setOcs] = useState<OrdemCompra[]>([]);
@@ -346,6 +349,25 @@ export default function AppComprador() {
           <span>9:41</span>
           <span className="tracking-widest">HETROS · SUPRIMENTOS</span>
           <span>100%</span>
+        </div>
+
+        {/* Barra do usuário + Sair (dentro do app) */}
+        <div className="shrink-0 px-6 py-2 flex items-center justify-between border-b border-neutral-200/70">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="h-7 w-7 shrink-0 rounded-full bg-neutral-900 text-white text-[12px] font-bold flex items-center justify-center">
+              {user?.nome?.[0]?.toUpperCase() || 'U'}
+            </span>
+            <div className="min-w-0 leading-tight">
+              <p className="text-[13px] font-semibold text-neutral-900 truncate">{user?.nome || 'Comprador'}</p>
+              <p className="text-[10px] text-neutral-400 truncate">{filialAtiva?.nome || 'Compras'}</p>
+            </div>
+          </div>
+          <button
+            onClick={() => { logout(); navigate('/login'); }}
+            className="flex items-center gap-1 text-[12px] font-semibold text-neutral-500 hover:text-rose-600 px-2.5 py-1.5 rounded-lg hover:bg-rose-50 active:scale-95 transition"
+          >
+            <LogOut className="h-4 w-4" /> Sair
+          </button>
         </div>
 
         {/* Conteúdo */}
@@ -1287,6 +1309,14 @@ function NovaOCModal({
   const [numeroEdicao, setNumeroEdicao] = useState<number | string>('');
   const editando = !!ordemId;
 
+  // Animação de entrada/saída (desliza de baixo), igual ao painel do produto.
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setShow(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  const fecharAnimado = () => { setShow(false); setTimeout(onClose, 280); };
+
   useEffect(() => {
     Promise.all([
       fornecedoresApi.list().then((r) => (Array.isArray(r.data) ? r.data : [])).catch(() => []),
@@ -1383,8 +1413,14 @@ function NovaOCModal({
 
   return (
     <div className="absolute inset-0 z-40 flex items-end">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full bg-[#FAFAFA] rounded-t-[2rem] max-h-[94%] overflow-y-auto animate-[slideUp_.25s_ease-out]">
+      <div
+        className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${show ? 'opacity-100' : 'opacity-0'}`}
+        onClick={fecharAnimado}
+      />
+      <div
+        className="relative w-full bg-[#FAFAFA] rounded-t-[2rem] max-h-[94%] overflow-y-auto transition-transform duration-300 ease-out will-change-transform"
+        style={{ transform: show ? 'translateY(0)' : 'translateY(100%)' }}
+      >
         <div className="sticky top-0 bg-[#FAFAFA] px-6 pt-3 pb-4 z-10">
           <div className="mx-auto h-1.5 w-12 rounded-full bg-neutral-300 mb-4" />
           <div className="flex items-center justify-between">
@@ -1392,7 +1428,7 @@ function NovaOCModal({
               <h2 className="text-xl font-semibold text-neutral-900">{editando ? `Editar CI #${numeroEdicao}` : 'Nova Ordem de Compra'}</h2>
               <p className="text-[12px] text-neutral-400">{editando ? 'Altere itens, quantidades ou fornecedor' : 'Enviada ao sistema como OC pendente'}</p>
             </div>
-            <button onClick={onClose} className="h-9 w-9 rounded-full bg-neutral-200 flex items-center justify-center">
+            <button onClick={fecharAnimado} className="h-9 w-9 rounded-full bg-neutral-200 flex items-center justify-center active:scale-95 transition">
               <X className="h-4 w-4 text-neutral-600" />
             </button>
           </div>
