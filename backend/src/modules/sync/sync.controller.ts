@@ -23,6 +23,13 @@ export class SyncController {
     return this.service.pull();
   }
 
+  /** CD NODE: empurra as CIs/OCs locais para a nuvem (idempotente). */
+  @Post('push')
+  @ApiOperation({ summary: 'CD node: sobe as CIs/OCs criadas no CD para a nuvem' })
+  push() {
+    return this.service.pushCompras();
+  }
+
   /** Status: este processo é um CD node? */
   @Get('status')
   @ApiOperation({ summary: 'Indica se este processo é um CD node (tem upstream)' })

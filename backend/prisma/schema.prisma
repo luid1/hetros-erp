@@ -706,6 +706,7 @@ model OrdemCompra {
   valorTotal          Decimal   @default(0) @db.Decimal(12, 2)
   entradaId           String?   // entrada de mercadoria gerada no recebimento
   clientRef           String?   // idempotência: chave gerada pelo cliente (fila offline do app)
+  sincronizadoEm      DateTime? // P3: quando esta OC foi empurrada do CD node para a nuvem
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
