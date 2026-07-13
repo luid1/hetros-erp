@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, Pressable, FlatList, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useAuth } from '../auth';
-import { api } from '../api';
+import { api, ehErroDeRede, outboxAdd, outboxCount, flushOutbox } from '../api';
 import { CORES } from '../config';
 
 const UNIDADES = ['KG', 'UN', 'CX', 'BJ', 'PC', 'BD', 'MC', 'SC', 'DZ'];
@@ -16,8 +16,18 @@ export default function NovaOCScreen({ navigation }) {
   const [resultados, setResultados] = useState([]);
   const [itens, setItens] = useState([]); // { produtoId, descricao, unidade, qtd, preco }
   const [enviando, setEnviando] = useState(false);
+  const [pendentes, setPendentes] = useState(0); // CIs na fila offline aguardando envio
 
   useEffect(() => { api.get('/fornecedores').then(r => setFornecedores(r.data || [])).catch(() => {}); }, []);
+
+  // Ao abrir a tela: tenta esvaziar a fila (se voltou a internet) e mostra o que ainda falta.
+  useEffect(() => {
+    (async () => {
+      const r = await flushOutbox();
+      setPendentes(await outboxCount());
+      if (r.enviadas > 0) Alert.alert('Sincronizado', `${r.enviadas} CI(s) que estavam na fila foram enviadas.`);
+    })();
+  }, []);
 
   // Busca de produtos (debounce simples)
   useEffect(() => {
@@ -43,23 +53,43 @@ export default function NovaOCScreen({ navigation }) {
     if (!fornId) { Alert.alert('Escolha o fornecedor'); return; }
     if (itens.length === 0) { Alert.alert('Adicione ao menos um produto'); return; }
     setEnviando(true);
+    const payload = {
+      fornecedorId: fornId,
+      filialId: filial?.id || null,
+      itens: itens.map(i => ({ produtoId: i.produtoId, descricao: i.descricao, unidade: i.unidade, quantidade: num(i.qtd), precoUnitario: num(i.preco) })),
+    };
+    const limpar = () => { setItens([]); setFornId(null); };
     try {
-      await api.post('/compras', {
-        fornecedorId: fornId,
-        filialId: filial?.id || null,
-        itens: itens.map(i => ({ produtoId: i.produtoId, descricao: i.descricao, unidade: i.unidade, quantidade: num(i.qtd), precoUnitario: num(i.preco) })),
-      });
+      await api.post('/compras', payload);
       Alert.alert('OC criada!', 'A ordem de compra subiu pro sistema (aguardando aprovação).', [
-        { text: 'OK', onPress: () => { setItens([]); setFornId(null); navigation.navigate('Minhas OCs'); } },
+        { text: 'OK', onPress: () => { limpar(); navigation.navigate('Minhas OCs'); } },
       ]);
     } catch (e) {
-      Alert.alert('Erro', e?.response?.data?.message || 'Não consegui enviar a OC.');
+      if (ehErroDeRede(e)) {
+        // Sem internet: guarda na fila — envia sozinha quando a conexão voltar. Nada se perde.
+        await outboxAdd(payload);
+        setPendentes(await outboxCount());
+        Alert.alert('Sem internet — CI salva 📥', 'Você está offline. A CI foi guardada no aparelho e será enviada automaticamente quando a conexão voltar.', [
+          { text: 'OK', onPress: limpar },
+        ]);
+      } else {
+        Alert.alert('Erro', e?.response?.data?.message || 'Não consegui enviar a OC.');
+      }
     } finally { setEnviando(false); }
   }
 
   return (
     <View style={s.wrap}>
       <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        {pendentes > 0 && (
+          <Pressable
+            onPress={async () => { const r = await flushOutbox(); setPendentes(r.restantes); if (r.enviadas > 0) Alert.alert('Sincronizado', `${r.enviadas} CI(s) enviada(s).`); }}
+            style={s.filaBanner}
+          >
+            <Text style={s.filaTxt}>📥 {pendentes} CI(s) aguardando envio (offline)</Text>
+            <Text style={s.filaAcao}>tentar enviar agora ›</Text>
+          </Pressable>
+        )}
         <Text style={s.secao}>Fornecedor</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 6 }}>
           {fornecedores.map(f => (
@@ -116,6 +146,9 @@ export default function NovaOCScreen({ navigation }) {
 const s = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: CORES.bg },
   secao: { color: CORES.amber, fontSize: 12, fontWeight: '800', textTransform: 'uppercase', marginTop: 14, marginBottom: 8 },
+  filaBanner: { backgroundColor: 'rgba(251,191,36,0.12)', borderColor: CORES.amber, borderWidth: 1, borderRadius: 12, padding: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  filaTxt: { color: CORES.amber, fontWeight: '700', fontSize: 13, flex: 1 },
+  filaAcao: { color: CORES.amber, fontWeight: '800', fontSize: 12 },
   sub: { color: CORES.sub, fontSize: 12 },
   chip: { backgroundColor: CORES.card, borderColor: CORES.borda, borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9, marginRight: 8 },
   chipOn: { backgroundColor: CORES.amber, borderColor: CORES.amber },

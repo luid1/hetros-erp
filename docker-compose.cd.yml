@@ -1,0 +1,80 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# CD NODE — Hetros ERP rodando LOCALMENTE no mini-PC do CD (Jeito B, Fase P1).
+#
+# Sobe o sistema inteiro num comando, para os PCs do galpão usarem pela rede
+# interna mesmo sem internet:
+#     docker compose -f docker-compose.cd.yml up -d --build
+#
+# Depois, no navegador dos PCs do CD:  http://<IP-do-mini-PC>/     (porta 80)
+#
+# A sincronização com a nuvem (P2/P3) ainda NÃO está implementada — esta fase
+# entrega o CD node autônomo e testável. Config de upstream já reservada abaixo.
+# ═══════════════════════════════════════════════════════════════════════════
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cd_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-erp_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erp_password}
+      POSTGRES_DB: ${POSTGRES_DB:-erp_wms}
+    volumes:
+      - cd_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-erp_user} -d ${POSTGRES_DB:-erp_wms}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: cd_redis
+    restart: unless-stopped
+    volumes:
+      - cd_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: cd_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-erp_user}:${POSTGRES_PASSWORD:-erp_password}@postgres:5432/${POSTGRES_DB:-erp_wms}"
+      REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
+      NODE_ENV: production
+      # NF-e sempre em simulação no CD (emissão real é só na nuvem/online).
+      NFE_PROVIDER: mock
+      # Semeia o banco na 1ª subida (idempotente). Deixe false após P2 (dados vêm da nuvem).
+      SEED_ON_BOOT: ${SEED_ON_BOOT:-true}
+      # Reservado p/ P2/P3: endereço da nuvem para sincronizar.
+      UPSTREAM_URL: ${UPSTREAM_URL:-}
+    # migrate deploy sempre; seed só se SEED_ON_BOOT=true; depois inicia a API.
+    command: >
+      sh -c "npx prisma migrate deploy &&
+             if [ \"$$SEED_ON_BOOT\" = \"true\" ]; then npx ts-node prisma/seed.ts || true; fi &&
+             node dist/src/main"
+
+  frontend:
+    build: ./frontend
+    container_name: cd_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${WEB_PORT:-80}:80"   # os PCs do CD acessam http://<IP-do-mini-PC>:<WEB_PORT>
+
+volumes:
+  cd_postgres_data:
+  cd_redis_data:

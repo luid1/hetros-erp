@@ -216,8 +216,13 @@ export default function AppShell() {
       {/* Flyout de submenu — abre ao passar o mouse sobre um item com sub-páginas */}
       {flyout && createPortal(
         <div
-          className="fixed z-[60] w-60 rounded-xl border border-white/[0.09] bg-[#0E141F]/95 backdrop-blur-2xl shadow-[0_16px_48px_0_rgba(0,0,0,0.55)] py-1.5 animate-fade-in"
-          style={{ top: Math.min(flyout.top, window.innerHeight - (flyout.items.length * 46 + 56)), left: flyout.left }}
+          className="fixed z-[60] w-60 rounded-xl border border-white/[0.09] bg-[#0E141F]/95 backdrop-blur-2xl shadow-[0_16px_48px_0_rgba(0,0,0,0.55)] py-1.5 animate-fade-in overflow-y-auto"
+          style={(() => {
+            // Ancora o topo puxando pra cima quando o menu é longo, e amarra a altura
+            // máxima ao topo real — assim nunca vaza pra fora da tela (rola se precisar).
+            const top = Math.max(8, Math.min(flyout.top, window.innerHeight - (flyout.items.length * 46 + 56)));
+            return { top, left: flyout.left, maxHeight: window.innerHeight - top - 8 };
+          })()}
           onMouseEnter={cancelarFecho}
           onMouseLeave={agendarFecho}
         >

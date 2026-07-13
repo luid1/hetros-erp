@@ -39,13 +39,21 @@ export const TELAS: TelaDef[] = [
   // Visão geral
   { key: '/dashboard', label: 'Dashboard', grupo: 'Visão Geral', icon: LayoutDashboard },
 
-  // A · Cadastros
-  { key: '/cadastros/clientes', label: 'Clientes', grupo: 'A · Cadastros', icon: Users },
-  { key: '/cadastros/fornecedores', label: 'Fornecedores', grupo: 'A · Cadastros', icon: Building2 },
-  { key: '/cadastros/transportadoras', label: 'Transportadoras', grupo: 'A · Cadastros', icon: Truck },
-  { key: '/cadastros/produtos', label: 'Produtos & NCM', grupo: 'A · Cadastros', icon: Package },
-  { key: '/cadastros/filiais', label: 'Filiais / Boxes', grupo: 'A · Cadastros', icon: Warehouse },
-  { key: '/cadastros/tabelas-preco', label: 'Tabelas de Preço', grupo: 'A · Cadastros', icon: Tags },
+  // A · Cadastros — agrupado num flyout (o item pai abre a lista ao passar o mouse).
+  { key: '/cadastros/clientes', label: 'Cadastros', grupo: 'A · Cadastros', icon: Package, submenu: [
+    { key: '/cadastros/clientes', label: 'Clientes', icon: Users, hint: 'Compradores e limites' },
+    { key: '/cadastros/fornecedores', label: 'Fornecedores', icon: Building2, hint: 'Produtores e distribuidores' },
+    { key: '/cadastros/transportadoras', label: 'Transportadoras', icon: Truck, hint: 'Frotas terceirizadas' },
+    { key: '/cadastros/produtos', label: 'Produtos & NCM', icon: Package, hint: 'Itens, NCM e preços' },
+    { key: '/cadastros/filiais', label: 'Filiais / Boxes', icon: Warehouse, hint: 'Unidades e boxes' },
+    { key: '/cadastros/tabelas-preco', label: 'Tabelas de Preço', icon: Tags, hint: 'Preço por tabela/promoção' },
+  ] },
+  // Itens individuais preservados (rota + permissão) mas fora da barra — vivem no flyout acima.
+  { key: '/cadastros/fornecedores', label: 'Fornecedores', grupo: 'A · Cadastros', icon: Building2, oculto: true },
+  { key: '/cadastros/transportadoras', label: 'Transportadoras', grupo: 'A · Cadastros', icon: Truck, oculto: true },
+  { key: '/cadastros/produtos', label: 'Produtos & NCM', grupo: 'A · Cadastros', icon: Package, oculto: true },
+  { key: '/cadastros/filiais', label: 'Filiais / Boxes', grupo: 'A · Cadastros', icon: Warehouse, oculto: true },
+  { key: '/cadastros/tabelas-preco', label: 'Tabelas de Preço', grupo: 'A · Cadastros', icon: Tags, oculto: true },
 
   // B · Estoque / WMS
   { key: '/wms/posicao', label: 'Posição de Estoque', grupo: 'B · Estoque / WMS', icon: Warehouse, submenu: [
@@ -58,9 +66,10 @@ export const TELAS: TelaDef[] = [
   { key: '/compras/app', label: 'App de Compras', grupo: 'B · Estoque / WMS', icon: ShoppingCart, highlight: true },
   { key: '/wms/entradas', label: 'Entradas (XML NF-e)', grupo: 'B · Estoque / WMS', icon: ClipboardList },
   { key: '/wms/devolucoes-compra', label: 'Devoluções ao Fornecedor', grupo: 'B · Estoque / WMS', icon: Undo2 },
-  { key: '/wms/movimentacoes', label: 'Movimentações', grupo: 'B · Estoque / WMS', icon: BarChart3 },
-  { key: '/wms/inventario', label: 'Inventário', grupo: 'B · Estoque / WMS', icon: ClipboardList },
-  { key: '/wms/analise-estoque', label: 'Análise Estoque Físico', grupo: 'B · Estoque / WMS', icon: BarChart3, highlight: true },
+  // Movimentações / Inventário / Análise: já no flyout de "Posição de Estoque" — ocultos na barra p/ não duplicar.
+  { key: '/wms/movimentacoes', label: 'Movimentações', grupo: 'B · Estoque / WMS', icon: BarChart3, oculto: true },
+  { key: '/wms/inventario', label: 'Inventário', grupo: 'B · Estoque / WMS', icon: ClipboardList, oculto: true },
+  { key: '/wms/analise-estoque', label: 'Análise Estoque Físico', grupo: 'B · Estoque / WMS', icon: BarChart3, highlight: true, oculto: true },
 
   // C · Logística
   { key: '/logistica/pedidos', label: 'Pedidos de Venda', grupo: 'C · Logística', icon: ClipboardList },
@@ -83,8 +92,9 @@ export const TELAS: TelaDef[] = [
     { key: '/fiscal/nfe', label: 'NF-e Emitidas', icon: Receipt, hint: 'Documentos autorizados' },
     { key: '/fiscal/painel', label: 'Painel de Faturamento', icon: BarChart3, hint: 'Gráficos e indicadores' },
   ] },
-  { key: '/fiscal/matriz', label: 'Matriz Fiscal', grupo: 'D · Fiscal / DFe', icon: FileText },
-  { key: '/fiscal/cte', label: 'CT-e / MDF-e', grupo: 'D · Fiscal / DFe', icon: FileText },
+  // Matriz Fiscal e CT-e/MDF-e: já no flyout de "Faturamento" — ocultos na barra p/ não duplicar.
+  { key: '/fiscal/matriz', label: 'Matriz Fiscal', grupo: 'D · Fiscal / DFe', icon: FileText, oculto: true },
+  { key: '/fiscal/cte', label: 'CT-e / MDF-e', grupo: 'D · Fiscal / DFe', icon: FileText, oculto: true },
   // Painel de Faturamento (dashboard de gráficos) fundido na Gestão Fiscal — fora do menu, acessível por rota.
   { key: '/fiscal/painel', label: 'Painel de Faturamento', grupo: 'D · Fiscal / DFe', icon: BarChart3, oculto: true },
   // NF-e Emitidas: fundida na Gestão Fiscal — fora do menu, mas acessível.
@@ -122,12 +132,14 @@ export const TELAS: TelaDef[] = [
 
   // F · Gerencial
   { key: '/gerencial/relatorios', label: 'Relatórios Gerenciais', grupo: 'F · Gerencial', icon: BarChart3 },
-  { key: '/gerencial/auditoria', label: 'Logs de Auditoria', grupo: 'F · Gerencial', icon: ShieldCheck },
+  // Logs de Auditoria: já no flyout de "Usuários & Acessos" — oculto na barra p/ não duplicar.
+  { key: '/gerencial/auditoria', label: 'Logs de Auditoria', grupo: 'F · Gerencial', icon: ShieldCheck, oculto: true },
   { key: '/gerencial/usuarios', label: 'Usuários & Acessos', grupo: 'F · Gerencial', icon: Users, submenu: [
     { key: '/gerencial/configuracoes', label: 'Configurações', icon: Settings, hint: 'Parâmetros do sistema' },
     { key: '/gerencial/auditoria', label: 'Logs de Auditoria', icon: ShieldCheck, hint: 'Trilha de eventos' },
   ] },
-  { key: '/gerencial/configuracoes', label: 'Configurações', grupo: 'F · Gerencial', icon: Settings },
+  // Configurações: já no flyout de "Usuários & Acessos" — oculto na barra p/ não duplicar.
+  { key: '/gerencial/configuracoes', label: 'Configurações', grupo: 'F · Gerencial', icon: Settings, oculto: true },
 ];
 
 function agrupar(lista: TelaDef[]) {

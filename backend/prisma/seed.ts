@@ -33,8 +33,8 @@ async function main() {
         razaoSocial:       'Hetros Distribuição Ltda',
         nomeFantasia:      'Hetros',
         cnpj:              '00.000.000/0001-00',
-        regimeTributario:  'SIMPLES_NACIONAL',
-        crt:               1,
+        regimeTributario:  'LUCRO_PRESUMIDO', // Hetros não é optante do Simples (Receita: opcao_pelo_simples = não)
+        crt:               3,                 // 3 = Regime Normal
       },
     });
     console.log(`✅ Tenant criado: ${tenant.razaoSocial}`);
@@ -53,6 +53,8 @@ async function main() {
         codigo:   '1001',
         nome:     'Hetros - CEAGESP',
         tipo:     'MATRIZ',
+        regimeTributario: 'LUCRO_PRESUMIDO', // Regime Normal (não-Simples) — ver tenant acima
+        crt:      '3',
         endereco: {
           rua:    'Av. Dr. Gastão Vidigal',
           numero: '1946',

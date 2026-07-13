@@ -1,11 +1,23 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, FlatList, RefreshControl, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, FlatList, RefreshControl, Pressable, StyleSheet, Alert, Share } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { CORES } from '../config';
 
 const R$ = (v) => 'R$ ' + (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const CONDICAO = { A_VISTA: 'À vista', '30_DIAS': '30 dias', '30_60': '30/60 dias', '30_60_90': '30/60/90 dias' };
+
+// Monta o texto do pedido pra enviar no WhatsApp (Share nativo).
+function textoPedido(oc) {
+  const forn = oc.fornecedor?.nomeFantasia || oc.fornecedor?.razaoSocial || '—';
+  const itens = (oc.itens || []).map((i) => {
+    const q = Number(i.quantidade) || 0, p = Number(i.precoUnitario) || 0;
+    return `• ${i.descricao || i.produto?.descricao || '—'} — ${q} ${i.unidade || ''} × ${R$(p)} = ${R$(q * p)}`;
+  }).join('\n');
+  const cond = oc.condicaoPagamento ? `\nPagamento: ${CONDICAO[oc.condicaoPagamento] || oc.condicaoPagamento}` : '';
+  return `*PEDIDO DE COMPRA — HETROS*\nOC #${oc.numero}\nFornecedor: ${forn}\n\n${itens || '(sem itens)'}\n\n*Total: ${R$(oc.valorTotal)}*${cond}`;
+}
 const STATUS = {
   PENDENTE: { l: 'Pendente', c: CORES.amber },
   APROVADA: { l: 'Aprovada', c: CORES.sky },
@@ -33,6 +45,14 @@ export default function MinhasOCsScreen() {
     catch (e) { Alert.alert('Erro', e?.response?.data?.message || 'Não consegui aprovar.'); }
   }
 
+  async function compartilhar(oc) {
+    // Busca o detalhe (com itens) pra montar o texto; se offline, usa o resumo da lista.
+    let full = oc;
+    try { const { data } = await api.get(`/compras/${oc.id}`); full = data; } catch {}
+    try { await Share.share({ message: textoPedido(full) }); }
+    catch (e) { Alert.alert('Erro', 'Não consegui abrir o compartilhamento.'); }
+  }
+
   return (
     <View style={s.wrap}>
       <FlatList
@@ -55,9 +75,12 @@ export default function MinhasOCsScreen() {
                 <Text style={s.sub}>{item._count?.itens ?? item.itens?.length ?? 0} item(ns)</Text>
                 <Text style={s.total}>{R$(item.valorTotal)}</Text>
               </View>
-              {item.status === 'PENDENTE' && podeAprovar && (
-                <Pressable onPress={() => aprovar(item)} style={s.aprovar}><Text style={s.aprovarTxt}>Aprovar OC</Text></Pressable>
-              )}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                <Pressable onPress={() => compartilhar(item)} style={s.whats}><Text style={s.whatsTxt}>📲 Enviar no WhatsApp</Text></Pressable>
+                {item.status === 'PENDENTE' && podeAprovar && (
+                  <Pressable onPress={() => aprovar(item)} style={[s.aprovar, { flex: 1, marginTop: 0 }]}><Text style={s.aprovarTxt}>Aprovar OC</Text></Pressable>
+                )}
+              </View>
             </View>
           );
         }}
@@ -78,5 +101,7 @@ const s = StyleSheet.create({
   badgeTxt: { fontSize: 11, fontWeight: '800' },
   aprovar: { backgroundColor: CORES.sky, borderRadius: 10, paddingVertical: 11, alignItems: 'center', marginTop: 10 },
   aprovarTxt: { color: '#0B0F17', fontWeight: '800' },
+  whats: { flex: 1, backgroundColor: '#25D36622', borderColor: '#25D36688', borderWidth: 1, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  whatsTxt: { color: '#25D366', fontWeight: '800' },
   vazio: { color: CORES.sub, textAlign: 'center', marginTop: 40 },
 });

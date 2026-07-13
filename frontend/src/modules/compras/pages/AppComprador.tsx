@@ -23,9 +23,11 @@ import {
   CalendarDays,
   Store,
   Pencil,
+  FileText,
 } from 'lucide-react';
 import { comprasApi, produtosApi, fornecedoresApi } from '../../../services/api';
 import { useAuth } from '../../../contexts/AuthContext';
+import { imprimirPedidoCompra } from '../../estoque/impressoOC';
 
 /* ══════════════════════════════════════════════════════════════════════════════
    App de Compras & Abastecimento (Compradores) — Hetros WMS
@@ -161,6 +163,7 @@ export default function AppComprador() {
   const [prefillRep, setPrefillRep] = useState<ItemAComprar | null>(null);
   const [editandoOcId, setEditandoOcId] = useState<string | null>(null);
   const [produtoSel, setProdutoSel] = useState<ItemAComprar | null>(null);
+  const [detalheOc, setDetalheOc] = useState<OrdemCompra | null>(null);
 
   const fecharModal = useCallback(() => {
     setModalNovaOC(false);
@@ -338,6 +341,7 @@ export default function AppComprador() {
               onReprovar={(oc) => alterarStatus(oc, 'CANCELADA')}
               onCancelar={(oc) => alterarStatus(oc, 'CANCELADA', 'cancelada')}
               onEditar={abrirEdicao}
+              onAbrir={setDetalheOc}
               onAtualizar={carregarOcs}
             />
           )}
@@ -353,6 +357,16 @@ export default function AppComprador() {
             />
           )}
         </div>
+
+        {/* FAB — Nova CI/OC rápida (abre a modal com a CI vazia) */}
+        <button
+          onClick={() => { setEditandoOcId(null); setPrefillRep(null); setModalNovaOC(true); }}
+          className="absolute bottom-24 right-5 z-40 h-14 w-14 rounded-full bg-sky-500 text-white shadow-xl shadow-sky-500/30 flex items-center justify-center active:scale-95 transition-transform hover:bg-sky-600"
+          title="Nova CI / Ordem de compra"
+          aria-label="Nova CI"
+        >
+          <Plus className="h-7 w-7" strokeWidth={2.5} />
+        </button>
 
         {/* Bottom tabs */}
         <nav className="shrink-0 bg-white/90 backdrop-blur border-t border-neutral-200 px-3 pt-2 pb-5 grid grid-cols-2 gap-1">
@@ -401,6 +415,11 @@ export default function AppComprador() {
           />
         )}
 
+        {/* Folha de detalhe da CI (clique no card) */}
+        {detalheOc && (
+          <CIDetalheSheet oc={detalheOc} onClose={() => setDetalheOc(null)} />
+        )}
+
         {/* Modal Nova/Editar CI */}
         {modalNovaOC && (
           <NovaOCModal
@@ -431,6 +450,7 @@ function AprovacoesTab({
   onReprovar,
   onCancelar,
   onEditar,
+  onAbrir,
   onAtualizar,
 }: {
   disponivel: number;
@@ -444,6 +464,7 @@ function AprovacoesTab({
   onReprovar: (oc: OrdemCompra) => void;
   onCancelar: (oc: OrdemCompra) => void;
   onEditar: (oc: OrdemCompra) => void;
+  onAbrir: (oc: OrdemCompra) => void;
   onAtualizar: () => void;
 }) {
   return (
@@ -519,7 +540,11 @@ function AprovacoesTab({
           </h3>
           <div className="space-y-2">
             {resolvidas.map((oc) => (
-              <div key={oc.id} className="flex items-center gap-3 rounded-2xl bg-white border border-neutral-200 px-4 py-3">
+              <div
+                key={oc.id}
+                onClick={() => onAbrir(oc)}
+                className="flex items-center gap-3 rounded-2xl bg-white border border-neutral-200 px-4 py-3 cursor-pointer hover:border-neutral-300 hover:shadow-sm transition"
+              >
                 <span
                   className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
                     oc.status === 'CANCELADA' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'
@@ -538,7 +563,7 @@ function AprovacoesTab({
                 <p className="text-[13px] font-semibold text-neutral-500 tabular-nums">{brl(n(oc.valorTotal))}</p>
                 {oc.status === 'APROVADA' && (
                   <button
-                    onClick={() => onEditar(oc)}
+                    onClick={(e) => { e.stopPropagation(); onEditar(oc); }}
                     title="Editar CI"
                     className="shrink-0 h-8 w-8 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-500 hover:bg-neutral-900 hover:text-white active:scale-95 transition"
                   >
@@ -547,7 +572,8 @@ function AprovacoesTab({
                 )}
                 {oc.status === 'APROVADA' && (
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       if (window.confirm(`Cancelar a CI #${oc.numero}?`)) onCancelar(oc);
                     }}
                     title="Cancelar CI"
@@ -875,6 +901,107 @@ function ReposicaoTab({
 }
 
 /* ── Painel deslizante do produto (histórico de compras + pedidos) ── */
+/* ── Folha de detalhe da CI (info + comprovante PDF) ── */
+function CIDetalheSheet({ oc, onClose }: { oc: OrdemCompra; onClose: () => void }) {
+  const [full, setFull] = useState<any>(oc);
+  const [carregando, setCarregando] = useState(true);
+  const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setShow(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  const sairPara = (cb: () => void) => { setShow(false); setTimeout(cb, 280); };
+
+  useEffect(() => {
+    let vivo = true;
+    setCarregando(true);
+    comprasApi.get(oc.id)
+      .then((r) => { if (vivo) setFull(r.data); })
+      .catch(() => {})
+      .finally(() => { if (vivo) setCarregando(false); });
+    return () => { vivo = false; };
+  }, [oc.id]);
+
+  const itens = full?.itens || [];
+  const cancelada = full?.status === 'CANCELADA';
+  const CONDICAO: Record<string, string> = { A_VISTA: 'À vista', '30_DIAS': '30 dias', '30_60': '30/60 dias', '30_60_90': '30/60/90 dias' };
+  const condLabel = (c: string) => CONDICAO[c] || c;
+
+  return (
+    <div className="absolute inset-0 z-40 flex items-end">
+      <div
+        className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${show ? 'opacity-100' : 'opacity-0'}`}
+        onClick={() => sairPara(onClose)}
+      />
+      <div
+        className="relative w-full bg-[#FAFAFA] rounded-t-[2rem] max-h-[92%] overflow-y-auto transition-transform duration-300 ease-out will-change-transform"
+        style={{ transform: show ? 'translateY(0)' : 'translateY(100%)' }}
+      >
+        <div className="sticky top-0 bg-[#FAFAFA] px-6 pt-3 pb-4 z-10">
+          <div className="mx-auto h-1.5 w-12 rounded-full bg-neutral-300 mb-4" />
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-neutral-900 leading-snug">CI #{full?.numero}</h2>
+              <p className="text-[12px] text-neutral-400 mt-0.5">{nomeForn(full?.fornecedor)}</p>
+            </div>
+            <button onClick={() => sairPara(onClose)} className="h-9 w-9 rounded-full bg-neutral-200 flex items-center justify-center active:scale-95 transition shrink-0">
+              <X className="h-4 w-4 text-neutral-600" />
+            </button>
+          </div>
+        </div>
+
+        <div className="px-6 pb-8 space-y-4">
+          {/* Cabeçalho de dados */}
+          <div className="rounded-2xl bg-white border border-neutral-200 p-4 space-y-1.5">
+            <div className="flex justify-between text-[13px]"><span className="text-neutral-400">Status</span><span className={`font-semibold ${cancelada ? 'text-rose-600' : 'text-emerald-600'}`}>{cancelada ? 'Cancelada' : (full?.status === 'PENDENTE' ? 'Pendente' : 'Aprovada')}</span></div>
+            <div className="flex justify-between text-[13px]"><span className="text-neutral-400">Emissão</span><span className="text-neutral-700">{dataCurta(full?.dataEmissao)}</span></div>
+            {full?.condicaoPagamento && <div className="flex justify-between text-[13px]"><span className="text-neutral-400">Pagamento</span><span className="text-neutral-700">{condLabel(full.condicaoPagamento)}</span></div>}
+          </div>
+
+          {/* Itens */}
+          <div className="rounded-2xl bg-white border border-neutral-200 overflow-hidden">
+            <p className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wide text-neutral-400 font-semibold">Itens {carregando ? '' : `(${itens.length})`}</p>
+            {carregando ? (
+              <p className="px-4 py-4 text-[13px] text-neutral-400">Carregando…</p>
+            ) : itens.length === 0 ? (
+              <p className="px-4 py-4 text-[13px] text-neutral-400">Sem itens.</p>
+            ) : (
+              <div className="divide-y divide-neutral-100">
+                {itens.map((it: any, i: number) => {
+                  const q = n(it.quantidade), p = n(it.precoUnitario);
+                  return (
+                    <div key={i} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[13px] text-neutral-800 truncate">{it.descricao || it.produto?.descricao || '—'}</p>
+                        <p className="text-[11px] text-neutral-400">{num(q)} {it.unidade || ''} × {brl(p)}</p>
+                      </div>
+                      <p className="text-[13px] font-semibold text-neutral-700 tabular-nums shrink-0">{brl(q * p)}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="px-4 py-3 flex items-center justify-between border-t border-neutral-100 bg-neutral-50">
+              <span className="text-[13px] font-semibold text-neutral-500">Total</span>
+              <span className="text-lg font-bold text-neutral-900 tabular-nums">{brl(n(full?.valorTotal))}</span>
+            </div>
+          </div>
+
+          {/* Comprovante */}
+          <button
+            onClick={() => imprimirPedidoCompra(oc.id)}
+            className="w-full h-12 rounded-2xl bg-neutral-900 text-white flex items-center justify-center gap-2 font-semibold hover:bg-black active:scale-95 transition"
+          >
+            <FileText className="h-4 w-4" /> Comprovante da CI (PDF)
+          </button>
+          <p className="text-[11px] text-neutral-400 text-center">Abre o documento pra imprimir ou salvar em PDF e enviar ao fornecedor.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProdutoSheet({
   item,
   onComprar,

@@ -59,6 +59,11 @@ export class CreateOrdemCompraDto extends TenantAwareDto {
   @ApiPropertyOptional({ nullable: true }) @optStr()
   observacoes?: string | null;
 
+  // Chave de idempotência gerada pelo cliente (app dos compradores / fila offline).
+  // Reenvio com o mesmo clientRef não cria OC duplicada.
+  @ApiPropertyOptional({ nullable: true }) @optStr()
+  clientRef?: string | null;
+
   @ApiProperty({ type: [ItemOrdemCompraDto] })
   @IsArray() @ArrayNotEmpty({ message: 'Informe ao menos um item.' })
   @ValidateNested({ each: true }) @Type(() => ItemOrdemCompraDto)

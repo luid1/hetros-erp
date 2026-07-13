@@ -1,7 +1,8 @@
 import { toast, confirmDialog } from '../../../components/ui/feedback';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, RefreshCw, Trash2, Plus, Check, PackageCheck, Ban, Pencil } from 'lucide-react';
+import { ShoppingCart, RefreshCw, Trash2, Plus, Check, PackageCheck, Ban, Pencil, Printer } from 'lucide-react';
+import { imprimirPedidoCompra } from '../impressoOC';
 import { useAuth } from '../../../contexts/AuthContext';
 import api from '../../../services/api';
 import { CadastroShell, TopBar, FilterBar, Chips, TableCard, Th, Modal, Secao, Campo, Loader, Vazio, inp, R$ } from '../../cadastros/ui';
@@ -72,6 +73,7 @@ export default function Compras() {
                   <td className="px-3 py-2.5"><span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS[oc.status]?.cor}`}>{STATUS[oc.status]?.label || oc.status}</span></td>
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     <div className="flex items-center gap-1">
+                      <button onClick={() => imprimirPedidoCompra(oc.id)} className="text-slate-400 hover:text-sky-300 p-1" title="Imprimir / Salvar PDF (enviar ao fornecedor)"><Printer className="h-3.5 w-3.5" /></button>
                       {oc.status === 'PENDENTE' && <button onClick={() => acao(oc, 'APROVADA')} className="text-[11px] bg-sky-500/10 text-sky-300 border border-sky-500/30 px-2 py-1 rounded font-semibold hover:bg-sky-500/20 flex items-center gap-1"><Check className="h-3 w-3" /> Aprovar</button>}
                       {(oc.status === 'PENDENTE' || oc.status === 'APROVADA' || oc.status === 'PARCIAL') && <button onClick={() => navigate(`/wms/entradas?oc=${oc.id}`)} className="text-[11px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 px-2 py-1 rounded font-semibold hover:bg-emerald-500/20 flex items-center gap-1" title="Receber via Entrada de mercadoria"><PackageCheck className="h-3 w-3" /> Receber</button>}
                       {(oc.status === 'PENDENTE' || oc.status === 'APROVADA') && <button onClick={() => abrirEditar(oc)} className="text-slate-400 hover:text-sky-300 p-1" title="Editar"><Pencil className="h-3.5 w-3.5" /></button>}

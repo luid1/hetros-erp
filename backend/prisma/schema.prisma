@@ -705,12 +705,14 @@ model OrdemCompra {
   observacoes         String?
   valorTotal          Decimal   @default(0) @db.Decimal(12, 2)
   entradaId           String?   // entrada de mercadoria gerada no recebimento
+  clientRef           String?   // idempotência: chave gerada pelo cliente (fila offline do app)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
   itens               ItemOrdemCompra[]
 
   @@unique([tenantId, numero])
+  @@unique([tenantId, clientRef])
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([fornecedorId])

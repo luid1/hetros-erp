@@ -108,6 +108,17 @@ export class ComprasService {
   // ── CREATE ──
   async create(tenantId: string, dto: any) {
     if (!dto.fornecedorId) throw new BadRequestException('Selecione o fornecedor.');
+
+    // Idempotência: se a CI já foi criada com este clientRef (reenvio da fila offline
+    // após resposta perdida), devolve a existente em vez de duplicar.
+    if (dto.clientRef) {
+      const existente = await this.prisma.ordemCompra.findFirst({
+        where: { tenantId, clientRef: dto.clientRef },
+        include: { itens: true },
+      });
+      if (existente) return existente;
+    }
+
     const { preparados, valorTotal } = this.prepararItens(dto.itens);
 
     const ultimo = await this.prisma.ordemCompra.findFirst({ where: { tenantId }, orderBy: { numero: 'desc' } });
@@ -123,6 +134,7 @@ export class ComprasService {
         condicaoPagamento: dto.condicaoPagamento || null,
         dataEntregaPrevista: dto.dataEntregaPrevista ? new Date(dto.dataEntregaPrevista) : null,
         observacoes: dto.observacoes || null,
+        clientRef: dto.clientRef || null,
         valorTotal,
         itens: { create: preparados },
       },
