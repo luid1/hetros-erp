@@ -115,7 +115,9 @@ export default function LoginPage() {
       localStorage.setItem('wms_user', JSON.stringify(authUser));
       localStorage.setItem('wms_filiais', JSON.stringify(filiais));
       if (filiais[0]) localStorage.setItem('wms_filial', JSON.stringify(filiais[0]));
-      window.location.href = rotaInicial(data.usuario.telas, data.usuario.role, data.usuario.telaInicial);
+      // Se veio de uma tela cheia (APK/WebView), volta pra ela; senão, rota inicial do papel.
+      const next = new URLSearchParams(window.location.search).get('next');
+      window.location.href = next || rotaInicial(data.usuario.telas, data.usuario.role, data.usuario.telaInicial);
     } catch (err: any) {
       setError(err.message);
       setPassword('');

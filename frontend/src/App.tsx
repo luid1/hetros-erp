@@ -62,12 +62,30 @@ function Guard({ children }: { children: React.ReactNode }) {
   return user ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
+// Guard de tela cheia (APK/WebView): sem o AppShell (menu do ERP), ocupa a tela toda.
+// Se não estiver logado, manda pro /login guardando o destino em ?next= pra voltar depois.
+function AppFullscreen({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return (
+    <div className="flex h-screen items-center justify-center bg-gray-950">
+      <div className="animate-spin h-8 w-8 border-2 border-sky-500 border-t-transparent rounded-full" />
+    </div>
+  );
+  if (!user) return <Navigate to={`/login?next=${encodeURIComponent(window.location.pathname)}`} replace />;
+  return <div className="h-screen w-screen overflow-y-auto bg-white">{children}</div>;
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+
+          {/* Apps de tela cheia (empacotados como APK/WebView) — sem o menu do ERP */}
+          <Route path="/app/comprador" element={<AppFullscreen><AppComprador /></AppFullscreen>} />
+          <Route path="/app/motorista" element={<AppFullscreen><AppMotorista /></AppFullscreen>} />
+
           <Route path="/" element={<Guard><AppShell /></Guard>}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />

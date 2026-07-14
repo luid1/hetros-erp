@@ -31,3 +31,13 @@ services:
       # 1º deploy: popula tenant/usuários/produtos num banco vazio. Depois mude p/ false.
       - key: SEED_ON_BOOT
         value: "true"
+
+  # Frontend web (SPA nginx). Serve o ERP e os apps de tela cheia (/app/comprador,
+  # /app/motorista) que os APKs abrem via WebView. O nginx faz proxy /api -> backend.
+  - type: web
+    name: hetros-frontend
+    runtime: docker
+    plan: free
+    rootDir: frontend
+    dockerfilePath: ./Dockerfile.render
+    autoDeploy: true
